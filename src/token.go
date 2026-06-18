@@ -13,7 +13,8 @@ import (
 // repository should be the full repository path (e.g. "itzemoji/nix-cache-test/nix-cache")
 func ExchangeToken(registry, repository, basicAuthToken string) (string, error) {
 	scope := fmt.Sprintf("repository:%s:pull,push", repository)
-	tokenURL := fmt.Sprintf("https://%s/token?scope=%s&service=%s", registry, scope, registry)
+	proto := GetProtocol(registry)
+	tokenURL := fmt.Sprintf("%s://%s/token?scope=%s&service=%s", proto, registry, scope, registry)
 
 	req, err := http.NewRequest("GET", tokenURL, nil)
 	if err != nil {
