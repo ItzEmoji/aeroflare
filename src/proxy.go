@@ -664,7 +664,7 @@ func (ps *ProxyServer) streamUpstream(w http.ResponseWriter, path string, conten
 			_, err = io.Copy(w, resp.Body)
 			return err
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	return fmt.Errorf("not found in any upstream cache")
