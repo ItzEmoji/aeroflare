@@ -41,7 +41,8 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 	}
 
 	// 1. Check if blob already exists
-	checkURL := fmt.Sprintf("https://%s/v2/%s/blobs/%s", registry, repository, digest)
+	proto := GetProtocol(registry)
+	checkURL := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, registry, repository, digest)
 	req, err := http.NewRequest("HEAD", checkURL, nil)
 	if err != nil {
 		return "", err
@@ -60,7 +61,8 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 	}
 
 	// 2. Initiate upload
-	initURL := fmt.Sprintf("https://%s/v2/%s/blobs/uploads/", registry, repository)
+	proto = GetProtocol(registry)
+	initURL := fmt.Sprintf("%s://%s/v2/%s/blobs/uploads/", proto, registry, repository)
 	req, err = http.NewRequest("POST", initURL, nil)
 	if err != nil {
 		return "", err
@@ -86,7 +88,8 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 
 	// Make URL absolute if relative
 	if strings.HasPrefix(uploadURL, "/") {
-		uploadURL = fmt.Sprintf("https://%s%s", registry, uploadURL)
+		proto = GetProtocol(registry)
+		uploadURL = fmt.Sprintf("%s://%s%s", proto, registry, uploadURL)
 	}
 
 	// 3. Upload blob in single PUT
@@ -135,7 +138,8 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 // PullBlob fetches a blob from any OCI registry and writes it to outFile.
 // repository should be the full repository path (e.g. "itzemoji/nix-cache-test/nix-cache")
 func PullBlob(digest, outFile, registry, repository, token string) error {
-	getURL := fmt.Sprintf("https://%s/v2/%s/blobs/%s", registry, repository, digest)
+	proto := GetProtocol(registry)
+	getURL := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, registry, repository, digest)
 	req, err := http.NewRequest("GET", getURL, nil)
 	if err != nil {
 		return err
