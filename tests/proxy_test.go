@@ -127,7 +127,10 @@ func TestProxyServerEndpoints(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected 200, got %d", resp.StatusCode)
 	}
-	bodyBytes, _ := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
 	if string(bodyBytes) != "mock-upstream-nar" {
 		t.Errorf("Expected mock-upstream-nar, got %s", string(bodyBytes))
 	}
