@@ -18,7 +18,7 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	stat, err := f.Stat()
 	if err != nil {
@@ -51,7 +51,7 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 
 	resp, err := client.Do(req)
 	if err == nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			return digest, nil
 		}
@@ -72,7 +72,7 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to initiate upload: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -122,7 +122,7 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to upload blob: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusAccepted {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -150,7 +150,7 @@ func PullBlob(digest, outFile, registry, repository, token string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -161,7 +161,7 @@ func PullBlob(digest, outFile, registry, repository, token string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	_, err = io.Copy(f, resp.Body)
 	return err

@@ -36,7 +36,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if cmd == "push-blob" {
+	switch cmd {
+	case "push-blob":
 		filePath := os.Args[2]
 		digest, err := network.PushBlob(filePath, registry, repository, ociToken)
 		if err != nil {
@@ -44,7 +45,7 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(digest)
-	} else if cmd == "pull-blob" {
+	case "pull-blob":
 		if len(os.Args) < 4 {
 			fmt.Fprintf(os.Stderr, "Usage: %s pull-blob <digest> <output-file>\n", os.Args[0])
 			os.Exit(1)
@@ -57,7 +58,7 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("Successfully pulled blob to", outFile)
-	} else {
+	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
 		os.Exit(1)
 	}
