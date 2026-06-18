@@ -11,13 +11,13 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ steps.app-token.outputs.token }}
       - uses: actions/setup-go@v6
         with:
           go-version: stable
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12
-      - uses: actions/checkout@v5
-        with:
-          token: ${{ steps.app-token.outputs.token }}
+          version: v1.60
