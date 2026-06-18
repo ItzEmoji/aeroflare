@@ -72,7 +72,7 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to initiate upload: %v", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	if resp.StatusCode >= 400 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
