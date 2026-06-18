@@ -198,11 +198,12 @@ func TestProxyServerWorkerMode(t *testing.T) {
 
 func TestBootstrapConfig(t *testing.T) {
 	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/token" {
+		switch r.URL.Path {
+		case "/token":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"token": "mock-bearer-token"}`))
-		} else if r.URL.Path == "/v2/test-repo/nix-cache/manifests/cache-config" {
+		case "/v2/test-repo/nix-cache/manifests/cache-config":
 			w.Header().Set("Content-Type", "application/vnd.oci.image.manifest.v1+json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{
@@ -215,14 +216,14 @@ func TestBootstrapConfig(t *testing.T) {
 					}
 				]
 			}`))
-		} else if r.URL.Path == "/v2/test-repo/nix-cache/blobs/sha256:config-blob-digest" {
+		case "/v2/test-repo/nix-cache/blobs/sha256:config-blob-digest":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{
 				"worker_url": "https://remote-worker.dev",
 				"public_key": "remote-key-data",
 				"upstream_caches": ["https://cache.nixos.org", "https://nix-community.cachix.org"]
 			}`))
-		} else {
+		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))

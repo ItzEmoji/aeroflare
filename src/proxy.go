@@ -115,7 +115,7 @@ func (tm *TokenManager) fetchToken() (string, error) {
 
 			resp, err := client.Do(req)
 			if err == nil {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				if resp.StatusCode == http.StatusOK {
 					var result struct {
 						Token string `json:"token"`
@@ -138,7 +138,7 @@ func (tm *TokenManager) fetchToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -310,7 +310,7 @@ func (ci *CacheIndex) refresh() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -344,7 +344,7 @@ func (ci *CacheIndex) refresh() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -390,7 +390,8 @@ type ProxyServer struct {
 func (ps *ProxyServer) Handler(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimSuffix(r.URL.Path, "/")
 
-	if r.Method == http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
 		switch {
 		case path == "/nix-cache-info":
 			ps.serveNixCacheInfo(w)
@@ -405,14 +406,14 @@ func (ps *ProxyServer) Handler(w http.ResponseWriter, r *http.Request) {
 		default:
 			http.Error(w, "Not Found", http.StatusNotFound)
 		}
-	} else if r.Method == http.MethodPost {
+	case http.MethodPost:
 		switch path {
 		case "/_refresh":
 			ps.handleRefresh(w)
 		default:
 			http.Error(w, "Not Found", http.StatusNotFound)
 		}
-	} else {
+	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
@@ -490,7 +491,7 @@ func (ps *ProxyServer) handleRefresh(w http.ResponseWriter) {
 			req.Header.Set("User-Agent", "aeroflare/1.0")
 			resp, err := ps.HttpShortClient.Do(req)
 			if err == nil {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				w.WriteHeader(resp.StatusCode)
 				_, _ = io.Copy(w, resp.Body)
 				return
@@ -619,7 +620,7 @@ func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentT
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -654,7 +655,7 @@ func (ps *ProxyServer) streamUpstream(w http.ResponseWriter, path string, conten
 		}
 
 		if resp.StatusCode == http.StatusOK {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			w.Header().Set("Content-Type", contentType)
 			if resp.ContentLength > 0 {
 				w.Header().Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
@@ -682,7 +683,7 @@ func (ps *ProxyServer) fetchUpstreamBytes(path string) ([]byte, error) {
 		if err != nil {
 			continue
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode == http.StatusOK {
 			return io.ReadAll(resp.Body)
@@ -707,7 +708,7 @@ func (ps *ProxyServer) fetchWorkerBytes(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("worker returned HTTP %d", resp.StatusCode)
@@ -741,7 +742,7 @@ func BootstrapConfig(registry, repository string, tokenMgr *TokenManager) (*Remo
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("config manifest HTTP %d", resp.StatusCode)
@@ -771,7 +772,7 @@ func BootstrapConfig(registry, repository string, tokenMgr *TokenManager) (*Remo
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("config blob HTTP %d", resp.StatusCode)
