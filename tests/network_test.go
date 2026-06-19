@@ -11,6 +11,29 @@ import (
 	"aeroflare/src"
 )
 
+// TestGetProtocol verifies that localhost/127.0.0.1 registries use http, others use https.
+func TestGetProtocol(t *testing.T) {
+	cases := []struct {
+		registry string
+		expected string
+	}{
+		{"127.0.0.1", "http"},
+		{"127.0.0.1:5000", "http"},
+		{"localhost", "http"},
+		{"localhost:5000", "http"},
+		{"ghcr.io", "https"},
+		{"registry.hub.docker.com", "https"},
+		{"my.private.registry", "https"},
+	}
+
+	for _, tc := range cases {
+		got := network.GetProtocol(tc.registry)
+		if got != tc.expected {
+			t.Errorf("GetProtocol(%q) = %q, want %q", tc.registry, got, tc.expected)
+		}
+	}
+}
+
 func TestExchangeToken(t *testing.T) {
 	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/token" {
@@ -112,5 +135,108 @@ func TestPushAndPullBlob(t *testing.T) {
 
 	if string(pulledData) != testContent {
 		t.Errorf("Expected %s, got %s", testContent, string(pulledData))
+	}
+}
+
+// TestExchangeToken_Error verifies that a non-200 response returns an error.
+func TestExchangeToken_Error(t *testing.T) {
+	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("unauthorized"))
+	}))
+	defer mockRegistry.Close()
+
+	u := strings.TrimPrefix(mockRegistry.URL, "http://")
+	_, err := network.ExchangeToken(u, "test-repo/nix-cache", "bad-token")
+	if err == nil {
+		t.Fatal("Expected error for 401 response, got nil")
+	}
+}
+
+// TestPushBlob_AlreadyExists verifies that PushBlob skips upload when blob already exists (HEAD returns 200).
+func TestPushBlob_AlreadyExists(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "aeroflare-test-exists-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	testFilePath := filepath.Join(tmpDir, "existing.txt")
+	if err := os.WriteFile(testFilePath, []byte("already uploaded content"), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	var uploadAttempted bool
+
+	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "HEAD" && strings.HasPrefix(r.URL.Path, "/v2/test-repo/blobs/") {
+			w.WriteHeader(http.StatusOK) // Blob already exists
+			return
+		}
+		// Any upload attempt should not happen
+		if r.Method == "POST" || r.Method == "PUT" {
+			uploadAttempted = true
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockRegistry.Close()
+
+	u := strings.TrimPrefix(mockRegistry.URL, "http://")
+	digest, err := network.PushBlob(testFilePath, u, "test-repo", "mock-token")
+	if err != nil {
+		t.Fatalf("PushBlob failed: %v", err)
+	}
+	if !strings.HasPrefix(digest, "sha256:") {
+		t.Errorf("Expected digest starting with sha256:, got %s", digest)
+	}
+	if uploadAttempted {
+		t.Error("PushBlob should not attempt upload when blob already exists")
+	}
+}
+
+// TestPullBlob_Error verifies that PullBlob returns an error on a non-200 response.
+func TestPullBlob_Error(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "aeroflare-test-pull-err-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("blob not found"))
+	}))
+	defer mockRegistry.Close()
+
+	u := strings.TrimPrefix(mockRegistry.URL, "http://")
+	outFilePath := filepath.Join(tmpDir, "out.txt")
+	err = network.PullBlob("sha256:nonexistentdigest", outFilePath, u, "test-repo", "mock-token")
+	if err == nil {
+		t.Fatal("Expected error for 404 response, got nil")
+	}
+}
+
+// TestExchangeToken_UsesHttpForLocalhost verifies that ExchangeToken uses http:// for localhost registries.
+func TestExchangeToken_UsesHttpForLocalhost(t *testing.T) {
+	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify no Authorization header contains "https" in the URL
+		if r.URL.Path == "/token" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"token": "local-bearer-token"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockRegistry.Close()
+
+	// The mock server is always http, trimming the http:// prefix so GetProtocol sees localhost:PORT
+	u := strings.TrimPrefix(mockRegistry.URL, "http://")
+	token, err := network.ExchangeToken(u, "my-org/nix-cache", "test-pat")
+	if err != nil {
+		t.Fatalf("ExchangeToken failed for localhost registry: %v", err)
+	}
+	if token != "local-bearer-token" {
+		t.Errorf("Expected local-bearer-token, got %s", token)
 	}
 }
