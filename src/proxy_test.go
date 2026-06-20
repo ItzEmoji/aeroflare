@@ -1,4 +1,4 @@
-package tests
+package network
 
 import (
 	"encoding/json"
@@ -10,8 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"aeroflare/src"
 )
 
 func TestProxyServerEndpoints(t *testing.T) {
@@ -26,11 +24,11 @@ func TestProxyServerEndpoints(t *testing.T) {
 	defer mockUpstream.Close()
 
 	// Setup mock CacheIndex
-	cacheIndex := &network.CacheIndex{
-		Data: &network.CacheIndexData{
+	cacheIndex := &CacheIndex{
+		Data: &CacheIndexData{
 			PublicKey: "test-public-key",
 			Generated: "2026-06-18",
-			Entries: map[string]network.IndexEntry{
+			Entries: map[string]IndexEntry{
 				"test-hash": {
 					NarInfo:   "StoreDir: /nix/store\nURL: nar/test-nar.nar.xz\n",
 					NarDigest: "sha256:test-digest",
@@ -44,13 +42,13 @@ func TestProxyServerEndpoints(t *testing.T) {
 		IndexTTL:  5 * time.Minute,
 	}
 
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		Port:            37515,
 		ListenAddr:      "127.0.0.1",
 		Registry:        "ghcr.io",
 		Repository:      "test-repo/nix-cache",
 		UpstreamCaches:  []string{mockUpstream.URL},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test-repo/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test-repo/nix-cache", ""),
 		CacheIndex:      cacheIndex,
 		HttpClient:      &http.Client{Timeout: 30 * time.Minute},
 		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
@@ -156,14 +154,14 @@ func TestProxyServerWorkerMode(t *testing.T) {
 	}))
 	defer mockWorker.Close()
 
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		Port:            37515,
 		ListenAddr:      "127.0.0.1",
 		Registry:        "ghcr.io",
 		Repository:      "test-repo/nix-cache",
 		UpstreamCaches:  []string{"https://cache.nixos.org"},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test-repo/nix-cache", ""),
-		CacheIndex:      &network.CacheIndex{},
+		TokenMgr:        NewTokenManager("ghcr.io", "test-repo/nix-cache", ""),
+		CacheIndex:      &CacheIndex{},
 		WorkerURL:       mockWorker.URL,
 		HttpClient:      &http.Client{Timeout: 30 * time.Minute},
 		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
@@ -238,8 +236,8 @@ func TestBootstrapConfig(t *testing.T) {
 	u = strings.TrimPrefix(u, "http://")
 	u = strings.TrimPrefix(u, "https://")
 
-	tokenMgr := network.NewTokenManager(u, "test-repo/nix-cache", "")
-	conf, err := network.BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
+	tokenMgr := NewTokenManager(u, "test-repo/nix-cache", "")
+	conf, err := BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
 	if err != nil {
 		t.Fatalf("Failed to bootstrap config: %v", err)
 	}
@@ -269,8 +267,8 @@ func TestBootstrapConfig_ManifestNotFound(t *testing.T) {
 	defer mockRegistry.Close()
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	tokenMgr := network.NewTokenManager(u, "test-repo/nix-cache", "")
-	_, err := network.BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
+	tokenMgr := NewTokenManager(u, "test-repo/nix-cache", "")
+	_, err := BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
 	if err == nil {
 		t.Fatal("Expected error when manifest returns 404, got nil")
 	}
@@ -295,8 +293,8 @@ func TestBootstrapConfig_EmptyLayers(t *testing.T) {
 	defer mockRegistry.Close()
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	tokenMgr := network.NewTokenManager(u, "test-repo/nix-cache", "")
-	_, err := network.BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
+	tokenMgr := NewTokenManager(u, "test-repo/nix-cache", "")
+	_, err := BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
 	if err == nil {
 		t.Fatal("Expected error when manifest has empty layers, got nil")
 	}
@@ -322,8 +320,8 @@ func TestBootstrapConfig_BlobNotFound(t *testing.T) {
 	defer mockRegistry.Close()
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	tokenMgr := network.NewTokenManager(u, "test-repo/nix-cache", "")
-	_, err := network.BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
+	tokenMgr := NewTokenManager(u, "test-repo/nix-cache", "")
+	_, err := BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
 	if err == nil {
 		t.Fatal("Expected error when blob returns 404, got nil")
 	}
@@ -331,11 +329,11 @@ func TestBootstrapConfig_BlobNotFound(t *testing.T) {
 
 // TestProxyHandler_MethodNotAllowed verifies that unsupported HTTP methods return 405.
 func TestProxyHandler_MethodNotAllowed(t *testing.T) {
-	ps := &network.ProxyServer{
-		CacheIndex:      &network.CacheIndex{},
+	ps := &ProxyServer{
+		CacheIndex:      &CacheIndex{},
 		HttpClient:      &http.Client{},
 		HttpShortClient: &http.Client{},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 	}
 
 	for _, method := range []string{"DELETE", "PUT", "PATCH"} {
@@ -350,11 +348,11 @@ func TestProxyHandler_MethodNotAllowed(t *testing.T) {
 
 // TestProxyHandler_UnknownGetPath verifies that GET requests for unknown paths return 404.
 func TestProxyHandler_UnknownGetPath(t *testing.T) {
-	ps := &network.ProxyServer{
-		CacheIndex:      &network.CacheIndex{},
+	ps := &ProxyServer{
+		CacheIndex:      &CacheIndex{},
 		HttpClient:      &http.Client{},
 		HttpShortClient: &http.Client{},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 	}
 
 	req := httptest.NewRequest("GET", "/unknown/path", nil)
@@ -367,11 +365,11 @@ func TestProxyHandler_UnknownGetPath(t *testing.T) {
 
 // TestProxyHandler_UnknownPostPath verifies that POST requests for unknown paths return 404.
 func TestProxyHandler_UnknownPostPath(t *testing.T) {
-	ps := &network.ProxyServer{
-		CacheIndex:      &network.CacheIndex{},
+	ps := &ProxyServer{
+		CacheIndex:      &CacheIndex{},
 		HttpClient:      &http.Client{},
 		HttpShortClient: &http.Client{},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 	}
 
 	req := httptest.NewRequest("POST", "/unknown/post", nil)
@@ -384,21 +382,21 @@ func TestProxyHandler_UnknownPostPath(t *testing.T) {
 
 // TestProxyServer_ServePublicKey_NotFound verifies that /public-key returns 404 when no key is configured.
 func TestProxyServer_ServePublicKey_NotFound(t *testing.T) {
-	cacheIndex := &network.CacheIndex{
-		Data: &network.CacheIndexData{
+	cacheIndex := &CacheIndex{
+		Data: &CacheIndexData{
 			PublicKey: "", // No public key
-			Entries:   map[string]network.IndexEntry{},
+			Entries:   map[string]IndexEntry{},
 		},
 		NarLookups: map[string]string{},
 		LastFetch:  time.Now(),
 		IndexTTL:   5 * time.Minute,
 	}
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		CacheIndex:      cacheIndex,
 		PublicKey:       "", // No public key set on server either
 		HttpClient:      &http.Client{},
 		HttpShortClient: &http.Client{},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 	}
 
 	req := httptest.NewRequest("GET", "/public-key", nil)
@@ -411,18 +409,18 @@ func TestProxyServer_ServePublicKey_NotFound(t *testing.T) {
 
 // TestProxyServer_ServePublicKey_FromServerField verifies that /public-key uses the PublicKey field when set directly.
 func TestProxyServer_ServePublicKey_FromServerField(t *testing.T) {
-	cacheIndex := &network.CacheIndex{
-		Data:       &network.CacheIndexData{Entries: map[string]network.IndexEntry{}},
+	cacheIndex := &CacheIndex{
+		Data:       &CacheIndexData{Entries: map[string]IndexEntry{}},
 		NarLookups: map[string]string{},
 		LastFetch:  time.Now(),
 		IndexTTL:   5 * time.Minute,
 	}
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		CacheIndex:      cacheIndex,
 		PublicKey:       "  server-configured-key  ", // Whitespace should be trimmed + newline appended
 		HttpClient:      &http.Client{},
 		HttpShortClient: &http.Client{},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 	}
 
 	req := httptest.NewRequest("GET", "/public-key", nil)
@@ -467,8 +465,8 @@ func TestProxyServer_HandleRefresh_NoWorker_Success(t *testing.T) {
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	reg := strings.TrimPrefix(mockRegistry.URL, "http://")
-	tokenMgr := network.NewTokenManager(reg, "test-repo/nix-cache", "")
-	cacheIndex := &network.CacheIndex{
+	tokenMgr := NewTokenManager(reg, "test-repo/nix-cache", "")
+	cacheIndex := &CacheIndex{
 		IndexDir:   tmpDir,
 		IndexTTL:   5 * time.Minute,
 		TokenMgr:   tokenMgr,
@@ -476,7 +474,7 @@ func TestProxyServer_HandleRefresh_NoWorker_Success(t *testing.T) {
 		Repository: "test-repo/nix-cache",
 	}
 
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		CacheIndex:      cacheIndex,
 		HttpClient:      &http.Client{Timeout: 30 * time.Second},
 		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
@@ -515,12 +513,12 @@ func TestProxyServer_HandleRefresh_WithWorker(t *testing.T) {
 	}))
 	defer mockWorker.Close()
 
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		WorkerURL:       mockWorker.URL,
-		CacheIndex:      &network.CacheIndex{},
+		CacheIndex:      &CacheIndex{},
 		HttpClient:      &http.Client{Timeout: 30 * time.Second},
 		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 	}
 
 	req := httptest.NewRequest("POST", "/_refresh", nil)
@@ -545,8 +543,8 @@ func TestProxyServer_HandleRefresh_NoWorker_Error(t *testing.T) {
 	defer brokenRegistry.Close()
 
 	reg := strings.TrimPrefix(brokenRegistry.URL, "http://")
-	tokenMgr := network.NewTokenManager(reg, "test-repo/nix-cache", "")
-	cacheIndex := &network.CacheIndex{
+	tokenMgr := NewTokenManager(reg, "test-repo/nix-cache", "")
+	cacheIndex := &CacheIndex{
 		IndexDir:   os.TempDir(),
 		IndexTTL:   5 * time.Minute,
 		TokenMgr:   tokenMgr,
@@ -554,7 +552,7 @@ func TestProxyServer_HandleRefresh_NoWorker_Error(t *testing.T) {
 		Repository: "test-repo/nix-cache",
 	}
 
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		CacheIndex:      cacheIndex,
 		HttpClient:      &http.Client{Timeout: 5 * time.Second},
 		HttpShortClient: &http.Client{Timeout: 5 * time.Second},
@@ -602,9 +600,9 @@ func TestProxyServer_ServeNar_BlobStream(t *testing.T) {
 
 	reg := strings.TrimPrefix(mockRegistry.URL, "http://")
 
-	cacheIndex := &network.CacheIndex{
-		Data: &network.CacheIndexData{
-			Entries: map[string]network.IndexEntry{},
+	cacheIndex := &CacheIndex{
+		Data: &CacheIndexData{
+			Entries: map[string]IndexEntry{},
 		},
 		NarLookups: map[string]string{
 			"cached.nar.xz": "sha256:narblob123",
@@ -613,11 +611,11 @@ func TestProxyServer_ServeNar_BlobStream(t *testing.T) {
 		IndexTTL:  5 * time.Minute,
 	}
 
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		Registry:        reg,
 		Repository:      "test-repo/nix-cache",
 		CacheIndex:      cacheIndex,
-		TokenMgr:        network.NewTokenManager(reg, "test-repo/nix-cache", ""),
+		TokenMgr:        NewTokenManager(reg, "test-repo/nix-cache", ""),
 		HttpClient:      &http.Client{Timeout: 30 * time.Second},
 		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
 		UpstreamCaches:  []string{},
@@ -646,18 +644,18 @@ func TestProxyServer_ServeNar_NotFound(t *testing.T) {
 	}))
 	defer mockUpstream.Close()
 
-	cacheIndex := &network.CacheIndex{
-		Data:       &network.CacheIndexData{Entries: map[string]network.IndexEntry{}},
+	cacheIndex := &CacheIndex{
+		Data:       &CacheIndexData{Entries: map[string]IndexEntry{}},
 		NarLookups: map[string]string{},
 		LastFetch:  time.Now(),
 		IndexTTL:   5 * time.Minute,
 	}
 
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		Registry:        "ghcr.io",
 		Repository:      "test-repo/nix-cache",
 		CacheIndex:      cacheIndex,
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 		HttpClient:      &http.Client{Timeout: 30 * time.Second},
 		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
 		UpstreamCaches:  []string{mockUpstream.URL},
@@ -703,7 +701,7 @@ func TestCacheIndex_UpdateInMemory_NarLookup(t *testing.T) {
 		t.Fatalf("Failed to write index file: %v", err)
 	}
 
-	ci := &network.CacheIndex{
+	ci := &CacheIndex{
 		IndexDir: tmpDir,
 		IndexTTL: 5 * time.Minute,
 	}
@@ -714,8 +712,8 @@ func TestCacheIndex_UpdateInMemory_NarLookup(t *testing.T) {
 	// by pre-seeding the data and calling Get().
 
 	// Pre-seed using the exported Data field directly and verify NarLookups via Get
-	data := &network.CacheIndexData{
-		Entries: map[string]network.IndexEntry{
+	data := &CacheIndexData{
+		Entries: map[string]IndexEntry{
 			"hash1abc": {
 				NarInfo:   "StorePath: /nix/store/hash1abc-foo\nURL: nar/hash1abc.nar.xz\nCompression: xz\n",
 				NarDigest: "sha256:digest1abc",
@@ -764,8 +762,8 @@ func TestCacheIndex_Get_ReturnsEmptyOnNilData(t *testing.T) {
 	defer brokenServer.Close()
 
 	reg := strings.TrimPrefix(brokenServer.URL, "http://")
-	tokenMgr := network.NewTokenManager(reg, "test-repo/nix-cache", "")
-	ci := &network.CacheIndex{
+	tokenMgr := NewTokenManager(reg, "test-repo/nix-cache", "")
+	ci := &CacheIndex{
 		IndexDir:   os.TempDir(),
 		IndexTTL:   5 * time.Minute,
 		TokenMgr:   tokenMgr,
@@ -791,7 +789,7 @@ func TestTokenManager_GetToken_OciTokenEnv(t *testing.T) {
 	t.Setenv("oci_token", "direct-oci-token-value")
 	t.Setenv("NIXCACHE_TOKEN", "")
 
-	tokenMgr := network.NewTokenManager("ghcr.io", "test/nix-cache", "")
+	tokenMgr := NewTokenManager("ghcr.io", "test/nix-cache", "")
 	token, err := tokenMgr.GetToken()
 	if err != nil {
 		t.Fatalf("GetToken failed: %v", err)
@@ -818,7 +816,7 @@ func TestTokenManager_GetToken_OciTokenEnv_GhpPrefix(t *testing.T) {
 	defer mockRegistry.Close()
 
 	reg := strings.TrimPrefix(mockRegistry.URL, "http://")
-	tokenMgr := network.NewTokenManager(reg, "test/nix-cache", "")
+	tokenMgr := NewTokenManager(reg, "test/nix-cache", "")
 	token, err := tokenMgr.GetToken()
 	if err != nil {
 		t.Fatalf("GetToken failed: %v", err)
@@ -837,7 +835,7 @@ func TestTokenManager_GetToken_NixcacheTokenEnv(t *testing.T) {
 	t.Setenv("oci_token", "")
 	t.Setenv("NIXCACHE_TOKEN", "nixcache-direct-token")
 
-	tokenMgr := network.NewTokenManager("ghcr.io", "test/nix-cache", "")
+	tokenMgr := NewTokenManager("ghcr.io", "test/nix-cache", "")
 	token, err := tokenMgr.GetToken()
 	if err != nil {
 		t.Fatalf("GetToken failed: %v", err)
@@ -865,7 +863,7 @@ func TestTokenManager_GetToken_Cached(t *testing.T) {
 	defer mockRegistry.Close()
 
 	reg := strings.TrimPrefix(mockRegistry.URL, "http://")
-	tokenMgr := network.NewTokenManager(reg, "test/nix-cache", "")
+	tokenMgr := NewTokenManager(reg, "test/nix-cache", "")
 
 	// First call fetches
 	token1, err := tokenMgr.GetToken()
@@ -906,7 +904,7 @@ func TestTokenManager_GetToken_WithGithubToken(t *testing.T) {
 	defer mockRegistry.Close()
 
 	reg := strings.TrimPrefix(mockRegistry.URL, "http://")
-	tokenMgr := network.NewTokenManager(reg, "test/nix-cache", "my-github-pat")
+	tokenMgr := NewTokenManager(reg, "test/nix-cache", "my-github-pat")
 	token, err := tokenMgr.GetToken()
 	if err != nil {
 		t.Fatalf("GetToken with github token failed: %v", err)
@@ -921,11 +919,11 @@ func TestTokenManager_GetToken_WithGithubToken(t *testing.T) {
 
 // TestProxyServer_NixCacheInfo_Content verifies the exact content of the /nix-cache-info response.
 func TestProxyServer_NixCacheInfo_Content(t *testing.T) {
-	ps := &network.ProxyServer{
-		CacheIndex:      &network.CacheIndex{},
+	ps := &ProxyServer{
+		CacheIndex:      &CacheIndex{},
 		HttpClient:      &http.Client{},
 		HttpShortClient: &http.Client{},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 	}
 
 	req := httptest.NewRequest("GET", "/nix-cache-info", nil)
@@ -942,14 +940,14 @@ func TestProxyServer_NixCacheInfo_Content(t *testing.T) {
 
 // TestProxyServer_ServeStatus_WorkerMode verifies that /_status with a workerURL shows managed-by-D1 index_generated.
 func TestProxyServer_ServeStatus_WorkerMode(t *testing.T) {
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		WorkerURL:       "https://my-worker.example.com",
 		Repository:      "test-repo/nix-cache",
 		UpstreamCaches:  []string{"https://cache.nixos.org"},
-		CacheIndex:      &network.CacheIndex{IndexTTL: 5 * time.Minute},
+		CacheIndex:      &CacheIndex{IndexTTL: 5 * time.Minute},
 		HttpClient:      &http.Client{},
 		HttpShortClient: &http.Client{},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 	}
 
 	req := httptest.NewRequest("GET", "/_status", nil)
@@ -987,18 +985,18 @@ func TestProxyServer_NarInfo_FallsBackToUpstream(t *testing.T) {
 	}))
 	defer mockUpstream.Close()
 
-	cacheIndex := &network.CacheIndex{
-		Data:       &network.CacheIndexData{Entries: map[string]network.IndexEntry{}},
+	cacheIndex := &CacheIndex{
+		Data:       &CacheIndexData{Entries: map[string]IndexEntry{}},
 		NarLookups: map[string]string{},
 		LastFetch:  time.Now(),
 		IndexTTL:   5 * time.Minute,
 	}
-	ps := &network.ProxyServer{
+	ps := &ProxyServer{
 		CacheIndex:      cacheIndex,
 		UpstreamCaches:  []string{mockUpstream.URL},
 		HttpClient:      &http.Client{Timeout: 10 * time.Second},
 		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
-		TokenMgr:        network.NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
 	}
 
 	req := httptest.NewRequest("GET", "/upstream-hash.narinfo", nil)

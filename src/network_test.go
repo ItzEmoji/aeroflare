@@ -1,4 +1,4 @@
-package tests
+package network
 
 import (
 	"net/http"
@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"aeroflare/src"
 )
 
 // TestGetProtocol verifies that localhost/127.0.0.1 registries use http, others use https.
@@ -27,7 +25,7 @@ func TestGetProtocol(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got := network.GetProtocol(tc.registry)
+		got := GetProtocol(tc.registry)
 		if got != tc.expected {
 			t.Errorf("GetProtocol(%q) = %q, want %q", tc.registry, got, tc.expected)
 		}
@@ -47,7 +45,7 @@ func TestExchangeToken(t *testing.T) {
 	defer mockRegistry.Close()
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	token, err := network.ExchangeToken(u, "test-repo/nix-cache", "my-basic-auth-pat")
+	token, err := ExchangeToken(u, "test-repo/nix-cache", "my-basic-auth-pat")
 	if err != nil {
 		t.Fatalf("ExchangeToken failed: %v", err)
 	}
@@ -109,7 +107,7 @@ func TestPushAndPullBlob(t *testing.T) {
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
 
 	// 1. Push
-	digest, err := network.PushBlob(testFilePath, u, "test-repo", "mock-token")
+	digest, err := PushBlob(testFilePath, u, "test-repo", "mock-token")
 	if err != nil {
 		t.Fatalf("PushBlob failed: %v", err)
 	}
@@ -123,7 +121,7 @@ func TestPushAndPullBlob(t *testing.T) {
 
 	// 2. Pull
 	outFilePath := filepath.Join(tmpDir, "out.txt")
-	err = network.PullBlob(digest, outFilePath, u, "test-repo", "mock-token")
+	err = PullBlob(digest, outFilePath, u, "test-repo", "mock-token")
 	if err != nil {
 		t.Fatalf("PullBlob failed: %v", err)
 	}
@@ -147,7 +145,7 @@ func TestExchangeToken_Error(t *testing.T) {
 	defer mockRegistry.Close()
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	_, err := network.ExchangeToken(u, "test-repo/nix-cache", "bad-token")
+	_, err := ExchangeToken(u, "test-repo/nix-cache", "bad-token")
 	if err == nil {
 		t.Fatal("Expected error for 401 response, got nil")
 	}
@@ -182,7 +180,7 @@ func TestPushBlob_AlreadyExists(t *testing.T) {
 	defer mockRegistry.Close()
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	digest, err := network.PushBlob(testFilePath, u, "test-repo", "mock-token")
+	digest, err := PushBlob(testFilePath, u, "test-repo", "mock-token")
 	if err != nil {
 		t.Fatalf("PushBlob failed: %v", err)
 	}
@@ -210,7 +208,7 @@ func TestPullBlob_Error(t *testing.T) {
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
 	outFilePath := filepath.Join(tmpDir, "out.txt")
-	err = network.PullBlob("sha256:nonexistentdigest", outFilePath, u, "test-repo", "mock-token")
+	err = PullBlob("sha256:nonexistentdigest", outFilePath, u, "test-repo", "mock-token")
 	if err == nil {
 		t.Fatal("Expected error for 404 response, got nil")
 	}
@@ -232,7 +230,7 @@ func TestExchangeToken_UsesHttpForLocalhost(t *testing.T) {
 
 	// The mock server is always http, trimming the http:// prefix so GetProtocol sees localhost:PORT
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	token, err := network.ExchangeToken(u, "my-org/nix-cache", "test-pat")
+	token, err := ExchangeToken(u, "my-org/nix-cache", "test-pat")
 	if err != nil {
 		t.Fatalf("ExchangeToken failed for localhost registry: %v", err)
 	}
