@@ -400,9 +400,9 @@ func (ps *ProxyServer) Handler(w http.ResponseWriter, r *http.Request) {
 		case path == "/_status":
 			ps.serveStatus(w)
 		case strings.HasSuffix(path, ".narinfo"):
-			ps.serveNarInfo(w, path)
+			ps.serveNarInfo(w, r, path)
 		case strings.HasPrefix(path, "/nar/"):
-			ps.serveNar(w, path, r.Method)
+			ps.serveNar(w, r, path, r.Method)
 		default:
 			http.Error(w, "Not Found", http.StatusNotFound)
 		}
@@ -519,7 +519,7 @@ func (ps *ProxyServer) handleRefresh(w http.ResponseWriter) {
 	})
 }
 
-func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, path string) {
+func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, r *http.Request, path string) {
 	storeHash := strings.TrimPrefix(path, "/")
 	storeHash = strings.TrimSuffix(storeHash, ".narinfo")
 
@@ -545,19 +545,16 @@ func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, path string) {
 	}
 
 	upstreamPath := fmt.Sprintf("/%s.narinfo", storeHash)
-	data, err := ps.fetchUpstreamBytes(upstreamPath)
-	if err == nil {
-		w.Header().Set("Content-Type", "text/x-nix-narinfo")
-		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(data)
+	if len(ps.UpstreamCaches) > 0 {
+		upstreamURL := fmt.Sprintf("%s%s", strings.TrimSuffix(ps.UpstreamCaches[0], "/"), upstreamPath)
+		http.Redirect(w, r, upstreamURL, http.StatusFound)
 		return
 	}
 
 	http.Error(w, "Narinfo Not Found", http.StatusNotFound)
 }
 
-func (ps *ProxyServer) serveNar(w http.ResponseWriter, path string, method string) {
+func (ps *ProxyServer) serveNar(w http.ResponseWriter, r *http.Request, path string, method string) {
 	narBasename := strings.TrimPrefix(path, "/nar/")
 	contentType := "application/x-nix-nar"
 	if strings.HasSuffix(narBasename, ".xz") {
@@ -591,8 +588,9 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, path string, method strin
 		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to stream blob %s from GHCR: %v. Trying upstream...\n", digest, err)
 	}
 
-	err := ps.streamUpstream(w, path, contentType, method)
-	if err == nil {
+	if len(ps.UpstreamCaches) > 0 {
+		upstreamURL := fmt.Sprintf("%s%s", strings.TrimSuffix(ps.UpstreamCaches[0], "/"), path)
+		http.Redirect(w, r, upstreamURL, http.StatusFound)
 		return
 	}
 
@@ -640,61 +638,7 @@ func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentT
 	return nil
 }
 
-func (ps *ProxyServer) streamUpstream(w http.ResponseWriter, path string, contentType string, method string) error {
-	for _, cacheURL := range ps.UpstreamCaches {
-		url := fmt.Sprintf("%s%s", strings.TrimSuffix(cacheURL, "/"), path)
-		req, err := http.NewRequest(method, url, nil)
-		if err != nil {
-			continue
-		}
-		req.Header.Set("User-Agent", "aeroflare/1.0")
 
-		resp, err := ps.HttpClient.Do(req)
-		if err != nil {
-			continue
-		}
-
-		if resp.StatusCode == http.StatusOK {
-			defer func() { _ = resp.Body.Close() }()
-			w.Header().Set("Content-Type", contentType)
-			if resp.ContentLength > 0 {
-				w.Header().Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
-			}
-			w.WriteHeader(http.StatusOK)
-			_, err = io.Copy(w, resp.Body)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for upstream path %s: %v\n", path, err)
-			}
-			return nil
-		}
-		_ = resp.Body.Close()
-	}
-
-	return fmt.Errorf("not found in any upstream cache")
-}
-
-func (ps *ProxyServer) fetchUpstreamBytes(path string) ([]byte, error) {
-	for _, cacheURL := range ps.UpstreamCaches {
-		url := fmt.Sprintf("%s%s", strings.TrimSuffix(cacheURL, "/"), path)
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			continue
-		}
-		req.Header.Set("User-Agent", "aeroflare/1.0")
-
-		resp, err := ps.HttpShortClient.Do(req)
-		if err != nil {
-			continue
-		}
-		defer func() { _ = resp.Body.Close() }()
-
-		if resp.StatusCode == http.StatusOK {
-			return io.ReadAll(resp.Body)
-		}
-	}
-
-	return nil, fmt.Errorf("not found upstream")
-}
 
 func (ps *ProxyServer) fetchWorkerBytes(path string) ([]byte, error) {
 	if ps.WorkerURL == "" {

@@ -19,7 +19,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <push|push-blob|pull-blob|proxy|prepare> [args...]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s <push|push-blob|pull-blob|proxy|prepare|clean-index|gc> [args...]\n", os.Args[0])
 		os.Exit(1)
 	}
 	cmd := os.Args[1]
@@ -59,22 +59,7 @@ func main() {
 			upstreams = []string{"https://cache.nixos.org"}
 		}
 
-		indexDir := os.Getenv("AEROFLARE_INDEX_DIR")
-		if indexDir == "" {
-			indexDir = os.Getenv("NIXCACHE_INDEX_DIR")
-		}
-		if indexDir == "" {
-			if cacheDir := os.Getenv("CACHE_DIRECTORY"); cacheDir != "" {
-				indexDir = cacheDir
-			} else {
-				home, err := os.UserHomeDir()
-				if err != nil {
-					home = os.TempDir()
-				}
-				repoSlug := strings.ReplaceAll(repository, "/", "--")
-				indexDir = filepath.Join(home, ".cache", "aeroflare-proxy", repoSlug)
-			}
-		}
+		indexDir := getIndexDir(repository)
 
 		workerURL := os.Getenv("AEROFLARE_WORKER_URL")
 		if workerURL == "" {
@@ -236,6 +221,96 @@ func main() {
 			fmt.Printf("\nProcessed %d paths, %d missing references, %d refs prepared, %d signed\n", len(results), totalMissing, totalPreparedRefs, totalSigned)
 		}
 
+	case "gc":
+		fs := flag.NewFlagSet("gc", flag.ExitOnError)
+		var maxFreed int64
+		var printRoots bool
+		var printLive bool
+		var printDead bool
+
+		fs.Int64Var(&maxFreed, "max-freed", 0, "Delete at most this number of bytes")
+		fs.BoolVar(&printRoots, "print-roots", false, "Print the GC roots")
+		fs.BoolVar(&printLive, "print-live", false, "Print the live paths")
+		fs.BoolVar(&printDead, "print-dead", false, "Print the dead paths")
+		_ = fs.Parse(os.Args[2:])
+
+		registry, repository := network.GetRegistryAndRepository()
+		ociToken := network.GetToken(registry, repository)
+		if ociToken == "" {
+			fmt.Fprintln(os.Stderr, "Error: oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
+			os.Exit(1)
+		}
+
+		index, err := network.FetchCacheIndex(registry, repository, ociToken)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to fetch remote index: %v\n", err)
+			os.Exit(1)
+		}
+
+		if printRoots {
+			fmt.Println("GC Roots:")
+			for _, root := range index.GCRoots {
+				fmt.Println("  " + root)
+			}
+		}
+
+		result := network.RunGC(index, maxFreed)
+
+		if printLive {
+			fmt.Println("Live Paths:")
+			for _, hash := range result.LivePaths {
+				fmt.Println("  " + hash)
+			}
+		}
+
+		if printDead {
+			fmt.Println("Dead Paths:")
+			for _, hash := range result.DeadPaths {
+				fmt.Println("  " + hash)
+			}
+		}
+
+		fmt.Printf("Garbage collection freed %d bytes.\n", result.FreedBytes)
+
+		if result.FreedBytes > 0 {
+			err = network.UpdateCacheIndex(nil, index, registry, repository, ociToken, "")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to push updated remote index: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Println("Successfully pushed updated remote index.")
+		}
+
+	case "clean-index":
+		registry, repository := network.GetRegistryAndRepository()
+
+		fmt.Printf("Are you sure you want to completely wipe the remote index on the registry? [y/N]: ")
+		var response string
+		fmt.Scanln(&response)
+		response = strings.ToLower(strings.TrimSpace(response))
+		if response != "y" && response != "yes" {
+			fmt.Println("Aborted.")
+			return
+		}
+
+		ociToken := network.GetToken(registry, repository)
+		if ociToken == "" {
+			fmt.Fprintln(os.Stderr, "Error: oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
+			os.Exit(1)
+		}
+
+		emptyIndex := &network.PushCacheIndex{
+			Entries: make(map[string]network.PushCacheEntry),
+			GCRoots: []string{},
+		}
+
+		err := network.UpdateCacheIndex(nil, emptyIndex, registry, repository, ociToken, "")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to wipe remote index: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Successfully wiped remote index.")
+
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
 		os.Exit(1)
@@ -266,4 +341,25 @@ func printResult(r *prepare.Result) {
 	} else if len(r.References) > 0 {
 		fmt.Printf("  All %d references found on upstream cache\n", len(r.References))
 	}
+}
+
+// getIndexDir returns the directory path to use for the proxy index cache
+func getIndexDir(repository string) string {
+	indexDir := os.Getenv("AEROFLARE_INDEX_DIR")
+	if indexDir == "" {
+		indexDir = os.Getenv("NIXCACHE_INDEX_DIR")
+	}
+	if indexDir == "" {
+		if cacheDir := os.Getenv("CACHE_DIRECTORY"); cacheDir != "" {
+			indexDir = cacheDir
+		} else {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				home = os.TempDir()
+			}
+			repoSlug := strings.ReplaceAll(repository, "/", "--")
+			indexDir = filepath.Join(home, ".cache", "aeroflare-proxy", repoSlug)
+		}
+	}
+	return indexDir
 }
