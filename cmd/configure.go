@@ -22,11 +22,11 @@ var configureCmd = &cobra.Command{
 		}
 
 		// Fetch existing config manifest if we can
-		var existingBackend string = "cache-index.json (Not Recommended)"
-		var existingPublicKey string = ""
-		var existingR2Bucket string = ""
+		var existingBackend = "cache-index.json (Not Recommended)"
+		var existingPublicKey = ""
+		var existingR2Bucket = ""
 		var existingR2PublicURL string
-		var existingR2Endpoint string = ""
+		var existingR2Endpoint = ""
 
 		tokenMgr := network.NewTokenManager(registry, repository, "")
 		remoteConf, existingAnnotations, _ := network.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)

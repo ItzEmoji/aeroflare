@@ -59,15 +59,7 @@ func GetR2Config(annotations map[string]string) *R2Config {
 }
 
 func (r *R2Config) NewClient(ctx context.Context) (*s3.Client, error) {
-	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		return aws.Endpoint{
-			URL:               r.Endpoint,
-			HostnameImmutable: true,
-		}, nil
-	})
-
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithEndpointResolverWithOptions(resolver),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(r.AccessKey, r.SecretKey, "")),
 		config.WithRegion("auto"),
 	)
@@ -75,7 +67,10 @@ func (r *R2Config) NewClient(ctx context.Context) (*s3.Client, error) {
 		return nil, fmt.Errorf("failed to load R2 config: %w", err)
 	}
 
-	return s3.NewFromConfig(cfg), nil
+	return s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(r.Endpoint)
+		o.UsePathStyle = true
+	}), nil
 }
 
 func (r *R2Config) UploadNarinfo(ctx context.Context, client *s3.Client, storePath, narinfoPath string) error {
