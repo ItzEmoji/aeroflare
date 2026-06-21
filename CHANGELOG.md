@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/ItzEmoji/aeroflare/compare/v1.1.0...v1.2.0) (2026-06-21)
+
+
+### Features
+
+* narinfo-parser and push ([#10](https://github.com/ItzEmoji/aeroflare/issues/10)) ([7e8bf41](https://github.com/ItzEmoji/aeroflare/commit/7e8bf410f35ae84950e6d2c6d0e64bc405873c48))
+
 ## [1.1.0](https://github.com/ItzEmoji/aeroflare/compare/v1.0.0...v1.1.0) (2026-06-19)
 
 
