@@ -149,7 +149,7 @@ func PullBlob(digest, outFile, registry, repository, token string) error {
 
 	// Create a new client that WILL follow redirects, as pulling blobs often redirects to cloud storage
 	client := &http.Client{Timeout: 5 * time.Minute}
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

@@ -34,7 +34,7 @@ func (b *LegacyStoreBackend) Closure(paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil
 	}
-	
+
 	args := append([]string{"-qR"}, paths...)
 	cmd := exec.Command("nix-store", args...)
 	output, err := cmd.Output()

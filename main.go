@@ -9,15 +9,17 @@ import (
 	"strconv"
 	"strings"
 
+	network "aeroflare/src"
 	"aeroflare/src/prepare/compress"
 	"aeroflare/src/prepare/prepare"
 	"aeroflare/src/prepare/signing"
-	network "aeroflare/src"
 )
+
+// Types moved to src package
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <push-blob|pull-blob|proxy|prepare> [args...]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s <push|push-blob|pull-blob|proxy|prepare> [args...]\n", os.Args[0])
 		os.Exit(1)
 	}
 	cmd := os.Args[1]
@@ -29,7 +31,7 @@ func main() {
 
 	switch cmd {
 	case "proxy":
-		registry, repository := getRegistryAndRepository()
+		registry, repository := network.GetRegistryAndRepository()
 
 		port := 37515
 		if pStr := os.Getenv("NIXCACHE_PORT"); pStr != "" {
@@ -90,9 +92,9 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Usage: %s push-blob <file-path>\n", os.Args[0])
 			os.Exit(1)
 		}
-		registry, repository := getRegistryAndRepository()
+		registry, repository := network.GetRegistryAndRepository()
 
-		ociToken := getToken(registry, repository)
+		ociToken := network.GetToken(registry, repository)
 		if ociToken == "" {
 			fmt.Fprintln(os.Stderr, "Error: oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
 			os.Exit(1)
@@ -111,9 +113,9 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Usage: %s pull-blob <digest> <output-file>\n", os.Args[0])
 			os.Exit(1)
 		}
-		registry, repository := getRegistryAndRepository()
+		registry, repository := network.GetRegistryAndRepository()
 
-		ociToken := getToken(registry, repository)
+		ociToken := network.GetToken(registry, repository)
 		if ociToken == "" {
 			fmt.Fprintln(os.Stderr, "Error: oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
 			os.Exit(1)
@@ -127,6 +129,9 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("Successfully pulled blob to", outFile)
+
+	case "push":
+		network.RunPush(os.Args[2:])
 
 	case "prepare":
 		fs := flag.NewFlagSet("prepare", flag.ExitOnError)
@@ -237,66 +242,7 @@ func main() {
 	}
 }
 
-// getToken attempts to get a valid token, exchanging a GitHub PAT if necessary
-func getToken(registry, repository string) string {
-	if t := os.Getenv("oci_token"); t != "" && !strings.HasPrefix(t, "ghp_") && !strings.HasPrefix(t, "github_pat_") {
-		return t // Token seems to be a valid Bearer token already
-	}
-
-	cred := os.Getenv("GITHUB_TOKEN")
-	if cred == "" {
-		cred = os.Getenv("GH_TOKEN")
-	}
-	if cred == "" {
-		return os.Getenv("oci_token")
-	}
-
-	// Try to exchange it
-	exchanged, err := network.ExchangeToken(registry, repository, cred)
-	if err == nil && exchanged != "" {
-		return exchanged
-	}
-
-	return cred // Fallback
-}
-
-// getRegistryAndRepository computes the registry and repository from environment variables.
-func getRegistryAndRepository() (string, string) {
-	registry := os.Getenv("AEROFLARE_REGISTRY")
-	if registry == "" {
-		registry = os.Getenv("NIXCACHE_REGISTRY")
-	}
-	if registry == "" {
-		registry = "ghcr.io"
-	}
-
-	ociURL := os.Getenv("AEROFLARE_OCI_URL")
-	var repository string
-
-	if ociURL != "" {
-		ociURL = strings.TrimPrefix(ociURL, "oci://")
-		parts := strings.SplitN(ociURL, "/", 2)
-		if len(parts) == 2 && strings.Contains(parts[0], ".") {
-			registry = parts[0]
-			repository = parts[1]
-		} else {
-			repository = ociURL
-		}
-	} else {
-		cacheName := os.Getenv("AEROFLARE_CACHE")
-		if cacheName == "" {
-			cacheName = os.Getenv("NIXCACHE_REPO")
-		}
-		if cacheName == "" {
-			fmt.Fprintln(os.Stderr, "Error: AEROFLARE_CACHE or AEROFLARE_OCI_URL environment variable is required")
-			os.Exit(1)
-		}
-		cacheName = strings.ToLower(cacheName)
-		repository = fmt.Sprintf("%s/nix-cache", cacheName)
-	}
-
-	return registry, repository
-}
+// Functions moved to src package
 
 // printResult prints the result of a prepare operation
 func printResult(r *prepare.Result) {

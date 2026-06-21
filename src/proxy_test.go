@@ -1,12 +1,14 @@
 package network
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -666,6 +668,99 @@ func TestProxyServer_ServeNar_NotFound(t *testing.T) {
 	ps.Handler(w, req)
 	if w.Result().StatusCode != http.StatusNotFound {
 		t.Errorf("Expected 404 for missing NAR, got %d", w.Result().StatusCode)
+	}
+}
+
+func TestProxyServer_ServeNar_Upstream_Success(t *testing.T) {
+	narContent := []byte("upstream-nar-blob-content")
+	mockUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/nar/found.nar.xz") {
+			w.Header().Set("Content-Length", strconv.Itoa(len(narContent)))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(narContent)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockUpstream.Close()
+
+	cacheIndex := &CacheIndex{
+		Data:       &CacheIndexData{Entries: map[string]IndexEntry{}},
+		NarLookups: map[string]string{},
+		LastFetch:  time.Now(),
+		IndexTTL:   5 * time.Minute,
+	}
+
+	ps := &ProxyServer{
+		Registry:        "ghcr.io",
+		Repository:      "test-repo/nix-cache",
+		CacheIndex:      cacheIndex,
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		HttpClient:      &http.Client{Timeout: 30 * time.Second},
+		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
+		UpstreamCaches:  []string{mockUpstream.URL},
+	}
+
+	req := httptest.NewRequest("GET", "/nar/found.nar.xz", nil)
+	w := httptest.NewRecorder()
+	ps.Handler(w, req)
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 for missing NAR found in upstream, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != string(narContent) {
+		t.Errorf("Expected NAR content %q, got %q", string(narContent), string(body))
+	}
+}
+
+func TestProxyServer_ServeNar_Upstream_Interrupted(t *testing.T) {
+	mockUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		panic(http.ErrAbortHandler)
+	}))
+	defer mockUpstream.Close()
+
+	cacheIndex := &CacheIndex{
+		Data:       &CacheIndexData{Entries: map[string]IndexEntry{}},
+		NarLookups: map[string]string{},
+		LastFetch:  time.Now(),
+		IndexTTL:   5 * time.Minute,
+	}
+
+	ps := &ProxyServer{
+		Registry:        "ghcr.io",
+		Repository:      "test-repo/nix-cache",
+		CacheIndex:      cacheIndex,
+		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
+		HttpClient:      &http.Client{Timeout: 30 * time.Second},
+		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
+		UpstreamCaches:  []string{mockUpstream.URL},
+	}
+
+	req := httptest.NewRequest("GET", "/nar/interrupted.nar.xz", nil)
+	w := httptest.NewRecorder()
+
+	oldStderr := os.Stderr
+	rPipe, wPipe, _ := os.Pipe()
+	os.Stderr = wPipe
+
+	ps.Handler(w, req)
+
+	wPipe.Close()
+	os.Stderr = oldStderr
+	var stderrOutput bytes.Buffer
+	_, _ = io.Copy(&stderrOutput, rPipe)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected 200 for interrupted upstream, got %d", resp.StatusCode)
+	}
+
+	if !strings.Contains(stderrOutput.String(), "Warning: stream interrupted for upstream path") {
+		t.Errorf("Expected warning in stderr, got: %s", stderrOutput.String())
 	}
 }
 

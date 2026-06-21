@@ -391,7 +391,7 @@ func (ps *ProxyServer) Handler(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimSuffix(r.URL.Path, "/")
 
 	switch r.Method {
-	case http.MethodGet:
+	case http.MethodGet, http.MethodHead:
 		switch {
 		case path == "/nix-cache-info":
 			ps.serveNixCacheInfo(w)
@@ -402,7 +402,7 @@ func (ps *ProxyServer) Handler(w http.ResponseWriter, r *http.Request) {
 		case strings.HasSuffix(path, ".narinfo"):
 			ps.serveNarInfo(w, path)
 		case strings.HasPrefix(path, "/nar/"):
-			ps.serveNar(w, path)
+			ps.serveNar(w, path, r.Method)
 		default:
 			http.Error(w, "Not Found", http.StatusNotFound)
 		}
@@ -557,7 +557,7 @@ func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, path string) {
 	http.Error(w, "Narinfo Not Found", http.StatusNotFound)
 }
 
-func (ps *ProxyServer) serveNar(w http.ResponseWriter, path string) {
+func (ps *ProxyServer) serveNar(w http.ResponseWriter, path string, method string) {
 	narBasename := strings.TrimPrefix(path, "/nar/")
 	contentType := "application/x-nix-nar"
 	if strings.HasSuffix(narBasename, ".xz") {
@@ -584,14 +584,14 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, path string) {
 	}
 
 	if digest != "" && strings.HasPrefix(digest, "sha256:") {
-		err := ps.streamBlob(w, digest, contentType)
+		err := ps.streamBlob(w, digest, contentType, method)
 		if err == nil {
 			return
 		}
 		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to stream blob %s from GHCR: %v. Trying upstream...\n", digest, err)
 	}
 
-	err := ps.streamUpstream(w, path, contentType)
+	err := ps.streamUpstream(w, path, contentType, method)
 	if err == nil {
 		return
 	}
@@ -599,7 +599,7 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, path string) {
 	http.Error(w, "NAR Not Found", http.StatusNotFound)
 }
 
-func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentType string) error {
+func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentType string, method string) error {
 	token, err := ps.TokenMgr.GetToken()
 	if err != nil {
 		return err
@@ -607,7 +607,7 @@ func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentT
 
 	proto := GetProtocol(ps.Registry)
 	url := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, ps.Registry, ps.Repository, digest)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return err
 	}
@@ -640,10 +640,10 @@ func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentT
 	return nil
 }
 
-func (ps *ProxyServer) streamUpstream(w http.ResponseWriter, path string, contentType string) error {
+func (ps *ProxyServer) streamUpstream(w http.ResponseWriter, path string, contentType string, method string) error {
 	for _, cacheURL := range ps.UpstreamCaches {
 		url := fmt.Sprintf("%s%s", strings.TrimSuffix(cacheURL, "/"), path)
-		req, err := http.NewRequest("GET", url, nil)
+		req, err := http.NewRequest(method, url, nil)
 		if err != nil {
 			continue
 		}
@@ -662,7 +662,10 @@ func (ps *ProxyServer) streamUpstream(w http.ResponseWriter, path string, conten
 			}
 			w.WriteHeader(http.StatusOK)
 			_, err = io.Copy(w, resp.Body)
-			return err
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for upstream path %s: %v\n", path, err)
+			}
+			return nil
 		}
 		_ = resp.Body.Close()
 	}
@@ -834,15 +837,15 @@ func StartProxy(port int, listenAddr string, registry string, repository string,
 	transport.IdleConnTimeout = 90 * time.Second
 
 	ps := &ProxyServer{
-		Port:            port,
-		ListenAddr:      listenAddr,
-		Registry:        registry,
-		Repository:      repository,
-		UpstreamCaches:  upstreams,
-		TokenMgr:        tokenMgr,
-		CacheIndex:      cacheIndex,
-		WorkerURL:       workerURL,
-		PublicKey:       bootstrappedKey,
+		Port:           port,
+		ListenAddr:     listenAddr,
+		Registry:       registry,
+		Repository:     repository,
+		UpstreamCaches: upstreams,
+		TokenMgr:       tokenMgr,
+		CacheIndex:     cacheIndex,
+		WorkerURL:      workerURL,
+		PublicKey:      bootstrappedKey,
 		HttpClient: &http.Client{
 			Transport: transport,
 			Timeout:   30 * time.Minute,
