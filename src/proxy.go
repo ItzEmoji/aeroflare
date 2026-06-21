@@ -403,6 +403,8 @@ func (ps *ProxyServer) Handler(w http.ResponseWriter, r *http.Request) {
 			ps.serveNixCacheInfo(w)
 		case path == "/public-key":
 			ps.servePublicKey(w)
+		case path == "/api/public-key":
+			ps.serveApiPublicKey(w)
 		case path == "/_status":
 			ps.serveStatus(w)
 		case strings.HasSuffix(path, ".narinfo"):
@@ -458,6 +460,24 @@ func (ps *ProxyServer) servePublicKey(w http.ResponseWriter) {
 		_, _ = w.Write(data)
 	} else {
 		http.Error(w, "No public key configured", http.StatusNotFound)
+	}
+}
+
+func (ps *ProxyServer) serveApiPublicKey(w http.ResponseWriter) {
+	ps.CacheIndex.mu.RLock()
+	annotations := ps.CacheIndex.ManifestAnnotations
+	ps.CacheIndex.mu.RUnlock()
+
+	pubKey := annotations["public-key"]
+	if pubKey != "" {
+		pubKey = strings.TrimSpace(pubKey) + "\n"
+		data := []byte(pubKey)
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(data)
+	} else {
+		http.Error(w, "No public key configured in manifest", http.StatusNotFound)
 	}
 }
 
@@ -682,8 +702,6 @@ func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentT
 	}
 	return nil
 }
-
-
 
 func (ps *ProxyServer) fetchWorkerBytes(path string) ([]byte, error) {
 	if ps.WorkerURL == "" {

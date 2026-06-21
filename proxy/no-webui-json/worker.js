@@ -1,7 +1,3 @@
-const DEFAULT_REPO = "cmspam/mynixcache-oci";
-const DEFAULT_REGISTRY = "ghcr.io";
-const DEFAULT_UPSTREAM = ["https://cache.nixos.org"];
-const DEFAULT_INDEX_TTL = 300;
 
 async function getOciToken(env) {
   const repo = env.NIXCACHE_REPO || DEFAULT_REPO;
@@ -83,6 +79,52 @@ async function getIndex(env, ctx) {
   }
 }
 
+async function getOciManifestText(env, ctx) {
+  const cache = caches.default;
+  const cacheKey = new Request("https://internal.cache/oci-manifest.json");
+  const ttl = parseInt(env.NIXCACHE_INDEX_TTL || DEFAULT_INDEX_TTL);
+  
+  try {
+    let response = await cache.match(cacheKey);
+    if (response) {
+      return await response.text();
+    }
+  } catch (err) {}
+
+  try {
+    const registry = env.NIXCACHE_REGISTRY || DEFAULT_REGISTRY;
+    const repo = env.NIXCACHE_REPO || DEFAULT_REPO;
+    const token = await getOciToken(env);
+    const headers = {
+      "Accept": "application/vnd.oci.image.manifest.v1+json"
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const manifestUrl = `https://${registry}/v2/${repo}/nix-cache/manifests/cache-index`;
+    const manifestRes = await fetch(manifestUrl, { headers });
+    if (!manifestRes.ok) return "";
+    
+    const manifestText = await manifestRes.text();
+    
+    try {
+      const cacheResponse = new Response(manifestText, {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": `s-maxage=${ttl}`
+        }
+      });
+      ctx.waitUntil(cache.put(cacheKey, cacheResponse));
+    } catch (err) {}
+    
+    return manifestText;
+  } catch (err) {
+    console.error("Error fetching manifest from GHCR:", err);
+    return "";
+  }
+}
+
 function findNarDigest(index, narBasename) {
   for (const entry of Object.values(index.entries || {})) {
     const narinfo = entry.narinfo || "";
@@ -110,6 +152,17 @@ export default {
         return new Response(info, {
           headers: { "Content-Type": "text/x-nix-cache-info" }
         });
+      }
+
+      if (path === "/api/public-key") {
+        const manifestText = await getOciManifestText(env, ctx);
+        const match = manifestText.match(/"public[-_]key"\s*:\s*"([^"]+)"/);
+        
+        if (match && match[1]) {
+          return new Response(match[1] + "\n", { headers: { "Content-Type": "text/plain" }});
+        }
+        
+        return new Response("No public key configured in manifest", { status: 404 });
       }
 
       if (path === "/public-key") {
@@ -228,7 +281,10 @@ export default {
       }
 
       // Fallback to static UI assets
-      return env.ASSETS.fetch(request);
+      if (env.ASSETS) {
+        return env.ASSETS.fetch(request);
+      }
+      return new Response("Not found", { status: 404 });
     } catch (err) {
       console.error("Top level fetch error:", err);
       return new Response("Internal Server Error", { status: 500 });

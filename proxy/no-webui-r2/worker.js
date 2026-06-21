@@ -1,8 +1,3 @@
-const DEFAULT_REPO = "cmspam/mynixcache-oci";
-const DEFAULT_REGISTRY = "ghcr.io";
-const DEFAULT_UPSTREAM = ["https://cache.nixos.org"];
-const DEFAULT_INDEX_TTL = 300;
-
 async function getOciToken(env) {
   const repo = env.NIXCACHE_REPO || DEFAULT_REPO;
   const registry = env.NIXCACHE_REGISTRY || DEFAULT_REGISTRY;
@@ -158,7 +153,7 @@ export default {
         });
       }
 
-      if (path === "/api/public-key" || path === "/public-key") {
+      if (path === "/api/public-key") {
         const manifestText = await getOciManifestText(env, ctx);
         const match = manifestText.match(/"public[-_]key"\s*:\s*"([^"]+)"/);
         
@@ -166,6 +161,14 @@ export default {
           return new Response(match[1] + "\n", { headers: { "Content-Type": "text/plain" }});
         }
         
+        return new Response("No public key configured in manifest", { status: 404 });
+      }
+
+      if (path === "/public-key") {
+        const index = await getIndex(env, ctx);
+        if (index.public_key) {
+          return new Response(index.public_key + "\n", { headers: { "Content-Type": "text/plain" }});
+        }
         return new Response("No public key configured", { status: 404 });
       }
 
@@ -273,7 +276,10 @@ export default {
       }
 
       // Fallback to static UI assets
-      return env.ASSETS.fetch(request);
+      if (env.ASSETS) {
+        return env.ASSETS.fetch(request);
+      }
+      return new Response("Not found", { status: 404 });
     } catch (err) {
       console.error("Top level fetch error:", err);
       return new Response("Internal Server Error", { status: 500 });

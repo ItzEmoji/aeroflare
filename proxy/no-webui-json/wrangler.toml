@@ -5,7 +5,7 @@ compatibility_date = "2026-06-20"
 # You can configure the following environment variables.
 # The values below are the defaults used by the script if not specified.
 [vars]
-# NIXCACHE_REPO = "cmspam/mynixcache-oci"
-# NIXCACHE_REGISTRY = "ghcr.io"
-# NIXCACHE_INDEX_TTL = "300"
-# NIXCACHE_UPSTREAM = "https://cache.nixos.org"
+# NIXCACHE_REPO = "<NIXCACHE_REPO>"
+# NIXCACHE_REGISTRY = "<NIXCACHE_REGISTRY>"
+# NIXCACHE_UPSTREAM = "<NIXCACHE_UPSTREAM>"
+# NIXCACHE_INDEX_TTL = "<NIXCACHE_INDEX_TTL"
