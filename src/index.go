@@ -92,7 +92,7 @@ func FetchCacheIndex(registry, repository, token string) (*PushCacheIndex, error
 }
 
 // UpdateCacheIndex merges new entries into existingIndex and pushes the updated manifest.
-func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, registry, repository, token, pubKeyPath string) error {
+func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, registry, repository, token, pubKeyPath string, r2Cfg *R2Config, configAnnotations map[string]string) error {
 
 
 	scheme := "https"
@@ -211,6 +211,28 @@ func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, reg
 		},
 	}
 
+	manifestAnnotations := map[string]string{}
+	if configAnnotations != nil {
+		if pk := configAnnotations["public-key"]; pk != "" {
+			manifestAnnotations["public-key"] = pk
+		}
+		if backend := configAnnotations["aeroflare.backend"]; backend != "" {
+			manifestAnnotations["index-type"] = backend
+		}
+	}
+
+	if r2Cfg != nil && r2Cfg.PublicURL != "" {
+		manifestAnnotations["index-type"] = "r2"
+		manifestAnnotations["public-r2-url"] = r2Cfg.PublicURL
+		manifestAnnotations["aeroflare.r2.public_url"] = r2Cfg.PublicURL
+	} else if manifestAnnotations["index-type"] == "" {
+		manifestAnnotations["index-type"] = "json"
+	}
+
+	if len(manifestAnnotations) > 0 {
+		manifest["annotations"] = manifestAnnotations
+	}
+
 	manifestBytes, _ := json.Marshal(manifest)
 	client := &http.Client{Timeout: 30 * time.Second}
 	putReq, err := http.NewRequest("PUT", manifestURL, bytes.NewReader(manifestBytes))
@@ -231,6 +253,67 @@ func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, reg
 		return fmt.Errorf("push manifest failed with HTTP %d: %s", putResp.StatusCode, string(respBytes))
 	}
 
+
+	return nil
+}
+
+// PushConfigManifest pushes the cache-config manifest with the provided annotations.
+func PushConfigManifest(registry, repository, token string, annotations map[string]string) error {
+	scheme := "https"
+	if strings.HasPrefix(registry, "localhost:") || strings.HasPrefix(registry, "127.0.0.1:") {
+		scheme = "http"
+	}
+	manifestURL := fmt.Sprintf("%s://%s/v2/%s/manifests/cache-config", scheme, registry, repository)
+
+	// Push empty config JSON as blob
+	outConfig, _ := os.CreateTemp("", "empty-config-*.json")
+	defer func() { _ = os.Remove(outConfig.Name()) }()
+	_ = os.WriteFile(outConfig.Name(), []byte("{}"), 0644)
+
+	configDigest, err := PushBlob(outConfig.Name(), registry, repository, token)
+	if err != nil {
+		return fmt.Errorf("push config blob: %w", err)
+	}
+	configStat, _ := os.Stat(outConfig.Name())
+
+	// Push Cache-Config Manifest
+	manifest := map[string]interface{}{
+		"schemaVersion": 2,
+		"mediaType":     "application/vnd.oci.image.manifest.v1+json",
+		"config": map[string]interface{}{
+			"mediaType": "application/vnd.oci.image.config.v1+json",
+			"digest":    configDigest,
+			"size":      configStat.Size(),
+		},
+		"layers": []map[string]interface{}{
+			{
+				"mediaType": "application/vnd.nix.cache.config.v1+json",
+				"digest":    configDigest,
+				"size":      configStat.Size(),
+			},
+		},
+		"annotations": annotations,
+	}
+
+	manifestBytes, _ := json.Marshal(manifest)
+	client := &http.Client{Timeout: 30 * time.Second}
+	putReq, err := http.NewRequest("PUT", manifestURL, bytes.NewReader(manifestBytes))
+	if err != nil {
+		return fmt.Errorf("create manifest put request: %w", err)
+	}
+	putReq.Header.Set("Authorization", "Bearer "+token)
+	putReq.Header.Set("Content-Type", "application/vnd.oci.image.manifest.v1+json")
+
+	putResp, err := client.Do(putReq)
+	if err != nil {
+		return fmt.Errorf("push manifest: %w", err)
+	}
+	defer func() { _ = putResp.Body.Close() }()
+
+	if putResp.StatusCode != http.StatusCreated && putResp.StatusCode != http.StatusOK {
+		respBytes, _ := io.ReadAll(putResp.Body)
+		return fmt.Errorf("push manifest failed with HTTP %d: %s", putResp.StatusCode, string(respBytes))
+	}
 
 	return nil
 }

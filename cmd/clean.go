@@ -35,8 +35,12 @@ var cleanIndexCmd = &cobra.Command{
 			GCRoots: []string{},
 		}
 
+		tokenMgr := network.NewTokenManager(registry, repository, "")
+		_, configAnnotations, _ := network.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+		r2Cfg := network.GetR2Config(configAnnotations)
+
 		PrintInfo("Wiping remote index...")
-		err := network.UpdateCacheIndex(nil, emptyIndex, registry, repository, ociToken, "")
+		err := network.UpdateCacheIndex(nil, emptyIndex, registry, repository, ociToken, "", r2Cfg, configAnnotations)
 		if err != nil {
 			PrintError(fmt.Sprintf("Failed to wipe remote index: %v", err))
 			os.Exit(1)

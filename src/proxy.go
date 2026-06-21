@@ -26,7 +26,8 @@ func GetProtocol(registry string) string {
 
 // IndexManifest represents the OCI image manifest for the cache index or configuration.
 type IndexManifest struct {
-	Layers []IndexLayer `json:"layers"`
+	Layers      []IndexLayer      `json:"layers"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // IndexLayer represents a layer in the OCI manifest.
@@ -160,16 +161,17 @@ func (tm *TokenManager) fetchToken() (string, error) {
 
 // CacheIndex handles loading, refreshing, and querying the cache index.
 type CacheIndex struct {
-	mu         sync.RWMutex
-	refreshMu  sync.Mutex
-	Data       *CacheIndexData
-	NarLookups map[string]string // narBasename -> narDigest
-	LastFetch  time.Time
-	IndexDir   string
-	IndexTTL   time.Duration
-	TokenMgr   *TokenManager
-	Registry   string
-	Repository string
+	mu                  sync.RWMutex
+	refreshMu           sync.Mutex
+	Data                *CacheIndexData
+	NarLookups          map[string]string // narBasename -> narDigest
+	ManifestAnnotations map[string]string
+	LastFetch           time.Time
+	IndexDir            string
+	IndexTTL            time.Duration
+	TokenMgr            *TokenManager
+	Registry            string
+	Repository          string
 }
 
 // Get returns the current cache index data and NAR lookups map, triggering a TTL-based refresh if needed.
@@ -321,6 +323,10 @@ func (ci *CacheIndex) refresh() error {
 	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
 		return err
 	}
+
+	ci.mu.Lock()
+	ci.ManifestAnnotations = manifest.Annotations
+	ci.mu.Unlock()
 
 	if len(manifest.Layers) == 0 {
 		return fmt.Errorf("no layers in cache-index manifest")
@@ -477,6 +483,22 @@ func (ps *ProxyServer) serveStatus(w http.ResponseWriter) {
 		"worker_url":      ps.WorkerURL,
 		"has_public_key":  ps.PublicKey != "",
 	}
+
+	ps.CacheIndex.mu.RLock()
+	annotations := ps.CacheIndex.ManifestAnnotations
+	ps.CacheIndex.mu.RUnlock()
+
+	if annotations["index-type"] == "r2" || annotations["aeroflare.r2.public_url"] != "" {
+		publicURL := annotations["public-r2-url"]
+		if publicURL == "" {
+			publicURL = annotations["aeroflare.r2.public_url"]
+		}
+		status["r2_enabled"] = true
+		status["r2_public_url"] = publicURL
+	} else {
+		status["r2_enabled"] = false
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(status)
 }
@@ -522,6 +544,29 @@ func (ps *ProxyServer) handleRefresh(w http.ResponseWriter) {
 func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, r *http.Request, path string) {
 	storeHash := strings.TrimPrefix(path, "/")
 	storeHash = strings.TrimSuffix(storeHash, ".narinfo")
+
+	ps.CacheIndex.mu.RLock()
+	annotations := ps.CacheIndex.ManifestAnnotations
+	ps.CacheIndex.mu.RUnlock()
+
+	if annotations["index-type"] == "r2" {
+		publicURL := annotations["public-r2-url"]
+		if publicURL == "" {
+			publicURL = annotations["aeroflare.r2.public_url"]
+		}
+		if publicURL == "" {
+			http.Error(w, "Error: The cache uses R2 but no public-url is configured. It is not possible to access this cache.", http.StatusForbidden)
+			return
+		}
+		redirectURL := fmt.Sprintf("%s/%s.narinfo", strings.TrimRight(publicURL, "/"), storeHash)
+		http.Redirect(w, r, redirectURL, http.StatusFound)
+		return
+	} else if publicURL, ok := annotations["aeroflare.r2.public_url"]; ok && publicURL != "" {
+		// Fallback for previous configuration without index-type
+		redirectURL := fmt.Sprintf("%s/%s.narinfo", strings.TrimRight(publicURL, "/"), storeHash)
+		http.Redirect(w, r, redirectURL, http.StatusFound)
+		return
+	}
 
 	if ps.WorkerURL != "" {
 		data, err := ps.fetchWorkerBytes(path)
@@ -666,9 +711,14 @@ func (ps *ProxyServer) fetchWorkerBytes(path string) ([]byte, error) {
 
 // BootstrapConfig fetches configuration dynamically from the GHCR 'cache-config' OCI image/blob.
 func BootstrapConfig(registry, repository string, tokenMgr *TokenManager) (*RemoteConfig, error) {
+	config, _, err := BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+	return config, err
+}
+
+func BootstrapConfigWithAnnotations(registry, repository string, tokenMgr *TokenManager) (*RemoteConfig, map[string]string, error) {
 	token, err := tokenMgr.GetToken()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -677,7 +727,7 @@ func BootstrapConfig(registry, repository string, tokenMgr *TokenManager) (*Remo
 	manifestURL := fmt.Sprintf("%s://%s/v2/%s/manifests/cache-config", proto, registry, repository)
 	req, err := http.NewRequest("GET", manifestURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
 	req.Header.Set("User-Agent", "aeroflare/1.0")
@@ -687,28 +737,28 @@ func BootstrapConfig(registry, repository string, tokenMgr *TokenManager) (*Remo
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("config manifest HTTP %d", resp.StatusCode)
+		return nil, nil, fmt.Errorf("config manifest HTTP %d", resp.StatusCode)
 	}
 
 	var manifest IndexManifest
 	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(manifest.Layers) == 0 {
-		return nil, fmt.Errorf("no layers in cache-config manifest")
+		return nil, manifest.Annotations, fmt.Errorf("no layers in cache-config manifest")
 	}
 
 	digest := manifest.Layers[0].Digest
 	blobURL := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, registry, repository, digest)
 	req, err = http.NewRequest("GET", blobURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, manifest.Annotations, err
 	}
 	req.Header.Set("User-Agent", "aeroflare/1.0")
 	if token != "" {
@@ -717,20 +767,24 @@ func BootstrapConfig(registry, repository string, tokenMgr *TokenManager) (*Remo
 
 	resp, err = client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, manifest.Annotations, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("config blob HTTP %d", resp.StatusCode)
+		return nil, manifest.Annotations, fmt.Errorf("config blob HTTP %d", resp.StatusCode)
 	}
 
 	var config RemoteConfig
 	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
-		return nil, err
+		return nil, manifest.Annotations, err
 	}
 
-	return &config, nil
+	if pk, ok := manifest.Annotations["public-key"]; ok && pk != "" && config.PublicKey == "" {
+		config.PublicKey = pk
+	}
+
+	return &config, manifest.Annotations, nil
 }
 
 // StartProxy starts the proxy HTTP server on the configured address.

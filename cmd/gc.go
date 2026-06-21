@@ -60,8 +60,12 @@ var gcCmd = &cobra.Command{
 		PrintSuccess(fmt.Sprintf("Garbage collection freed %d bytes.", result.FreedBytes))
 
 		if result.FreedBytes > 0 {
+			tokenMgr := network.NewTokenManager(registry, repository, "")
+			_, configAnnotations, _ := network.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+			r2Cfg := network.GetR2Config(configAnnotations)
+
 			PrintInfo("Pushing updated remote index...")
-			err = network.UpdateCacheIndex(nil, index, registry, repository, ociToken, "")
+			err = network.UpdateCacheIndex(nil, index, registry, repository, ociToken, "", r2Cfg, configAnnotations)
 			if err != nil {
 				PrintError(fmt.Sprintf("Failed to push updated remote index: %v", err))
 				os.Exit(1)

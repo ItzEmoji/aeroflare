@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	network "aeroflare/src"
@@ -15,7 +16,9 @@ import (
 	"aeroflare/src/prepare/prepare"
 	"aeroflare/src/prepare/signing"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -175,6 +178,21 @@ var pushCmd = &cobra.Command{
 			return
 		}
 
+		tokenMgr := network.NewTokenManager(registry, repository, "")
+		_, configAnnotations, _ := network.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+
+		r2Cfg := network.GetR2Config(configAnnotations)
+		var s3Client *s3.Client
+		if r2Cfg != nil {
+			var initErr error
+			s3Client, initErr = r2Cfg.NewClient(ctx)
+			if initErr != nil {
+				PrintError(fmt.Sprintf("Failed to init R2 client: %v", initErr))
+				os.Exit(1)
+			}
+			fmt.Printf("R2 Object Storage enabled (Bucket: %s)\n", r2Cfg.Bucket)
+		}
+
 		var receipts []network.PushReceipt
 
 		chunkSize := 100
@@ -213,68 +231,113 @@ var pushCmd = &cobra.Command{
 			fmt.Println("Step 2/2: Uploading to OCI registry")
 			pushedPaths := make(map[string]bool)
 
-			var pushResult func(r *prepare.Result, isRoot bool)
-			pushResult = func(r *prepare.Result, isRoot bool) {
+			type pushTask struct {
+				r      *prepare.Result
+				isRoot bool
+			}
+			var tasks []pushTask
+
+			var collect func(r *prepare.Result, isRoot bool)
+			collect = func(r *prepare.Result, isRoot bool) {
 				if pushedPaths[r.StorePath] {
 					return
 				}
 				pushedPaths[r.StorePath] = true
 
-				narStat, err := os.Stat(r.NarPath)
-				if err != nil {
-					if isRoot {
-						PrintError(fmt.Sprintf("Failed to stat NAR file (%s): %v", r.NarPath, err))
-						os.Exit(1)
-					}
-					return
-				}
-
-				narDigest, err := network.PushBlob(r.NarPath, registry, repository, ociToken)
-				if err != nil {
-					if isRoot {
-						PrintError(fmt.Sprintf("Failed to upload NAR file (%s): %v", r.NarPath, err))
-						os.Exit(1)
-					} else {
-						PrintError(fmt.Sprintf("    Failed to upload reference NAR: %v", err))
-						return
-					}
-				}
-
-				_, err = network.PushBlob(r.NarinfoPath, registry, repository, ociToken)
-				if err != nil {
-					if isRoot {
-						PrintError(fmt.Sprintf("Failed to upload Narinfo file (%s): %v", r.NarinfoPath, err))
-						os.Exit(1)
-					} else {
-						PrintError(fmt.Sprintf("    Failed to upload reference Narinfo: %v", err))
-						return
-					}
-				}
-
-				pkgName := filepath.Base(r.StorePath)
-				fmt.Println("✔ " + pkgName)
-				totalUploaded++
-
-				receipts = append(receipts, network.PushReceipt{
-					StorePath:   r.StorePath,
-					NarinfoPath: r.NarinfoPath,
-					NarDigest:   narDigest,
-					NarSize:     narStat.Size(),
-					IsRoot:      isRoot,
-				})
+				tasks = append(tasks, pushTask{r: r, isRoot: isRoot})
 
 				for _, missingRef := range r.MissingRefResults {
-					pushResult(missingRef, false)
+					collect(missingRef, false)
 				}
 			}
 
 			for _, r := range results {
-				pushResult(r, true)
+				collect(r, true)
+			}
+
+			var mu sync.Mutex
+			eg, egCtx := errgroup.WithContext(ctx)
+			eg.SetLimit(pushWorkers)
+
+			for _, t := range tasks {
+				t := t // capture loop variable
+				eg.Go(func() error {
+					r := t.r
+					isRoot := t.isRoot
+
+					narStat, err := os.Stat(r.NarPath)
+					if err != nil {
+						if isRoot {
+							return fmt.Errorf("failed to stat NAR file (%s): %v", r.NarPath, err)
+						}
+						return nil
+					}
+
+					narDigest, err := network.PushBlob(r.NarPath, registry, repository, ociToken)
+					if err != nil {
+						if isRoot {
+							return fmt.Errorf("failed to upload NAR file (%s): %v", r.NarPath, err)
+						} else {
+							mu.Lock()
+							PrintError(fmt.Sprintf("    Failed to upload reference NAR: %v", err))
+							mu.Unlock()
+							return nil
+						}
+					}
+
+					if r2Cfg != nil && s3Client != nil {
+						err = r2Cfg.UploadNarinfo(egCtx, s3Client, r.StorePath, r.NarinfoPath)
+						if err != nil {
+							if isRoot {
+								return fmt.Errorf("failed to upload Narinfo file to R2 (%s): %v", r.NarinfoPath, err)
+							} else {
+								mu.Lock()
+								PrintError(fmt.Sprintf("    Failed to upload reference Narinfo to R2: %v", err))
+								mu.Unlock()
+								return nil
+							}
+						}
+					} else {
+						_, err = network.PushBlob(r.NarinfoPath, registry, repository, ociToken)
+						if err != nil {
+							if isRoot {
+								return fmt.Errorf("failed to upload Narinfo file (%s): %v", r.NarinfoPath, err)
+							} else {
+								mu.Lock()
+								PrintError(fmt.Sprintf("    Failed to upload reference Narinfo: %v", err))
+								mu.Unlock()
+								return nil
+							}
+						}
+					}
+
+					pkgName := filepath.Base(r.StorePath)
+					
+					mu.Lock()
+					fmt.Println("✔ " + pkgName)
+					totalUploaded++
+
+					receipts = append(receipts, network.PushReceipt{
+						StorePath:   r.StorePath,
+						NarinfoPath: r.NarinfoPath,
+						NarDigest:   narDigest,
+						NarSize:     narStat.Size(),
+						IsRoot:      isRoot,
+					})
+					mu.Unlock()
+
+					return nil
+				})
+			}
+
+			if err := eg.Wait(); err != nil {
+				PrintError(err.Error())
+				os.Exit(1)
 			}
 		}
 
 		fmt.Println("\nUpdating cache index...")
-		if err := network.UpdateCacheIndex(receipts, existingIndex, registry, repository, ociToken, pushSigningKey); err != nil {
+		if err := network.UpdateCacheIndex(receipts, existingIndex, registry, repository, ociToken, pushSigningKey, r2Cfg, configAnnotations); err != nil {
 			PrintError(fmt.Sprintf("Failed to update cache index: %v", err))
 			os.Exit(1)
 		}
