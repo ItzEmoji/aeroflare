@@ -1,0 +1,16 @@
+name = "aeroflare-proxy-r2"
+main = "worker.js"
+compatibility_date = "2024-03-20"
+
+# Bind your R2 bucket to 'BUCKET'
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "nix-narinfo-cache" 
+# Replace with your actual R2 bucket name
+
+# Environment variables you might want to set (optional)
+[vars]
+NIXCACHE_REPO = "ItzEmoji/nix-cache-test"
+NIXCACHE_REGISTRY = "ghcr.io"
+NIXCACHE_UPSTREAM = "https://cache.nixos.org"
+NIXCACHE_INDEX_TTL = "300"
