@@ -93,7 +93,7 @@ func FetchCacheIndex(registry, repository, token string) (*PushCacheIndex, error
 
 // UpdateCacheIndex merges new entries into existingIndex and pushes the updated manifest.
 func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, registry, repository, token, pubKeyPath string) error {
-	fmt.Println("\n>>> Updating cache-index.json...")
+
 
 	scheme := "https"
 	if strings.HasPrefix(registry, "localhost:") || strings.HasPrefix(registry, "127.0.0.1:") {
@@ -231,6 +231,6 @@ func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, reg
 		return fmt.Errorf("push manifest failed with HTTP %d: %s", putResp.StatusCode, string(respBytes))
 	}
 
-	fmt.Printf(">>> Cache index rebuilt: %d total entries (%d new), %d gc roots\n", len(newIndex.Entries), newEntriesCount, len(newIndex.GCRoots))
+
 	return nil
 }

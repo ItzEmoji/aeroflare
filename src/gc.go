@@ -25,9 +25,7 @@ func RunGC(index *PushCacheIndex, maxFreed int64) *GCResult {
 	// Find all live paths by traversing from GCRoots
 	live := make(map[string]bool)
 	queue := []string{}
-	for _, root := range index.GCRoots {
-		queue = append(queue, root)
-	}
+	queue = append(queue, index.GCRoots...)
 
 	for len(queue) > 0 {
 		hash := queue[0]
@@ -39,9 +37,7 @@ func RunGC(index *PushCacheIndex, maxFreed int64) *GCResult {
 		live[hash] = true
 
 		if refs, ok := graph[hash]; ok {
-			for _, ref := range refs {
-				queue = append(queue, ref)
-			}
+			queue = append(queue, refs...)
 		}
 	}
 
