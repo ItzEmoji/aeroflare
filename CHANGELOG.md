@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/ItzEmoji/aeroflare/compare/v1.2.0...v1.3.0) (2026-06-21)
+
+
+### Features
+
+* added parrael uploads, added r2 support, and made some other general improvments. ([#14](https://github.com/ItzEmoji/aeroflare/issues/14)) ([f8029a4](https://github.com/ItzEmoji/aeroflare/commit/f8029a421e9625b83ef723cf3054e2ba220a700a))
+* made some general fixes and the look of the cli has been improved.  ([#12](https://github.com/ItzEmoji/aeroflare/issues/12)) ([3cc45a2](https://github.com/ItzEmoji/aeroflare/commit/3cc45a21d799b693b7c7e9969e5cf3e236765f2e))
+
 ## [1.2.0](https://github.com/ItzEmoji/aeroflare/compare/v1.1.0...v1.2.0) (2026-06-21)
 
 
