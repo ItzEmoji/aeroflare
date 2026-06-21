@@ -23,13 +23,13 @@ var pushBlobCmd = &cobra.Command{
 
 		filePath := args[0]
 		PrintInfo(fmt.Sprintf("Pushing blob: %s", filePath))
-		
+
 		digest, err := network.PushBlob(filePath, registry, repository, ociToken)
 		if err != nil {
 			PrintError(fmt.Sprintf("Failed to push blob: %v", err))
 			os.Exit(1)
 		}
-		
+
 		fmt.Printf("✔ Blob Digest: %s\n", digest)
 	},
 }
@@ -49,9 +49,9 @@ var pullBlobCmd = &cobra.Command{
 
 		digest := args[0]
 		outFile := args[1]
-		
+
 		PrintInfo(fmt.Sprintf("Pulling blob %s to %s", digest, outFile))
-		
+
 		err := network.PullBlob(digest, outFile, registry, repository, ociToken)
 		if err != nil {
 			PrintError(fmt.Sprintf("Failed to pull blob: %v", err))

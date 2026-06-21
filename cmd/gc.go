@@ -80,6 +80,6 @@ func init() {
 	gcCmd.Flags().BoolVar(&printRoots, "print-roots", false, "Print the GC roots")
 	gcCmd.Flags().BoolVar(&printLive, "print-live", false, "Print the live paths")
 	gcCmd.Flags().BoolVar(&printDead, "print-dead", false, "Print the dead paths")
-	
+
 	rootCmd.AddCommand(gcCmd)
 }

@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -806,7 +805,7 @@ func BootstrapConfigWithAnnotations(registry, repository string, tokenMgr *Token
 }
 
 // StartProxy starts the proxy HTTP server on the configured address.
-func StartProxy(port int, listenAddr string, registry string, repository string, indexDir string, indexTTLSeconds int, upstreams []string, githubToken string, workerURL string) error {
+func StartProxy(ctx context.Context, port int, listenAddr string, registry string, repository string, indexDir string, indexTTLSeconds int, upstreams []string, githubToken string, workerURL string) (int, error) {
 	tokenMgr := NewTokenManager(registry, repository, githubToken)
 
 	var bootstrappedKey string
@@ -876,16 +875,18 @@ func StartProxy(port int, listenAddr string, registry string, repository string,
 	mux.HandleFunc("/", ps.Handler)
 
 	addr := fmt.Sprintf("%s:%d", listenAddr, port)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	actualPort := listener.Addr().(*net.TCPAddr).Port
+
 	server := &http.Server{
-		Addr:    addr,
 		Handler: mux,
 	}
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-
 	go func() {
-		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Starting proxy server on http://%s\n", addr)
+		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Starting proxy server on http://%s:%d\n", listenAddr, actualPort)
 		fmt.Fprintf(os.Stderr, "  Repo: %s\n", repository)
 		fmt.Fprintf(os.Stderr, "  Upstream: %s\n", strings.Join(upstreams, ", "))
 		if workerURL != "" {
@@ -894,16 +895,18 @@ func StartProxy(port int, listenAddr string, registry string, repository string,
 			fmt.Fprintf(os.Stderr, "  Index TTL: %s\n", ttl)
 		}
 
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
-			os.Exit(1)
 		}
 	}()
 
-	<-stop
-	fmt.Fprintf(os.Stderr, "\n[aeroflare proxy] Shutting down...\n")
+	go func() {
+		<-ctx.Done()
+		fmt.Fprintf(os.Stderr, "\n[aeroflare proxy] Shutting down...\n")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	return server.Shutdown(ctx)
+	return actualPort, nil
 }

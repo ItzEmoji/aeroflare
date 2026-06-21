@@ -97,7 +97,7 @@ var prepareCmd = &cobra.Command{
 					totalSigned++
 				}
 			}
-			
+
 			summary := fmt.Sprintf("Processed %d paths, %d missing references, %d refs prepared, %d signed", len(results), totalMissing, totalPreparedRefs, totalSigned)
 			PrintSuccess(summary)
 		}
@@ -113,7 +113,7 @@ func init() {
 	prepareCmd.Flags().IntVar(&workers, "workers", 50, "Number of concurrent workers")
 	prepareCmd.Flags().BoolVar(&prepareRefs, "prepare-refs", false, "Also prepare NAR+narinfo for references not on the upstream cache (one level deep)")
 	prepareCmd.Flags().StringVar(&signingKey, "signing-key", "", "Path to Nix signing private key file (format: name:base64seed, as produced by 'nix key-gen-secret')")
-	
+
 	rootCmd.AddCommand(prepareCmd)
 }
 

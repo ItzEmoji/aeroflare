@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	network "aeroflare/src"
 	"github.com/spf13/cobra"
@@ -50,13 +53,24 @@ var proxyCmd = &cobra.Command{
 			workerURL = os.Getenv("NIXCACHE_WORKER_URL")
 		}
 
-		PrintInfo(fmt.Sprintf("Starting proxy on %s:%d...", listenAddr, port))
-		
-		err := network.StartProxy(port, listenAddr, registry, repository, indexDir, indexTTL, upstreams, getGithubToken(), workerURL)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-c
+			cancel()
+		}()
+
+		actualPort, err := network.StartProxy(ctx, port, listenAddr, registry, repository, indexDir, indexTTL, upstreams, getGithubToken(), workerURL)
 		if err != nil {
 			PrintError(fmt.Sprintf("Proxy server failed: %v", err))
 			os.Exit(1)
 		}
+		PrintInfo(fmt.Sprintf("Started proxy on %s:%d...", listenAddr, actualPort))
+
+		<-ctx.Done()
 	},
 }
 

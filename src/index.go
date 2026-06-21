@@ -94,7 +94,6 @@ func FetchCacheIndex(registry, repository, token string) (*PushCacheIndex, error
 // UpdateCacheIndex merges new entries into existingIndex and pushes the updated manifest.
 func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, registry, repository, token, pubKeyPath string, r2Cfg *R2Config, configAnnotations map[string]string) error {
 
-
 	scheme := "https"
 	if strings.HasPrefix(registry, "localhost:") || strings.HasPrefix(registry, "127.0.0.1:") {
 		scheme = "http"
@@ -252,7 +251,6 @@ func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, reg
 		respBytes, _ := io.ReadAll(putResp.Body)
 		return fmt.Errorf("push manifest failed with HTTP %d: %s", putResp.StatusCode, string(respBytes))
 	}
-
 
 	return nil
 }
