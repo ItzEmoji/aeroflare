@@ -51,7 +51,7 @@ func RunPush(args []string) {
 		fs.PrintDefaults()
 	}
 
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	if storePath == "" && inputFile == "" {
 		fmt.Fprintln(os.Stderr, "Error: --store-path or --input is required")
@@ -91,7 +91,7 @@ func RunPush(args []string) {
 
 	if !keepFiles {
 		// Automatic cleanup at the end
-		defer os.RemoveAll(outputDir)
+		defer func() { _ = os.RemoveAll(outputDir) }()
 	} else {
 		fmt.Printf("Generated files will be kept in: %s\n", outputDir)
 	}

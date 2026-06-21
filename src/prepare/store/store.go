@@ -170,7 +170,7 @@ type dumpReadCloser struct {
 
 func (d *dumpReadCloser) Close() error {
 	err := d.ReadCloser.Close()
-	d.cmd.Wait() // wait to prevent zombie, ignore error as closing pipe might cause SIGPIPE
+	_ = d.cmd.Wait() // wait to prevent zombie, ignore error as closing pipe might cause SIGPIPE
 	return err
 }
 

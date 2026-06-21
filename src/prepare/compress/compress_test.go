@@ -56,7 +56,7 @@ func TestCompressRoundTrip(t *testing.T) {
 				if err != nil {
 					t.Fatalf("gzip reader: %v", err)
 				}
-				defer r.Close()
+				defer func() { _ = r.Close() }()
 				reader = r
 			case Xz:
 				r, err := xz.NewReader(&buf)

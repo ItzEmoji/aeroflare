@@ -164,7 +164,7 @@ func main() {
 			fs.PrintDefaults()
 		}
 
-		fs.Parse(os.Args[2:])
+		_ = fs.Parse(os.Args[2:])
 
 		if storePath == "" && inputFile == "" {
 			fmt.Fprintln(os.Stderr, "Error: --store-path or --input is required")

@@ -62,7 +62,7 @@ func FetchCacheIndex(registry, repository, token string) (*PushCacheIndex, error
 
 	resp, err := client.Do(req)
 	if err == nil && resp.StatusCode == http.StatusOK {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var manifest struct {
 			Layers []struct {
 				Digest string `json:"digest"`
@@ -71,12 +71,12 @@ func FetchCacheIndex(registry, repository, token string) (*PushCacheIndex, error
 		if err := json.NewDecoder(resp.Body).Decode(&manifest); err == nil && len(manifest.Layers) > 0 {
 			tmpIndex, err := os.CreateTemp("", "existing-index-*.json")
 			if err == nil {
-				tmpIndex.Close()
-				defer os.Remove(tmpIndex.Name())
+				_ = tmpIndex.Close()
+				defer func() { _ = os.Remove(tmpIndex.Name()) }()
 
 				if err := PullBlob(manifest.Layers[0].Digest, tmpIndex.Name(), registry, repository, token); err == nil {
 					if b, err := os.ReadFile(tmpIndex.Name()); err == nil {
-						json.Unmarshal(b, &existingIndex)
+						_ = json.Unmarshal(b, &existingIndex)
 						if existingIndex.Entries == nil {
 							existingIndex.Entries = make(map[string]PushCacheEntry)
 						}
@@ -85,7 +85,7 @@ func FetchCacheIndex(registry, repository, token string) (*PushCacheIndex, error
 			}
 		}
 	} else if resp != nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	return &existingIndex, nil
@@ -171,10 +171,10 @@ func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, reg
 
 	// Push new index JSON as blob
 	outIndex, _ := os.CreateTemp("", "new-index-*.json")
-	defer os.Remove(outIndex.Name())
+	defer func() { _ = os.Remove(outIndex.Name()) }()
 
 	b, _ := json.MarshalIndent(newIndex, "", "  ")
-	os.WriteFile(outIndex.Name(), b, 0644)
+	_ = os.WriteFile(outIndex.Name(), b, 0644)
 
 	indexDigest, err := PushBlob(outIndex.Name(), registry, repository, token)
 	if err != nil {
@@ -184,8 +184,8 @@ func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, reg
 
 	// Push empty config JSON as blob
 	outConfig, _ := os.CreateTemp("", "empty-config-*.json")
-	defer os.Remove(outConfig.Name())
-	os.WriteFile(outConfig.Name(), []byte("{}"), 0644)
+	defer func() { _ = os.Remove(outConfig.Name()) }()
+	_ = os.WriteFile(outConfig.Name(), []byte("{}"), 0644)
 
 	configDigest, err := PushBlob(outConfig.Name(), registry, repository, token)
 	if err != nil {
@@ -224,7 +224,7 @@ func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, reg
 	if err != nil {
 		return fmt.Errorf("push manifest: %w", err)
 	}
-	defer putResp.Body.Close()
+	defer func() { _ = putResp.Body.Close() }()
 
 	if putResp.StatusCode != http.StatusCreated && putResp.StatusCode != http.StatusOK {
 		respBytes, _ := io.ReadAll(putResp.Body)

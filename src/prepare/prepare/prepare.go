@@ -330,9 +330,7 @@ func computeMissingRefs(references []string, existsMap map[string]bool, hashToPa
 	if len(existsMap) == 0 {
 		// No cache configured: all references are "missing"
 		var missing []string
-		for _, ref := range references {
-			missing = append(missing, ref)
-		}
+		missing = append(missing, references...)
 		return missing
 	}
 
@@ -499,7 +497,7 @@ func writeNarAndNarinfo(storePath, pathHash string, info *store.PathInfo, cfg *C
 	if err != nil {
 		return "", "", fmt.Errorf("create nar file: %w", err)
 	}
-	defer narFile.Close()
+	defer func() { _ = narFile.Close() }()
 
 	compWriter, err := compress.NewWriter(narFile, cfg.Compression)
 	if err != nil {
@@ -509,7 +507,7 @@ func writeNarAndNarinfo(storePath, pathHash string, info *store.PathInfo, cfg *C
 	b := &store.LegacyStoreBackend{}
 	narStream, err := b.Dump(storePath)
 	if err != nil {
-		compWriter.Close()
+		_ = compWriter.Close()
 		return "", "", fmt.Errorf("dump nar: %w", err)
 	}
 
@@ -522,13 +520,13 @@ func writeNarAndNarinfo(storePath, pathHash string, info *store.PathInfo, cfg *C
 		if n > 0 {
 			narSize += int64(n)
 			if _, werr := narHasher.Write(buf[:n]); werr != nil {
-				narStream.Close()
-				compWriter.Close()
+				_ = narStream.Close()
+				_ = compWriter.Close()
 				return "", "", fmt.Errorf("hash write error: %w", werr)
 			}
 			if _, werr := compWriter.Write(buf[:n]); werr != nil {
-				narStream.Close()
-				compWriter.Close()
+				_ = narStream.Close()
+				_ = compWriter.Close()
 				return "", "", fmt.Errorf("compress write error: %w", werr)
 			}
 		}
@@ -536,13 +534,13 @@ func writeNarAndNarinfo(storePath, pathHash string, info *store.PathInfo, cfg *C
 			if readErr == io.EOF {
 				break
 			}
-			narStream.Close()
-			compWriter.Close()
+			_ = narStream.Close()
+			_ = compWriter.Close()
 			return "", "", fmt.Errorf("read nar stream: %w", readErr)
 		}
 	}
 	if err := narStream.Close(); err != nil {
-		compWriter.Close()
+		_ = compWriter.Close()
 		return "", "", fmt.Errorf("close nar stream: %w", err)
 	}
 

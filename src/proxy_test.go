@@ -749,7 +749,7 @@ func TestProxyServer_ServeNar_Upstream_Interrupted(t *testing.T) {
 
 	ps.Handler(w, req)
 
-	wPipe.Close()
+	_ = wPipe.Close()
 	os.Stderr = oldStderr
 	var stderrOutput bytes.Buffer
 	_, _ = io.Copy(&stderrOutput, rPipe)

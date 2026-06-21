@@ -122,7 +122,7 @@ func (c *Cache) checkRemote(ctx context.Context, hash string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("request %s: %w", url, err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
