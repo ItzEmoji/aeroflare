@@ -609,9 +609,7 @@ func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, r *http.Request, path
 	}
 
 	upstreamPath := fmt.Sprintf("/%s.narinfo", storeHash)
-	if len(ps.UpstreamCaches) > 0 {
-		upstreamURL := fmt.Sprintf("%s%s", strings.TrimSuffix(ps.UpstreamCaches[0], "/"), upstreamPath)
-		http.Redirect(w, r, upstreamURL, http.StatusFound)
+	if ps.proxyUpstream(w, r, upstreamPath) {
 		return
 	}
 
@@ -652,9 +650,7 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, r *http.Request, path str
 		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to stream blob %s from GHCR: %v. Trying upstream...\n", digest, err)
 	}
 
-	if len(ps.UpstreamCaches) > 0 {
-		upstreamURL := fmt.Sprintf("%s%s", strings.TrimSuffix(ps.UpstreamCaches[0], "/"), path)
-		http.Redirect(w, r, upstreamURL, http.StatusFound)
+	if ps.proxyUpstream(w, r, path) {
 		return
 	}
 
@@ -700,6 +696,35 @@ func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentT
 		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for blob %s: %v\n", digest, err)
 	}
 	return nil
+}
+
+func (ps *ProxyServer) proxyUpstream(w http.ResponseWriter, r *http.Request, upstreamPath string) bool {
+	if len(ps.UpstreamCaches) == 0 {
+		return false
+	}
+	upstreamURL := fmt.Sprintf("%s%s", strings.TrimSuffix(ps.UpstreamCaches[0], "/"), upstreamPath)
+	req, err := http.NewRequest(r.Method, upstreamURL, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("User-Agent", "aeroflare/1.0")
+	resp, err := ps.HttpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	for k, vv := range resp.Header {
+		for _, v := range vv {
+			w.Header().Add(k, v)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for upstream path %s: %v\n", upstreamPath, err)
+	}
+	return true
 }
 
 func (ps *ProxyServer) fetchWorkerBytes(path string) ([]byte, error) {
