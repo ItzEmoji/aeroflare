@@ -1,7 +1,8 @@
-package network
+package proxy
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -138,68 +139,6 @@ func TestProxyServerEndpoints(t *testing.T) {
 	}
 }
 
-func TestProxyServerWorkerMode(t *testing.T) {
-	mockWorker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/public-key":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("worker-public-key"))
-		case "/worker-hash.narinfo":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("StoreDir: /nix/store\nURL: nar/worker-nar.nar.xz\n"))
-		case "/nar/worker-nar.nar.xz/digest":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("sha256:worker-digest-val"))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer mockWorker.Close()
-
-	ps := &ProxyServer{
-		Port:            37515,
-		ListenAddr:      "127.0.0.1",
-		Registry:        "ghcr.io",
-		Repository:      "test-repo/nix-cache",
-		UpstreamCaches:  []string{"https://cache.nixos.org"},
-		TokenMgr:        NewTokenManager("ghcr.io", "test-repo/nix-cache", ""),
-		CacheIndex:      &CacheIndex{},
-		WorkerURL:       mockWorker.URL,
-		HttpClient:      &http.Client{Timeout: 30 * time.Minute},
-		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
-	}
-
-	// 1. Test /public-key from worker
-	req := httptest.NewRequest("GET", "/public-key", nil)
-	w := httptest.NewRecorder()
-	ps.Handler(w, req)
-	resp := w.Result()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected 200, got %d", resp.StatusCode)
-	}
-
-	// 2. Test /worker-hash.narinfo from worker
-	req = httptest.NewRequest("GET", "/worker-hash.narinfo", nil)
-	w = httptest.NewRecorder()
-	ps.Handler(w, req)
-	resp = w.Result()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected 200, got %d", resp.StatusCode)
-	}
-
-	// 3. Test _status shows worker URL
-	req = httptest.NewRequest("GET", "/_status", nil)
-	w = httptest.NewRecorder()
-	ps.Handler(w, req)
-	resp = w.Result()
-	var status map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		t.Fatalf("Failed to decode status: %v", err)
-	}
-	if status["worker_url"] != mockWorker.URL {
-		t.Errorf("Expected worker_url %s, got %v", mockWorker.URL, status["worker_url"])
-	}
-}
 
 func TestBootstrapConfig(t *testing.T) {
 	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -239,7 +178,7 @@ func TestBootstrapConfig(t *testing.T) {
 	u = strings.TrimPrefix(u, "https://")
 
 	tokenMgr := NewTokenManager(u, "test-repo/nix-cache", "")
-	conf, err := BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
+	conf, err := BootstrapConfig(context.Background(), nil, u, "test-repo/nix-cache", tokenMgr)
 	if err != nil {
 		t.Fatalf("Failed to bootstrap config: %v", err)
 	}
@@ -270,7 +209,7 @@ func TestBootstrapConfig_ManifestNotFound(t *testing.T) {
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
 	tokenMgr := NewTokenManager(u, "test-repo/nix-cache", "")
-	_, err := BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
+	_, err := BootstrapConfig(context.Background(), nil, u, "test-repo/nix-cache", tokenMgr)
 	if err == nil {
 		t.Fatal("Expected error when manifest returns 404, got nil")
 	}
@@ -296,7 +235,7 @@ func TestBootstrapConfig_EmptyLayers(t *testing.T) {
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
 	tokenMgr := NewTokenManager(u, "test-repo/nix-cache", "")
-	_, err := BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
+	_, err := BootstrapConfig(context.Background(), nil, u, "test-repo/nix-cache", tokenMgr)
 	if err == nil {
 		t.Fatal("Expected error when manifest has empty layers, got nil")
 	}
@@ -323,7 +262,7 @@ func TestBootstrapConfig_BlobNotFound(t *testing.T) {
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
 	tokenMgr := NewTokenManager(u, "test-repo/nix-cache", "")
-	_, err := BootstrapConfig(u, "test-repo/nix-cache", tokenMgr)
+	_, err := BootstrapConfig(context.Background(), nil, u, "test-repo/nix-cache", tokenMgr)
 	if err == nil {
 		t.Fatal("Expected error when blob returns 404, got nil")
 	}
@@ -395,7 +334,6 @@ func TestProxyServer_ServePublicKey_NotFound(t *testing.T) {
 	}
 	ps := &ProxyServer{
 		CacheIndex:      cacheIndex,
-		PublicKey:       "", // No public key set on server either
 		HttpClient:      &http.Client{},
 		HttpShortClient: &http.Client{},
 		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
@@ -414,12 +352,12 @@ func TestProxyServer_ServePublicKey_FromServerField(t *testing.T) {
 	cacheIndex := &CacheIndex{
 		Data:       &CacheIndexData{Entries: map[string]IndexEntry{}},
 		NarLookups: map[string]string{},
+		ManifestAnnotations: map[string]string{"public-key": "  server-configured-key  "},
 		LastFetch:  time.Now(),
 		IndexTTL:   5 * time.Minute,
 	}
 	ps := &ProxyServer{
 		CacheIndex:      cacheIndex,
-		PublicKey:       "  server-configured-key  ", // Whitespace should be trimmed + newline appended
 		HttpClient:      &http.Client{},
 		HttpShortClient: &http.Client{},
 		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
@@ -504,37 +442,6 @@ func TestProxyServer_HandleRefresh_NoWorker_Success(t *testing.T) {
 }
 
 // TestProxyServer_HandleRefresh_WithWorker verifies /_refresh proxies to the worker.
-func TestProxyServer_HandleRefresh_WithWorker(t *testing.T) {
-	mockWorker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" && r.URL.Path == "/_refresh" {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"refreshed": true, "entries": 42}`))
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer mockWorker.Close()
-
-	ps := &ProxyServer{
-		WorkerURL:       mockWorker.URL,
-		CacheIndex:      &CacheIndex{},
-		HttpClient:      &http.Client{Timeout: 30 * time.Second},
-		HttpShortClient: &http.Client{Timeout: 10 * time.Second},
-		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
-	}
-
-	req := httptest.NewRequest("POST", "/_refresh", nil)
-	w := httptest.NewRecorder()
-	ps.Handler(w, req)
-	resp := w.Result()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected 200, got %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	if !strings.Contains(string(body), "42") {
-		t.Errorf("Expected proxied worker response with 42 entries, got %s", string(body))
-	}
-}
 
 // TestProxyServer_HandleRefresh_NoWorker_Error verifies /_refresh returns 500 when CacheIndex.ForceRefresh fails.
 func TestProxyServer_HandleRefresh_NoWorker_Error(t *testing.T) {
@@ -832,7 +739,7 @@ func TestCacheIndex_UpdateInMemory_NarLookup(t *testing.T) {
 	}
 	ci.LastFetch = time.Now()
 
-	indexData, narLookups := ci.Get()
+	indexData, narLookups := ci.Get(context.Background())
 
 	if len(indexData.Entries) != 3 {
 		t.Errorf("Expected 3 entries, got %d", len(indexData.Entries))
@@ -867,7 +774,7 @@ func TestCacheIndex_Get_ReturnsEmptyOnNilData(t *testing.T) {
 		// Data is nil
 	}
 
-	indexData, narLookups := ci.Get()
+	indexData, narLookups := ci.Get(context.Background())
 	if indexData == nil {
 		t.Fatal("Get() should never return nil CacheIndexData")
 	}
@@ -885,7 +792,7 @@ func TestTokenManager_GetToken_OciTokenEnv(t *testing.T) {
 	t.Setenv("NIXCACHE_TOKEN", "")
 
 	tokenMgr := NewTokenManager("ghcr.io", "test/nix-cache", "")
-	token, err := tokenMgr.GetToken()
+	token, err := tokenMgr.GetToken(context.Background())
 	if err != nil {
 		t.Fatalf("GetToken failed: %v", err)
 	}
@@ -912,7 +819,7 @@ func TestTokenManager_GetToken_OciTokenEnv_GhpPrefix(t *testing.T) {
 
 	reg := strings.TrimPrefix(mockRegistry.URL, "http://")
 	tokenMgr := NewTokenManager(reg, "test/nix-cache", "")
-	token, err := tokenMgr.GetToken()
+	token, err := tokenMgr.GetToken(context.Background())
 	if err != nil {
 		t.Fatalf("GetToken failed: %v", err)
 	}
@@ -931,7 +838,7 @@ func TestTokenManager_GetToken_NixcacheTokenEnv(t *testing.T) {
 	t.Setenv("NIXCACHE_TOKEN", "nixcache-direct-token")
 
 	tokenMgr := NewTokenManager("ghcr.io", "test/nix-cache", "")
-	token, err := tokenMgr.GetToken()
+	token, err := tokenMgr.GetToken(context.Background())
 	if err != nil {
 		t.Fatalf("GetToken failed: %v", err)
 	}
@@ -961,12 +868,12 @@ func TestTokenManager_GetToken_Cached(t *testing.T) {
 	tokenMgr := NewTokenManager(reg, "test/nix-cache", "")
 
 	// First call fetches
-	token1, err := tokenMgr.GetToken()
+	token1, err := tokenMgr.GetToken(context.Background())
 	if err != nil {
 		t.Fatalf("First GetToken call failed: %v", err)
 	}
 	// Second call should use cache
-	token2, err := tokenMgr.GetToken()
+	token2, err := tokenMgr.GetToken(context.Background())
 	if err != nil {
 		t.Fatalf("Second GetToken call failed: %v", err)
 	}
@@ -1000,7 +907,7 @@ func TestTokenManager_GetToken_WithGithubToken(t *testing.T) {
 
 	reg := strings.TrimPrefix(mockRegistry.URL, "http://")
 	tokenMgr := NewTokenManager(reg, "test/nix-cache", "my-github-pat")
-	token, err := tokenMgr.GetToken()
+	token, err := tokenMgr.GetToken(context.Background())
 	if err != nil {
 		t.Fatalf("GetToken with github token failed: %v", err)
 	}
@@ -1034,39 +941,6 @@ func TestProxyServer_NixCacheInfo_Content(t *testing.T) {
 }
 
 // TestProxyServer_ServeStatus_WorkerMode verifies that /_status with a workerURL shows managed-by-D1 index_generated.
-func TestProxyServer_ServeStatus_WorkerMode(t *testing.T) {
-	ps := &ProxyServer{
-		WorkerURL:       "https://my-worker.example.com",
-		Repository:      "test-repo/nix-cache",
-		UpstreamCaches:  []string{"https://cache.nixos.org"},
-		CacheIndex:      &CacheIndex{IndexTTL: 5 * time.Minute},
-		HttpClient:      &http.Client{},
-		HttpShortClient: &http.Client{},
-		TokenMgr:        NewTokenManager("ghcr.io", "test/nix-cache", ""),
-	}
-
-	req := httptest.NewRequest("GET", "/_status", nil)
-	w := httptest.NewRecorder()
-	ps.Handler(w, req)
-	resp := w.Result()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected 200, got %d", resp.StatusCode)
-	}
-
-	var status map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		t.Fatalf("Failed to decode status: %v", err)
-	}
-	if status["index_entries"].(float64) != -1 {
-		t.Errorf("Expected index_entries=-1 in worker mode, got %v", status["index_entries"])
-	}
-	if status["index_generated"] != "managed by Cloudflare D1" {
-		t.Errorf("Expected 'managed by Cloudflare D1', got %v", status["index_generated"])
-	}
-	if status["worker_url"] != "https://my-worker.example.com" {
-		t.Errorf("Expected worker_url to match, got %v", status["worker_url"])
-	}
-}
 
 // TestProxyServer_NarInfo_FallsBackToUpstream verifies narinfo falls back to upstream when not in index.
 func TestProxyServer_NarInfo_FallsBackToUpstream(t *testing.T) {

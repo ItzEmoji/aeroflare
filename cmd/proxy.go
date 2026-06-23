@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	network "aeroflare/src"
+	"aeroflare/src/proxy"
 	"github.com/spf13/cobra"
 )
 
@@ -48,10 +49,6 @@ var proxyCmd = &cobra.Command{
 
 		indexDir := getIndexDir(repository)
 
-		workerURL := os.Getenv("AEROFLARE_WORKER_URL")
-		if workerURL == "" {
-			workerURL = os.Getenv("NIXCACHE_WORKER_URL")
-		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -63,7 +60,7 @@ var proxyCmd = &cobra.Command{
 			cancel()
 		}()
 
-		actualPort, err := network.StartProxy(ctx, port, listenAddr, registry, repository, indexDir, indexTTL, upstreams, getGithubToken(), workerURL)
+		actualPort, err := proxy.StartProxy(ctx, port, listenAddr, registry, repository, indexDir, "", indexTTL, upstreams, getGithubToken())
 		if err != nil {
 			PrintError(fmt.Sprintf("Proxy server failed: %v", err))
 			os.Exit(1)

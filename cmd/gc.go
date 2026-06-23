@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	network "aeroflare/src"
+	"aeroflare/src/proxy"
 	"github.com/spf13/cobra"
 )
 
@@ -60,8 +62,8 @@ var gcCmd = &cobra.Command{
 		PrintSuccess(fmt.Sprintf("Garbage collection freed %d bytes.", result.FreedBytes))
 
 		if result.FreedBytes > 0 {
-			tokenMgr := network.NewTokenManager(registry, repository, "")
-			_, configAnnotations, _ := network.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+			tokenMgr := proxy.NewTokenManager(registry, repository, "")
+			_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(context.Background(), nil, registry, repository, tokenMgr)
 			r2Cfg := network.GetR2Config(configAnnotations)
 
 			PrintInfo("Pushing updated remote index...")

@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	network "aeroflare/src"
+	"aeroflare/src/proxy"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -28,8 +30,8 @@ var configureCmd = &cobra.Command{
 		var existingR2PublicURL string
 		var existingR2Endpoint = ""
 
-		tokenMgr := network.NewTokenManager(registry, repository, "")
-		remoteConf, existingAnnotations, _ := network.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+		tokenMgr := proxy.NewTokenManager(registry, repository, "")
+		remoteConf, existingAnnotations, _ := proxy.BootstrapConfigWithAnnotations(context.Background(), nil, registry, repository, tokenMgr)
 		if existingAnnotations != nil {
 			if b := existingAnnotations["aeroflare.backend"]; b != "" {
 				if b == "r2" {
