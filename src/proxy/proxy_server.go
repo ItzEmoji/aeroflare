@@ -1,12 +1,14 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strconv"
+	"errors"
 	"strings"
 )
 
@@ -33,11 +35,11 @@ func (ps *ProxyServer) Handler(w http.ResponseWriter, r *http.Request) {
 		case path == "/nix-cache-info":
 			ps.serveNixCacheInfo(w)
 		case path == "/public-key":
-			ps.servePublicKey(w)
+			ps.servePublicKey(w, r)
 		case path == "/api/public-key":
 			ps.serveApiPublicKey(w)
 		case path == "/_status":
-			ps.serveStatus(w)
+			ps.serveStatus(w, r)
 		case strings.HasSuffix(path, ".narinfo"):
 			ps.serveNarInfo(w, r, path)
 		case strings.HasPrefix(path, "/nar/"):
@@ -48,7 +50,7 @@ func (ps *ProxyServer) Handler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		switch path {
 		case "/_refresh":
-			ps.handleRefresh(w)
+			ps.handleRefresh(w, r)
 		default:
 			http.Error(w, "Not Found", http.StatusNotFound)
 		}
@@ -65,7 +67,7 @@ func (ps *ProxyServer) serveNixCacheInfo(w http.ResponseWriter) {
 	_, _ = w.Write(data)
 }
 
-func (ps *ProxyServer) servePublicKey(w http.ResponseWriter) {
+func (ps *ProxyServer) servePublicKey(w http.ResponseWriter, r *http.Request) {
 	// Primary source: the cache-index manifest annotation.
 	ps.CacheIndex.mu.RLock()
 	pubKey := ""
@@ -76,8 +78,10 @@ func (ps *ProxyServer) servePublicKey(w http.ResponseWriter) {
 
 	// Fallback (json mode): the public_key field of the cached index blob.
 	if pubKey == "" && !ps.CacheIndex.IsR2() {
-		indexData, _ := ps.CacheIndex.Get()
-		pubKey = indexData.PublicKey
+		indexData, _ := ps.CacheIndex.Get(r.Context())
+		if indexData != nil {
+			pubKey = indexData.PublicKey
+		}
 	}
 
 	if pubKey != "" {
@@ -113,12 +117,19 @@ func (ps *ProxyServer) serveApiPublicKey(w http.ResponseWriter) {
 	}
 }
 
-func (ps *ProxyServer) serveStatus(w http.ResponseWriter) {
-	indexData, _ := ps.CacheIndex.Get()
+func (ps *ProxyServer) serveStatus(w http.ResponseWriter, r *http.Request) {
+	indexData, _ := ps.CacheIndex.Get(r.Context())
+
+	entriesCount := 0
+	var generated string
+	if indexData != nil {
+		entriesCount = len(indexData.Entries)
+		generated = indexData.Generated
+	}
 
 	status := map[string]interface{}{
-		"index_entries":   len(indexData.Entries),
-		"index_generated": indexData.Generated,
+		"index_entries":   entriesCount,
+		"index_generated": generated,
 		"index_ttl":       int(ps.CacheIndex.IndexTTL.Seconds()),
 		"repo":            ps.Repository,
 		"upstream":        ps.UpstreamCaches,
@@ -143,10 +154,10 @@ func (ps *ProxyServer) serveStatus(w http.ResponseWriter) {
 	_ = json.NewEncoder(w).Encode(status)
 }
 
-func (ps *ProxyServer) handleRefresh(w http.ResponseWriter) {
+func (ps *ProxyServer) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	count, err := ps.CacheIndex.ForceRefresh()
+	count, err := ps.CacheIndex.ForceRefresh(r.Context())
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -178,14 +189,16 @@ func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, r *http.Request, path
 	}
 
 	// json mode: serve from the cached index.
-	indexData, _ := ps.CacheIndex.Get()
-	if entry, ok := indexData.Entries[storeHash]; ok && entry.NarInfo != "" {
-		body := []byte(entry.NarInfo)
-		w.Header().Set("Content-Type", "text/x-nix-narinfo")
-		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(body)
-		return
+	indexData, _ := ps.CacheIndex.Get(r.Context())
+	if indexData != nil {
+		if entry, ok := indexData.Entries[storeHash]; ok && entry.NarInfo != "" {
+			body := []byte(entry.NarInfo)
+			w.Header().Set("Content-Type", "text/x-nix-narinfo")
+			w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(body)
+			return
+		}
 	}
 
 	// Fallback to upstream cache.
@@ -208,21 +221,23 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, r *http.Request, path str
 
 	// r2 mode: derive the blob digest from the narinfo's FileHash served by R2.
 	if ps.CacheIndex.IsR2() {
-		if d, err := ps.digestFromR2Narinfo(narBasename); err == nil && d != "" {
+		if d, err := ps.digestFromR2Narinfo(r.Context(), narBasename); err == nil && d != "" {
 			digest = d
 		} else if err != nil {
 			fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to derive digest from R2 narinfo for %s: %v. Trying upstream...\n", narBasename, err)
 		}
 	} else {
 		// json mode: use the NAR lookup built from the cached index.
-		_, narLookups := ps.CacheIndex.Get()
-		if d, ok := narLookups[narBasename]; ok && d != "" {
-			digest = d
+		_, narLookups := ps.CacheIndex.Get(r.Context())
+		if narLookups != nil {
+			if d, ok := narLookups[narBasename]; ok && d != "" {
+				digest = d
+			}
 		}
 	}
 
 	if digest != "" && strings.HasPrefix(digest, "sha256:") {
-		err := ps.streamBlob(w, digest, contentType, method)
+		err := ps.streamBlob(r.Context(), w, digest, contentType, method)
 		if err == nil {
 			return
 		}
@@ -239,7 +254,7 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, r *http.Request, path str
 // digestFromR2Narinfo fetches the narinfo for a NAR from the public R2 URL and
 // converts its FileHash (sha256:<nix-base32> of the compressed NAR) into the
 // GHCR blob digest form (sha256:<hex>).
-func (ps *ProxyServer) digestFromR2Narinfo(narBasename string) (string, error) {
+func (ps *ProxyServer) digestFromR2Narinfo(ctx context.Context, narBasename string) (string, error) {
 	publicURL := ps.CacheIndex.PublicR2URL()
 	if publicURL == "" {
 		return "", fmt.Errorf("no public R2 URL configured")
@@ -253,7 +268,7 @@ func (ps *ProxyServer) digestFromR2Narinfo(narBasename string) (string, error) {
 	}
 
 	narinfoURL := fmt.Sprintf("%s/%s.narinfo", strings.TrimRight(publicURL, "/"), storeHash)
-	req, err := http.NewRequest("GET", narinfoURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", narinfoURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -276,15 +291,15 @@ func (ps *ProxyServer) digestFromR2Narinfo(narBasename string) (string, error) {
 	return fileHashToBlobDigest(string(body))
 }
 
-func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentType string, method string) error {
-	token, err := ps.TokenMgr.GetToken()
+func (ps *ProxyServer) streamBlob(ctx context.Context, w http.ResponseWriter, digest string, contentType string, method string) error {
+	token, err := ps.TokenMgr.GetToken(ctx)
 	if err != nil {
 		return err
 	}
 
 	proto := GetProtocol(ps.Registry)
 	url := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, ps.Registry, ps.Repository, digest)
-	req, err := http.NewRequest(method, url, nil)
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
 		return err
 	}
@@ -316,32 +331,46 @@ func (ps *ProxyServer) streamBlob(w http.ResponseWriter, digest string, contentT
 	}
 	return nil
 }
-
 func (ps *ProxyServer) proxyUpstream(w http.ResponseWriter, r *http.Request, upstreamPath string) bool {
-	if len(ps.UpstreamCaches) == 0 {
-		return false
-	}
-	upstreamURL := fmt.Sprintf("%s%s", strings.TrimSuffix(ps.UpstreamCaches[0], "/"), upstreamPath)
-	req, err := http.NewRequest(r.Method, upstreamURL, nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set("User-Agent", "aeroflare/1.0")
-	resp, err := ps.HttpClient.Do(req)
-	if err != nil {
-		return false
-	}
-	defer func() { _ = resp.Body.Close() }()
+        if len(ps.UpstreamCaches) == 0 {
+                return false
+        }
 
-	for k, vv := range resp.Header {
-		for _, v := range vv {
-			w.Header().Add(k, v)
-		}
-	}
-	w.WriteHeader(resp.StatusCode)
-	_, err = io.Copy(w, resp.Body)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for upstream path %s: %v\n", upstreamPath, err)
-	}
-	return true
+        for _, cache := range ps.UpstreamCaches {
+                upstreamURL := fmt.Sprintf("%s%s", strings.TrimSuffix(cache, "/"), upstreamPath)
+                
+                req, err := http.NewRequestWithContext(r.Context(), r.Method, upstreamURL, nil)
+                if err != nil {
+                        continue // Try next upstream
+                }
+                req.Header.Set("User-Agent", "aeroflare/1.0")
+
+                resp, err := ps.HttpClient.Do(req)
+                if err != nil {
+                        continue // Try next upstream on network error
+                }
+                
+                // If it's a 404, we might want to try the next cache. 
+                // If it's a 200 OK, serve it and return.
+                if resp.StatusCode != http.StatusOK {
+                        _ = resp.Body.Close()
+                        continue
+                }
+
+                defer func() { _ = resp.Body.Close() }()
+
+                for k, vv := range resp.Header {
+                        for _, v := range vv {
+                                w.Header().Add(k, v)
+                        }
+                }
+                w.WriteHeader(resp.StatusCode)
+                _, err = io.Copy(w, resp.Body)
+                if err != nil && !errors.Is(err, context.Canceled) {
+                        fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for upstream path %s: %v\n", upstreamPath, err)
+                }
+                return true
+        }
+
+        return false
 }

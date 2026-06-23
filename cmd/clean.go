@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -37,7 +38,7 @@ var cleanIndexCmd = &cobra.Command{
 		}
 
 		tokenMgr := proxy.NewTokenManager(registry, repository, "")
-		_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+		_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(context.Background(), nil, registry, repository, tokenMgr)
 		r2Cfg := network.GetR2Config(configAnnotations)
 
 		PrintInfo("Wiping remote index...")

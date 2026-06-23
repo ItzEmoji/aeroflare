@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -62,7 +63,7 @@ var gcCmd = &cobra.Command{
 
 		if result.FreedBytes > 0 {
 			tokenMgr := proxy.NewTokenManager(registry, repository, "")
-			_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+			_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(context.Background(), nil, registry, repository, tokenMgr)
 			r2Cfg := network.GetR2Config(configAnnotations)
 
 			PrintInfo("Pushing updated remote index...")

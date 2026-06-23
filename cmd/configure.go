@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -30,7 +31,7 @@ var configureCmd = &cobra.Command{
 		var existingR2Endpoint = ""
 
 		tokenMgr := proxy.NewTokenManager(registry, repository, "")
-		remoteConf, existingAnnotations, _ := proxy.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+		remoteConf, existingAnnotations, _ := proxy.BootstrapConfigWithAnnotations(context.Background(), nil, registry, repository, tokenMgr)
 		if existingAnnotations != nil {
 			if b := existingAnnotations["aeroflare.backend"]; b != "" {
 				if b == "r2" {

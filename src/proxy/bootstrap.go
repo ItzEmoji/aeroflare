@@ -4,83 +4,95 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
-	"os"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// BootstrapConfig fetches configuration dynamically from the GHCR 'cache-config' OCI image/blob.
-// Used by the push/configure pipeline; the proxy itself reads from the cache-index manifest.
-func BootstrapConfig(registry, repository string, tokenMgr *TokenManager) (*RemoteConfig, error) {
-	config, _, err := BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+const (
+	userAgent            = "aeroflare/1.0"
+	ociManifestMediaType = "application/vnd.oci.image.manifest.v1+json"
+)
+
+// BootstrapConfig fetches configuration dynamically from the OCI-Registry.
+// Now accepts an *http.Client to utilize connection pooling from the caller.
+func BootstrapConfig(ctx context.Context, client *http.Client, registry, repository string, tokenMgr *TokenManager) (*RemoteConfig, error) {
+	config, _, err := BootstrapConfigWithAnnotations(ctx, client, registry, repository, tokenMgr)
 	return config, err
 }
 
-func BootstrapConfigWithAnnotations(registry, repository string, tokenMgr *TokenManager) (*RemoteConfig, map[string]string, error) {
-	token, err := tokenMgr.GetToken()
+func BootstrapConfigWithAnnotations(ctx context.Context, client *http.Client, registry, repository string, tokenMgr *TokenManager) (*RemoteConfig, map[string]string, error) {
+	token, err := tokenMgr.GetToken(context.Background())
 	if err != nil {
 		return nil, nil, err
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	// Fallback to avoid panics if nil is passed
+	if client == nil {
+		client = http.DefaultClient
+	}
+
 	proto := GetProtocol(registry)
 
+	// --- 1. Manifest Fetch ---
 	manifestURL := fmt.Sprintf("%s://%s/v2/%s/manifests/cache-config", proto, registry, repository)
-	req, err := http.NewRequest("GET", manifestURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", manifestURL, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed creating manifest request: %w", err)
 	}
-	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
-	req.Header.Set("User-Agent", "aeroflare/1.0")
+	req.Header.Set("Accept", ociManifestMediaType)
+	req.Header.Set("User-Agent", userAgent)
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := client.Do(req)
+	manifestResp, err := client.Do(req)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed fetching manifest from %s: %w", manifestURL, err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = manifestResp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("config manifest HTTP %d", resp.StatusCode)
+	if manifestResp.StatusCode != http.StatusOK {
+		return nil, nil, fmt.Errorf("config manifest HTTP %d for %s", manifestResp.StatusCode, manifestURL)
 	}
 
 	var manifest IndexManifest
-	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
-		return nil, nil, err
+	if err := json.NewDecoder(manifestResp.Body).Decode(&manifest); err != nil {
+		return nil, nil, fmt.Errorf("failed decoding manifest JSON: %w", err)
 	}
 
 	if len(manifest.Layers) == 0 {
 		return nil, manifest.Annotations, fmt.Errorf("no layers in cache-config manifest")
 	}
 
+	// --- 2. Blob Fetch ---
 	digest := manifest.Layers[0].Digest
 	blobURL := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, registry, repository, digest)
-	req, err = http.NewRequest("GET", blobURL, nil)
+	blobReq, err := http.NewRequestWithContext(ctx, "GET", blobURL, nil)
 	if err != nil {
-		return nil, manifest.Annotations, err
+		return nil, manifest.Annotations, fmt.Errorf("failed creating blob request: %w", err)
 	}
-	req.Header.Set("User-Agent", "aeroflare/1.0")
+	blobReq.Header.Set("User-Agent", userAgent)
 	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+		blobReq.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err = client.Do(req)
+	blobResp, err := client.Do(blobReq)
 	if err != nil {
-		return nil, manifest.Annotations, err
+		return nil, manifest.Annotations, fmt.Errorf("failed fetching blob from %s: %w", blobURL, err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = blobResp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, manifest.Annotations, fmt.Errorf("config blob HTTP %d", resp.StatusCode)
+	if blobResp.StatusCode != http.StatusOK {
+		return nil, manifest.Annotations, fmt.Errorf("config blob HTTP %d for %s", blobResp.StatusCode, blobURL)
 	}
 
 	var config RemoteConfig
-	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
-		return nil, manifest.Annotations, err
+	if err := json.NewDecoder(blobResp.Body).Decode(&config); err != nil {
+		return nil, manifest.Annotations, fmt.Errorf("failed decoding blob JSON: %w", err)
 	}
 
 	if pk, ok := manifest.Annotations["public-key"]; ok && pk != "" && config.PublicKey == "" {
@@ -92,6 +104,13 @@ func BootstrapConfigWithAnnotations(registry, repository string, tokenMgr *Token
 
 // StartProxy starts the proxy HTTP server on the configured address.
 func StartProxy(ctx context.Context, port int, listenAddr string, registry string, repository string, indexDir string, cacheFileName string, indexTTLSeconds int, upstreams []string, githubToken string) (int, error) {
+	// --- VALIDATION CHECK ---
+	for _, upstream := range upstreams {
+		if !IsValidUpstreamURL(upstream) {
+			return 0, fmt.Errorf("fatal: invalid upstream URL configured: %q", upstream)
+		}
+	}
+
 	tokenMgr := NewTokenManager(registry, repository, githubToken)
 
 	if cacheFileName == "" {
@@ -108,17 +127,41 @@ func StartProxy(ctx context.Context, port int, listenAddr string, registry strin
 		Repository:    repository,
 	}
 
-	// Seed the local cache file (if present) so the very first request doesn't
-	// block on a registry round-trip, then refresh in the background.
+	// --- HTTP TRANSPORT & CLIENT TUNING ---
+	var transport *http.Transport
+	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
+		transport = dt.Clone()
+		transport.MaxIdleConns = 100
+		transport.MaxIdleConnsPerHost = 100
+		transport.IdleConnTimeout = 90 * time.Second
+	} else {
+		transport = &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+	}
+
+	proxyClient := &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Minute, // Kept high for massive NARs
+	}
+
+	// Seed the local cache file and refresh in the background
 	_ = cacheIndex.loadLocal()
 	go func() {
-		_, _ = cacheIndex.Get()
+		// context.WithoutCancel (Go 1.21+) decouples this from server startup context
+		bgCtx := context.WithoutCancel(ctx)
+		cacheIndex.Get(bgCtx)
 	}()
-
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.MaxIdleConns = 100
-	transport.MaxIdleConnsPerHost = 100
-	transport.IdleConnTimeout = 90 * time.Second
 
 	ps := &ProxyServer{
 		Port:           port,
@@ -128,10 +171,7 @@ func StartProxy(ctx context.Context, port int, listenAddr string, registry strin
 		UpstreamCaches: upstreams,
 		TokenMgr:       tokenMgr,
 		CacheIndex:     cacheIndex,
-		HttpClient: &http.Client{
-			Transport: transport,
-			Timeout:   30 * time.Minute,
-		},
+		HttpClient:     proxyClient,
 		HttpShortClient: &http.Client{
 			Transport: transport,
 			Timeout:   10 * time.Second,
@@ -141,34 +181,47 @@ func StartProxy(ctx context.Context, port int, listenAddr string, registry strin
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", ps.Handler)
 
-	addr := fmt.Sprintf("%s:%d", listenAddr, port)
+	addr := net.JoinHostPort(listenAddr, strconv.Itoa(port))
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return 0, err
 	}
 	actualPort := listener.Addr().(*net.TCPAddr).Port
 
+	// --- SERVER TUNING ---
 	server := &http.Server{
-		Handler: mux,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		// Replaced strict WriteTimeout with IdleTimeout to prevent Slowloris 
+		// without killing active multi-gigabyte derivations mid-download.
+		IdleTimeout:       120 * time.Second,
 	}
 
-	go func() {
-		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Starting proxy server on http://%s:%d\n", listenAddr, actualPort)
-		fmt.Fprintf(os.Stderr, "  Repo: %s\n", repository)
-		fmt.Fprintf(os.Stderr, "  Upstream: %s\n", strings.Join(upstreams, ", "))
-		fmt.Fprintf(os.Stderr, "  Index TTL: %s\n", ttl)
+	serveErr := make(chan error, 1)
 
-		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
-		}
+	go func() {
+		slog.Info("Starting proxy server",
+			"listen_addr", listenAddr,
+			"port", actualPort,
+			"repository", repository,
+			"upstream", strings.Join(upstreams, ", "),
+			"index_ttl", ttl.String(),
+		)
+		serveErr <- server.Serve(listener)
 	}()
 
 	go func() {
-		<-ctx.Done()
-		fmt.Fprintf(os.Stderr, "\n[aeroflare proxy] Shutting down...\n")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = server.Shutdown(shutdownCtx)
+		select {
+		case <-ctx.Done():
+			slog.Info("Shutting down proxy server...")
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = server.Shutdown(shutdownCtx)
+		case err := <-serveErr:
+			if err != nil && err != http.ErrServerClosed {
+				slog.Error("Server error", "error", err)
+			}
+		}
 	}()
 
 	return actualPort, nil

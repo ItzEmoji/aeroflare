@@ -183,7 +183,7 @@ func performPush(targetPaths []string) {
 	}
 
 	tokenMgr := proxy.NewTokenManager(registry, repository, "")
-	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, nil, registry, repository, tokenMgr)
 
 	r2Cfg := network.GetR2Config(configAnnotations)
 	var s3Client *s3.Client

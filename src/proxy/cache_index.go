@@ -1,9 +1,11 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -67,7 +69,7 @@ func (ci *CacheIndex) PublicR2URL() string {
 }
 
 // Get returns the current cache index data and NAR lookups map, triggering a TTL-based refresh if needed.
-func (ci *CacheIndex) Get() (*CacheIndexData, map[string]string) {
+func (ci *CacheIndex) Get(ctx context.Context) (*CacheIndexData, map[string]string) {
 	ci.mu.RLock()
 	needRefresh := time.Since(ci.LastFetch) > ci.IndexTTL
 	isNil := ci.Data == nil && ci.ManifestAnnotations == nil
@@ -79,8 +81,8 @@ func (ci *CacheIndex) Get() (*CacheIndexData, map[string]string) {
 		isNil = ci.Data == nil && ci.ManifestAnnotations == nil
 		ci.mu.RUnlock()
 		if isNil {
-			if err := ci.refresh(); err != nil {
-				fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to refresh index: %v. Using cached index.\n", err)
+			if err := ci.refresh(ctx); err != nil {
+				slog.Warn("Failed to refresh index. Using cached index.", "error", err)
 				if ci.Data == nil {
 					_ = ci.loadLocal()
 				}
@@ -92,10 +94,13 @@ func (ci *CacheIndex) Get() (*CacheIndexData, map[string]string) {
 		ci.refreshMu.Unlock()
 	} else if needRefresh {
 		if ci.refreshMu.TryLock() {
+			// context.WithoutCancel (Go 1.21+) ensures the background refresh isn't aborted 
+			// if the HTTP request triggering it is completed/closed by the client.
+			bgCtx := context.WithoutCancel(ctx)
 			go func() {
 				defer ci.refreshMu.Unlock()
-				if err := ci.refresh(); err != nil {
-					fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to refresh index: %v.\n", err)
+				if err := ci.refresh(bgCtx); err != nil {
+					slog.Warn("Failed to refresh index in background", "error", err)
 				}
 				ci.mu.Lock()
 				ci.LastFetch = time.Now()
@@ -114,11 +119,11 @@ func (ci *CacheIndex) Get() (*CacheIndexData, map[string]string) {
 }
 
 // ForceRefresh triggers an unconditional refresh of the cache index.
-func (ci *CacheIndex) ForceRefresh() (int, error) {
+func (ci *CacheIndex) ForceRefresh(ctx context.Context) (int, error) {
 	ci.refreshMu.Lock()
 	defer ci.refreshMu.Unlock()
 
-	err := ci.refresh()
+	err := ci.refresh(ctx)
 	ci.mu.Lock()
 	ci.LastFetch = time.Now()
 	entries := 0
@@ -182,8 +187,8 @@ func (ci *CacheIndex) updateInMemory(data *CacheIndexData) {
 	ci.mu.Unlock()
 }
 
-func (ci *CacheIndex) refresh() error {
-	token, err := ci.TokenMgr.GetToken()
+func (ci *CacheIndex) refresh(ctx context.Context) error {
+	token, err := ci.TokenMgr.GetToken(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to get token: %w", err)
 	}
@@ -193,19 +198,19 @@ func (ci *CacheIndex) refresh() error {
 
 	// 1. Fetch manifest — this is the single source of truth for annotations.
 	manifestURL := fmt.Sprintf("%s://%s/v2/%s/manifests/cache-index", proto, ci.Registry, ci.Repository)
-	req, err := http.NewRequest("GET", manifestURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", manifestURL, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating manifest request: %w", err)
 	}
-	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
-	req.Header.Set("User-Agent", "aeroflare/1.0")
+	req.Header.Set("Accept", ociManifestMediaType) // Konstante aus bootstrap.go
+	req.Header.Set("User-Agent", userAgent)        // Konstante aus bootstrap.go
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed fetching manifest from %s: %w", manifestURL, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -216,7 +221,7 @@ func (ci *CacheIndex) refresh() error {
 
 	var manifest IndexManifest
 	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
-		return err
+		return fmt.Errorf("failed decoding manifest JSON: %w", err)
 	}
 
 	ci.mu.Lock()
@@ -231,7 +236,7 @@ func (ci *CacheIndex) refresh() error {
 		ci.Data = &CacheIndexData{Entries: make(map[string]IndexEntry)}
 		ci.NarLookups = make(map[string]string)
 		ci.mu.Unlock()
-		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Manifest refreshed (r2 mode): public-r2-url=%s\n", ci.PublicR2URL())
+		slog.Info("Manifest refreshed (r2 mode)", "public_r2_url", ci.PublicR2URL())
 		return nil
 	}
 
@@ -243,11 +248,11 @@ func (ci *CacheIndex) refresh() error {
 
 	// 2. Fetch blob (json mode)
 	blobURL := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, ci.Registry, ci.Repository, digest)
-	req, err = http.NewRequest("GET", blobURL, nil)
+	req, err = http.NewRequestWithContext(ctx, "GET", blobURL, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating blob request: %w", err)
 	}
-	req.Header.Set("User-Agent", "aeroflare/1.0")
+	req.Header.Set("User-Agent", userAgent)
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -255,7 +260,7 @@ func (ci *CacheIndex) refresh() error {
 	blobClient := &http.Client{Timeout: 120 * time.Second}
 	resp, err = blobClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed fetching blob from %s: %w", blobURL, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -266,12 +271,12 @@ func (ci *CacheIndex) refresh() error {
 
 	dataBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed reading blob response body: %w", err)
 	}
 
 	var indexData CacheIndexData
 	if err := json.Unmarshal(dataBytes, &indexData); err != nil {
-		return err
+		return fmt.Errorf("failed unmarshaling blob JSON: %w", err)
 	}
 
 	if err := os.MkdirAll(ci.IndexDir, 0755); err == nil {
@@ -283,6 +288,6 @@ func (ci *CacheIndex) refresh() error {
 	}
 
 	ci.updateInMemory(&indexData)
-	fmt.Fprintf(os.Stderr, "[aeroflare proxy] Index refreshed: %d entries\n", len(indexData.Entries))
+	slog.Info("Index refreshed", "entries", len(indexData.Entries))
 	return nil
 }
