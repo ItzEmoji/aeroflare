@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/ItzEmoji/aeroflare/compare/v1.3.1...v1.3.2) (2026-06-23)
+
+
+### Bug Fixes
+
+* general things ([#17](https://github.com/ItzEmoji/aeroflare/issues/17)) ([7de0967](https://github.com/ItzEmoji/aeroflare/commit/7de09670683a0d4b579a2033fc93bdbe7e156e6b))
+
 ## [1.3.1](https://github.com/ItzEmoji/aeroflare/compare/v1.3.0...v1.3.1) (2026-06-22)
 
 
