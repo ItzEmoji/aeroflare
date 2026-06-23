@@ -11,6 +11,7 @@ import (
 	"time"
 
 	network "aeroflare/src"
+	"aeroflare/src/proxy"
 	"aeroflare/src/prepare/cache"
 	"aeroflare/src/prepare/compress"
 	"aeroflare/src/prepare/prepare"
@@ -181,8 +182,8 @@ func performPush(targetPaths []string) {
 		return
 	}
 
-	tokenMgr := network.NewTokenManager(registry, repository, "")
-	_, configAnnotations, _ := network.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+	tokenMgr := proxy.NewTokenManager(registry, repository, "")
+	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
 
 	r2Cfg := network.GetR2Config(configAnnotations)
 	var s3Client *s3.Client

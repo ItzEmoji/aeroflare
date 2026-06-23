@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	network "aeroflare/src"
+	"aeroflare/src/proxy"
 	"github.com/spf13/cobra"
 )
 
@@ -35,8 +36,8 @@ var cleanIndexCmd = &cobra.Command{
 			GCRoots: []string{},
 		}
 
-		tokenMgr := network.NewTokenManager(registry, repository, "")
-		_, configAnnotations, _ := network.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
+		tokenMgr := proxy.NewTokenManager(registry, repository, "")
+		_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(registry, repository, tokenMgr)
 		r2Cfg := network.GetR2Config(configAnnotations)
 
 		PrintInfo("Wiping remote index...")

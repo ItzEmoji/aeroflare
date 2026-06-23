@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"aeroflare/src/proxy"
 )
 
 // PushBlob natively hashes and streams a file to any OCI registry.
@@ -41,7 +43,7 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 	}
 
 	// 1. Check if blob already exists
-	proto := GetProtocol(registry)
+	proto := proxy.GetProtocol(registry)
 	checkURL := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, registry, repository, digest)
 	req, err := http.NewRequest("HEAD", checkURL, nil)
 	if err != nil {
@@ -61,7 +63,7 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 	}
 
 	// 2. Initiate upload
-	proto = GetProtocol(registry)
+	proto = proxy.GetProtocol(registry)
 	initURL := fmt.Sprintf("%s://%s/v2/%s/blobs/uploads/", proto, registry, repository)
 	req, err = http.NewRequest("POST", initURL, nil)
 	if err != nil {
@@ -88,7 +90,7 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 
 	// Make URL absolute if relative
 	if strings.HasPrefix(uploadURL, "/") {
-		proto = GetProtocol(registry)
+		proto = proxy.GetProtocol(registry)
 		uploadURL = fmt.Sprintf("%s://%s%s", proto, registry, uploadURL)
 	}
 
@@ -138,7 +140,7 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 // PullBlob fetches a blob from any OCI registry and writes it to outFile.
 // repository should be the full repository path (e.g. "itzemoji/nix-cache-test/nix-cache")
 func PullBlob(digest, outFile, registry, repository, token string) error {
-	proto := GetProtocol(registry)
+	proto := proxy.GetProtocol(registry)
 	getURL := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, registry, repository, digest)
 	req, err := http.NewRequest("GET", getURL, nil)
 	if err != nil {

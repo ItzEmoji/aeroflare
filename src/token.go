@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"aeroflare/src/proxy"
 )
 
 // ExchangeToken performs a token exchange for a given OCI registry.
@@ -15,7 +17,7 @@ import (
 // repository should be the full repository path (e.g. "itzemoji/nix-cache-test/nix-cache")
 func ExchangeToken(registry, repository, basicAuthToken string) (string, error) {
 	scope := fmt.Sprintf("repository:%s:pull,push", repository)
-	proto := GetProtocol(registry)
+	proto := proxy.GetProtocol(registry)
 	tokenURL := fmt.Sprintf("%s://%s/token?scope=%s&service=%s", proto, registry, scope, registry)
 
 	req, err := http.NewRequest("GET", tokenURL, nil)
