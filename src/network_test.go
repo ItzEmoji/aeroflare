@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"aeroflare/src/proxy"
 )
 
 // TestGetProtocol verifies that localhost/127.0.0.1 registries use http, others use https.
@@ -25,7 +27,7 @@ func TestGetProtocol(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got := GetProtocol(tc.registry)
+		got := proxy.GetProtocol(tc.registry)
 		if got != tc.expected {
 			t.Errorf("GetProtocol(%q) = %q, want %q", tc.registry, got, tc.expected)
 		}
