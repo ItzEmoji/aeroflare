@@ -49,10 +49,6 @@ var proxyCmd = &cobra.Command{
 
 		indexDir := getIndexDir(repository)
 
-		workerURL := os.Getenv("AEROFLARE_WORKER_URL")
-		if workerURL == "" {
-			workerURL = os.Getenv("NIXCACHE_WORKER_URL")
-		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
