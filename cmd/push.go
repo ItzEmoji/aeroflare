@@ -181,7 +181,6 @@ func performPush(targetPaths []string) {
 		fmt.Println("No new paths to push.")
 		return
 	}
-
 	tokenMgr := proxy.NewTokenManager(registry, repository, "")
 	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, nil, registry, repository, tokenMgr)
 
