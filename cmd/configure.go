@@ -30,7 +30,7 @@ var configureCmd = &cobra.Command{
 		var existingR2PublicURL string
 		var existingR2Endpoint = ""
 
-		tokenMgr := proxy.NewTokenManager(registry, repository, "")
+		tokenMgr := proxy.NewTokenManager(registry, repository, getGithubToken())
 		remoteConf, existingAnnotations, _ := proxy.BootstrapConfigWithAnnotations(context.Background(), nil, registry, repository, tokenMgr)
 		if existingAnnotations != nil {
 			if b := existingAnnotations["aeroflare.backend"]; b != "" {
