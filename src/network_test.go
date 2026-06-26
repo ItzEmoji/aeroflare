@@ -47,7 +47,7 @@ func TestExchangeToken(t *testing.T) {
 	defer mockRegistry.Close()
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	token, err := ExchangeToken(u, "test-repo/nix-cache", "my-basic-auth-pat")
+	token, err := ExchangeToken(u, "test-repo/nix-cache", "token", "my-basic-auth-pat")
 	if err != nil {
 		t.Fatalf("ExchangeToken failed: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestExchangeToken_Error(t *testing.T) {
 	defer mockRegistry.Close()
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	_, err := ExchangeToken(u, "test-repo/nix-cache", "bad-token")
+	_, err := ExchangeToken(u, "test-repo/nix-cache", "token", "bad-token")
 	if err == nil {
 		t.Fatal("Expected error for 401 response, got nil")
 	}
@@ -218,25 +218,20 @@ func TestPullBlob_Error(t *testing.T) {
 
 // TestExchangeToken_UsesHttpForLocalhost verifies that ExchangeToken uses http:// for localhost registries.
 func TestExchangeToken_UsesHttpForLocalhost(t *testing.T) {
-	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify no Authorization header contains "https" in the URL
-		if r.URL.Path == "/token" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"token": "local-bearer-token"}`))
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"token": "localhost-token"}`))
 	}))
-	defer mockRegistry.Close()
+	defer ts.Close()
 
-	// The mock server is always http, trimming the http:// prefix so GetProtocol sees localhost:PORT
-	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	token, err := ExchangeToken(u, "my-org/nix-cache", "test-pat")
+	u := strings.TrimPrefix(ts.URL, "http://")
+	
+	token, err := ExchangeToken(u, "my-org/nix-cache", "token", "test-pat")
 	if err != nil {
 		t.Fatalf("ExchangeToken failed for localhost registry: %v", err)
 	}
-	if token != "local-bearer-token" {
-		t.Errorf("Expected local-bearer-token, got %s", token)
+	if token != "localhost-token" {
+		t.Errorf("expected localhost-token, got %s", token)
 	}
 }
