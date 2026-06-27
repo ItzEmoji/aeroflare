@@ -99,10 +99,10 @@ func createOCIRepository(cfg *InitConfig) error {
 	// network.GetToken relies on GITHUB_TOKEN/GH_TOKEN/GITLAB_TOKEN env vars.
 	// We inject the token we just obtained from the wizard.
 	if cfg.GitToken != "" {
-		os.Setenv("GITHUB_TOKEN", cfg.GitToken)
-		os.Setenv("GITLAB_TOKEN", cfg.GitToken)
+		_ = os.Setenv("GITHUB_TOKEN", cfg.GitToken)
+		_ = os.Setenv("GITLAB_TOKEN", cfg.GitToken)
 		if cfg.GitUsername != "" {
-			os.Setenv("AEROFLARE_GIT_USERNAME", cfg.GitUsername)
+			_ = os.Setenv("AEROFLARE_GIT_USERNAME", cfg.GitUsername)
 		}
 	}
 
@@ -219,19 +219,20 @@ func pushToGitRepo(cfg *InitConfig) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Fetch worker script
 	backendSuffix := "json"
-	if cfg.Backend == BackendR2 {
+	switch cfg.Backend {
+	case BackendR2:
 		backendSuffix = "r2"
-	} else if cfg.Backend == BackendNative {
+	case BackendNative:
 		backendSuffix = "native"
 	}
 	scriptPath, err := fetchLatestWorkerScript(backendSuffix)
 	if err == nil {
 		scriptContent, _ := os.ReadFile(scriptPath)
-		os.WriteFile(tmpDir+"/worker.js", scriptContent, 0644)
+		_ = os.WriteFile(tmpDir+"/worker.js", scriptContent, 0644)
 	}
 
 	// Write wrangler.toml
@@ -254,12 +255,12 @@ binding = "BUCKET"
 bucket_name = "%s"
 `, cfg.R2Bucket)
 	}
-	os.WriteFile(tmpDir+"/wrangler.toml", []byte(wranglerToml), 0644)
+	_ = os.WriteFile(tmpDir+"/wrangler.toml", []byte(wranglerToml), 0644)
 
 	// Write GitHub Actions workflow
 	if cfg.GitProvider == GitGitHub {
-		os.MkdirAll(tmpDir+"/.github/workflows", 0755)
-		workflow := fmt.Sprintf(`name: Deploy Worker
+		_ = os.MkdirAll(tmpDir+"/.github/workflows", 0755)
+		workflow := `name: Deploy Worker
 on:
   push:
     branches:
@@ -274,8 +275,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-`)
-		os.WriteFile(tmpDir+"/.github/workflows/deploy.yml", []byte(workflow), 0644)
+`
+		_ = os.WriteFile(tmpDir+"/.github/workflows/deploy.yml", []byte(workflow), 0644)
 	}
 
 	// Git init, commit and push
@@ -321,9 +322,10 @@ jobs:
 // Checks local conventional paths first, then fetches from the latest release.
 func resolveWorkerScript(cfg *InitConfig) (string, error) {
 	backendSuffix := "json"
-	if cfg.Backend == BackendR2 {
+	switch cfg.Backend {
+	case BackendR2:
 		backendSuffix = "r2"
-	} else if cfg.Backend == BackendNative {
+	case BackendNative:
 		backendSuffix = "native"
 	}
 
@@ -374,13 +376,13 @@ func fetchLatestWorkerScript(backendSuffix string) (string, error) {
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("wget -qO- %s | tar -xz -C %s --strip-components=1", tarURL, tmpDir))
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return "", fmt.Errorf("download release: %w", err)
 	}
 
 	scriptPath := fmt.Sprintf("%s/proxy/no-webui-%s/worker.js", tmpDir, backendSuffix)
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return "", fmt.Errorf("worker.js not found in release at %s", scriptPath)
 	}
 

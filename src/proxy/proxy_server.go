@@ -310,9 +310,9 @@ func (ps *ProxyServer) serveNativeNarinfo(w http.ResponseWriter, r *http.Request
 	}
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("StorePath: %s\n", anns["vnd.aeroflare.nar.storepath"]))
-	b.WriteString(fmt.Sprintf("URL: %s\n", anns["vnd.aeroflare.nar.url"]))
-	b.WriteString(fmt.Sprintf("Compression: %s\n", anns["vnd.aeroflare.nar.compression"]))
+	fmt.Fprintf(&b, "StorePath: %s\n", anns["vnd.aeroflare.nar.storepath"])
+	fmt.Fprintf(&b, "URL: %s\n", anns["vnd.aeroflare.nar.url"])
+	fmt.Fprintf(&b, "Compression: %s\n", anns["vnd.aeroflare.nar.compression"])
 	b.WriteString(fmt.Sprintf("FileHash: %s\n", anns["vnd.aeroflare.nar.filehash"]))
 	b.WriteString(fmt.Sprintf("FileSize: %s\n", anns["vnd.aeroflare.nar.filesize"]))
 	b.WriteString(fmt.Sprintf("NarHash: %s\n", anns["vnd.aeroflare.nar.narhash"]))

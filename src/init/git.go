@@ -17,7 +17,6 @@ import (
 )
 
 const githubOAuthClientID = "Ov23liIJyLpd2Cse5gne"
-const gitlabOAuthClientID = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0" // REPLACE_ME_GITLAB_CLIENT_ID
 
 // detectGitHubToken returns a GitHub token from common environment variables.
 func detectGitHubToken() string {
@@ -110,7 +109,7 @@ func createGitHubRepo(token, repoName string) (string, error) {
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("GitHub API HTTP %d: %s\nEnsure your token has the 'repo' scope.", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("GitHub API HTTP %d: %s (ensure your token has the 'repo' scope)", resp.StatusCode, string(respBody))
 	}
 
 	var result struct {
@@ -144,7 +143,7 @@ func createGitLabRepo(token, repoName string) (string, error) {
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("GitLab API HTTP %d: %s\nEnsure your token has 'api' scope.", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("GitLab API HTTP %d: %s (ensure your token has 'api' scope)", resp.StatusCode, string(respBody))
 	}
 
 	var result struct {
@@ -212,8 +211,8 @@ func githubDeviceFlow() string {
 			AccessToken string `json:"access_token"`
 			Error       string `json:"error"`
 		}
-		json.NewDecoder(tokenResp.Body).Decode(&result)
-		tokenResp.Body.Close()
+		_ = json.NewDecoder(tokenResp.Body).Decode(&result)
+		_ = tokenResp.Body.Close()
 
 		if result.AccessToken != "" {
 			printSuccess("GitHub authentication successful!")
@@ -273,7 +272,7 @@ func ensureGitLabProjectExists(token, fullProjectName string) error {
 		if err != nil {
 			return err
 		}
-		defer nsResp.Body.Close()
+		defer func() { _ = nsResp.Body.Close() }()
 
 		if nsResp.StatusCode != 200 {
 			nsBody, _ := io.ReadAll(nsResp.Body)
@@ -302,7 +301,7 @@ func ensureGitLabProjectExists(token, fullProjectName string) error {
 	if err != nil {
 		return err
 	}
-	defer createResp.Body.Close()
+	defer func() { _ = createResp.Body.Close() }()
 
 	if createResp.StatusCode < 200 || createResp.StatusCode >= 300 {
 		body, _ := io.ReadAll(createResp.Body)
@@ -326,7 +325,7 @@ func setGitHubSecret(token, owner, repo, secretName, secretValue string) error {
 	if err != nil {
 		return err
 	}
-	defer pubKeyResp.Body.Close()
+	defer func() { _ = pubKeyResp.Body.Close() }()
 
 	if pubKeyResp.StatusCode != 200 {
 		return fmt.Errorf("failed to get public key: HTTP %d", pubKeyResp.StatusCode)
@@ -373,7 +372,7 @@ func setGitHubSecret(token, owner, repo, secretName, secretValue string) error {
 	if err != nil {
 		return err
 	}
-	defer putResp.Body.Close()
+	defer func() { _ = putResp.Body.Close() }()
 
 	if putResp.StatusCode != 201 && putResp.StatusCode != 204 {
 		body, _ := io.ReadAll(putResp.Body)
