@@ -105,7 +105,19 @@ func runScaffold() {
 	PrintInfo(fmt.Sprintf("Downloading source for release %s...", releaseTag))
 	tarURL := fmt.Sprintf("https://github.com/ItzEmoji/aeroflare/archive/refs/tags/%s.tar.gz", releaseTag)
 
-	downloadCmd := exec.Command("sh", "-c", fmt.Sprintf("wget -qO- %s | tar -xz -C %s --strip-components=1", tarURL, targetDir))
+	tarResp, err := http.Get(tarURL)
+	if err != nil {
+		PrintError(fmt.Sprintf("Failed to download source: %v", err))
+		os.Exit(1)
+	}
+	defer tarResp.Body.Close()
+	if tarResp.StatusCode < 200 || tarResp.StatusCode >= 300 {
+		PrintError(fmt.Sprintf("Failed to download source: GitHub returned %s", tarResp.Status))
+		os.Exit(1)
+	}
+
+	downloadCmd := exec.Command("tar", "-xz", "-C", targetDir, "--strip-components=1")
+	downloadCmd.Stdin = tarResp.Body
 	downloadCmd.Stdout = os.Stdout
 	downloadCmd.Stderr = os.Stderr
 	if err := downloadCmd.Run(); err != nil {
