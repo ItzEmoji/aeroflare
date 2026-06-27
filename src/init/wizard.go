@@ -129,7 +129,9 @@ func promptCredentials(cfg *InitConfig) error {
 
 		if useOAuth {
 			cfg.GitToken = githubDeviceFlow()
-		} else {
+		}
+
+		if !useOAuth || cfg.GitToken == "" {
 			fields = append(fields, huh.NewInput().
 				Title("GitHub Token").
 				EchoMode(huh.EchoModePassword).
@@ -153,7 +155,9 @@ func promptCredentials(cfg *InitConfig) error {
 
 		if useOAuth {
 			cfg.GitToken = gitlabDeviceFlow()
-		} else {
+		}
+
+		if !useOAuth || cfg.GitToken == "" {
 			fields = append(fields, huh.NewInput().
 				Title("GitLab Token").
 				EchoMode(huh.EchoModePassword).
