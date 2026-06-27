@@ -1,7 +1,6 @@
 package setup
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -223,101 +222,7 @@ func githubDeviceFlow() string {
 	}
 }
 
-// gitlabDeviceFlow authenticates via GitLab OAuth Device Flow.
-func gitlabDeviceFlow() string {
-	reqBody := strings.NewReader(fmt.Sprintf("client_id=%s", gitlabOAuthClientID))
-	
-	ctxInit, cancelInit := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancelInit()
 
-	req, err := http.NewRequestWithContext(ctxInit, "POST", "https://gitlab.com/oauth/authorize_device", reqBody)
-	if err != nil {
-		return ""
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		printError(fmt.Sprintf("Failed to initialize GitLab device flow: %v", err))
-		return ""
-	}
-	defer resp.Body.Close()
-
-	var deviceResp struct {
-		DeviceCode              string `json:"device_code"`
-		UserCode                string `json:"user_code"`
-		VerificationURIComplete string `json:"verification_uri_complete"`
-		Interval                int    `json:"interval"`
-		ExpiresIn               int    `json:"expires_in"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&deviceResp); err != nil {
-		printError(fmt.Sprintf("Failed to initialize GitLab device flow: %v", err))
-		return ""
-	}
-
-	fmt.Println()
-	printInfo(fmt.Sprintf("Open your browser to: %s", deviceResp.VerificationURIComplete))
-	printInfo(fmt.Sprintf("Ensure the code matches: %s", deviceResp.UserCode))
-	printInfo("Waiting for authorization...")
-
-	interval := time.Duration(deviceResp.Interval) * time.Second
-	if interval == 0 {
-		interval = 5 * time.Second
-	}
-
-	expiresIn := deviceResp.ExpiresIn
-	if expiresIn == 0 {
-		expiresIn = 600
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(expiresIn)*time.Second)
-	defer cancel()
-
-	for {
-		select {
-		case <-ctx.Done():
-			printError("GitLab OAuth device flow timed out.")
-			return ""
-		case <-time.After(interval):
-		}
-
-		tokenBody := strings.NewReader(fmt.Sprintf(
-			"client_id=%s&device_code=%s&grant_type=urn:ietf:params:oauth:grant-type:device_code",
-			gitlabOAuthClientID, deviceResp.DeviceCode,
-		))
-		tokenReq, err := http.NewRequestWithContext(ctx, "POST", "https://gitlab.com/oauth/token", tokenBody)
-		if err != nil {
-			continue
-		}
-		tokenReq.Header.Set("Accept", "application/json")
-		tokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		tokenResp, err := http.DefaultClient.Do(tokenReq)
-		if err != nil {
-			continue
-		}
-
-		var result struct {
-			AccessToken string `json:"access_token"`
-			Error       string `json:"error"`
-		}
-		err = json.NewDecoder(tokenResp.Body).Decode(&result)
-		tokenResp.Body.Close()
-		if err != nil {
-			continue
-		}
-
-		if result.AccessToken != "" {
-			printSuccess("GitLab authentication successful!")
-			return result.AccessToken
-		}
-
-		if result.Error != "authorization_pending" && result.Error != "slow_down" {
-			printError(fmt.Sprintf("GitLab OAuth error: %s", result.Error))
-			return ""
-		}
-	}
-}
 
 // ensureGitLabProjectExists checks if the base project exists and creates it if it doesn't.
 func ensureGitLabProjectExists(token, fullProjectName string) error {

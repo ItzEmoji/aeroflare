@@ -28,11 +28,9 @@ func RunProvision(cfg *InitConfig) error {
 	}
 	printSuccess("OCI repository created")
 
-	next("Setting repository visibility to public...")
-	if err := setRepositoryPublic(cfg); err != nil {
-		printWarning(fmt.Sprintf("Could not set visibility: %v (you may need to do this manually)", err))
-	} else {
-		printSuccess("Repository visibility set to public")
+	next("Checking repository visibility...")
+	if err := checkRepositoryVisibility(cfg); err != nil {
+		printWarning(fmt.Sprintf("%v", err))
 	}
 
 	if cfg.GitProvider != GitNone {
@@ -130,52 +128,20 @@ func createOCIRepository(cfg *InitConfig) error {
 	return network.PushConfigManifest(cfg.Registry, cfg.Repository, ociToken, annotations)
 }
 
-// setRepositoryPublic sets the OCI package visibility to public.
-// On ghcr.io this uses the GitHub Packages API.
-func setRepositoryPublic(cfg *InitConfig) error {
+// checkRepositoryVisibility reminds the user to set package visibility.
+func checkRepositoryVisibility(cfg *InitConfig) error {
 	if cfg.Registry != "ghcr.io" {
 		printInfo("Non-ghcr.io registry \u2014 set package visibility to public manually if needed.")
 		return nil
 	}
 
-	gitToken := cfg.GitToken
-	if gitToken == "" {
-		gitToken = detectGitHubToken()
-	}
-	if gitToken == "" {
-		return fmt.Errorf("GitHub token required to set package visibility")
-	}
-
-	// Package name is everything after the owner in the repository path.
 	parts := strings.SplitN(cfg.Repository, "/", 2)
-	if len(parts) < 2 {
-		return fmt.Errorf("cannot parse package name from repository: %s", cfg.Repository)
+	owner := ""
+	if len(parts) >= 1 {
+		owner = parts[0]
 	}
-	packageName := parts[1]
-	owner := parts[0]
-
-	apiPath := fmt.Sprintf("https://api.github.com/users/%s/packages/container/%s",
-		owner, strings.ReplaceAll(packageName, "/", "%2F"))
-
-	payload := strings.NewReader(`{"visibility":"public"}`)
-	req, err := http.NewRequest("PATCH", apiPath, payload)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "token "+gitToken)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("GitHub Packages API HTTP %d \u2014 set visibility manually at https://github.com/%s?tab=packages", resp.StatusCode, owner)
-	}
-
+	
+	printInfo(fmt.Sprintf("Note: GitHub requires package visibility to be set to public manually at https://github.com/%s?tab=packages", owner))
 	return nil
 }
 
@@ -259,6 +225,8 @@ func pushToGitRepo(cfg *InitConfig) error {
 	backendSuffix := "json"
 	if cfg.Backend == BackendR2 {
 		backendSuffix = "r2"
+	} else if cfg.Backend == BackendNative {
+		backendSuffix = "native"
 	}
 	scriptPath, err := fetchLatestWorkerScript(backendSuffix)
 	if err == nil {
@@ -332,7 +300,8 @@ jobs:
 
 	if cfg.GitProvider == GitGitHub {
 		printInfo("Please add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository secrets on GitHub")
-		printInfo(fmt.Sprintf("Settings URL: https://github.com/%s/settings/secrets/actions", strings.TrimSuffix(cfg.WorkerName, "-proxy")))
+		repoName := fmt.Sprintf("%s-proxy", strings.ReplaceAll(cfg.CacheName, "/", "-"))
+		printInfo(fmt.Sprintf("Settings URL: https://github.com/%s/%s/settings/secrets/actions", cfg.GitUsername, repoName))
 	}
 
 	return nil
@@ -344,6 +313,8 @@ func resolveWorkerScript(cfg *InitConfig) (string, error) {
 	backendSuffix := "json"
 	if cfg.Backend == BackendR2 {
 		backendSuffix = "r2"
+	} else if cfg.Backend == BackendNative {
+		backendSuffix = "native"
 	}
 
 	localPaths := []string{

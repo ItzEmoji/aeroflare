@@ -142,29 +142,20 @@ func promptCredentials(cfg *InitConfig) error {
 	}
 
 	if cfg.GitProvider == GitGitLab && cfg.GitToken == "" {
-		var useOAuth bool
-		err := huh.NewForm(
-			huh.NewGroup(
-				huh.NewConfirm().
-					Title("No GitLab token found. Authenticate via browser (OAuth Device Flow)?").
-					Value(&useOAuth),
-			),
-		).WithTheme(AeroflareTheme()).Run()
-		if err != nil {
-			return fmt.Errorf("wizard cancelled")
-		}
-
-		if useOAuth {
-			cfg.GitToken = gitlabDeviceFlow()
-		}
-
-		if !useOAuth || cfg.GitToken == "" {
-			fields = append(fields, huh.NewInput().
-				Title("GitLab Token").
-				EchoMode(huh.EchoModePassword).
-				Value(&cfg.GitToken).
-				Validate(notEmpty("GitLab Token")))
-		}
+		fields = append(fields, huh.NewInput().
+			Title("GitLab Token").
+			EchoMode(huh.EchoModePassword).
+			Value(&cfg.GitToken).
+			Validate(func(s string) error {
+				if err := notEmpty("GitLab Token")(s); err != nil {
+					return err
+				}
+				_, err := getGitLabUsername(s)
+				if err != nil {
+					return fmt.Errorf("invalid token: %v", err)
+				}
+				return nil
+			}))
 	}
 
 	// Show the credentials form only if there are missing values.
