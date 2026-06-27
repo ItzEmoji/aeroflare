@@ -60,6 +60,7 @@ func promptCoreSettings(cfg *InitConfig) error {
 				Description("How should the cache index be stored?").
 				Options(
 					huh.NewOption("Cloudflare R2 (recommended)", "r2"),
+					huh.NewOption("Native OCI Tags (experimental)", "native"),
 					huh.NewOption("JSON index stored in OCI", "oci"),
 				).
 				Value(&backend),
@@ -73,7 +74,7 @@ func promptCoreSettings(cfg *InitConfig) error {
 				).
 				Value(&gitProvider),
 		),
-	).Run()
+	).WithTheme(AeroflareTheme()).Run()
 	if err != nil {
 		return fmt.Errorf("wizard cancelled")
 	}
@@ -122,7 +123,7 @@ func promptCredentials(cfg *InitConfig) error {
 					Title("No GitHub token found. Authenticate via browser (OAuth Device Flow)?").
 					Value(&useOAuth),
 			),
-		).Run()
+		).WithTheme(AeroflareTheme()).Run()
 		if err != nil {
 			return fmt.Errorf("wizard cancelled")
 		}
@@ -148,7 +149,7 @@ func promptCredentials(cfg *InitConfig) error {
 
 	// Show the credentials form only if there are missing values.
 	if len(fields) > 0 {
-		if err := huh.NewForm(huh.NewGroup(fields...)).Run(); err != nil {
+		if err := huh.NewForm(huh.NewGroup(fields...)).WithTheme(AeroflareTheme()).Run(); err != nil {
 			return fmt.Errorf("wizard cancelled")
 		}
 	}
@@ -173,9 +174,9 @@ func promptCredentials(cfg *InitConfig) error {
 // DisplaySummary shows a configuration summary and asks for confirmation.
 func DisplaySummary(cfg *InitConfig) (bool, error) {
 	fmt.Println()
-	fmt.Println("  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510")
-	fmt.Println("  \u2502  Summary                                    \u2502")
-	fmt.Println("  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524")
+	fmt.Println("  ╭──────────────────────────────────────────────╮")
+	fmt.Println("  │  Summary                                     │")
+	fmt.Println("  ├──────────────────────────────────────────────┤")
 	printField("Cache", cfg.CacheName)
 	printField("Registry", cfg.Registry)
 	printField("Repository", cfg.Repository)
@@ -187,7 +188,7 @@ func DisplaySummary(cfg *InitConfig) (bool, error) {
 	if cfg.GitProvider != GitNone {
 		printField("Git", fmt.Sprintf("%s (%s)", cfg.GitProvider, cfg.GitUsername))
 	}
-	fmt.Println("  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518")
+	fmt.Println("  ╰──────────────────────────────────────────────╯")
 	fmt.Println()
 
 	var confirmed bool
@@ -199,7 +200,7 @@ func DisplaySummary(cfg *InitConfig) (bool, error) {
 				Negative("Cancel").
 				Value(&confirmed),
 		),
-	).Run()
+	).WithTheme(AeroflareTheme()).Run()
 	if err != nil {
 		return false, nil
 	}
