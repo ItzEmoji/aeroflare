@@ -186,6 +186,15 @@ func performPush(targetPaths []string) {
 	tokenMgr := proxy.NewTokenManager(registry, repository, "")
 	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, nil, registry, repository, tokenMgr)
 
+	isNative := false
+	if configAnnotations != nil {
+		if backend := configAnnotations["aeroflare.index-type"]; backend == "native" {
+			isNative = true
+		} else if backend := configAnnotations["aeroflare.backend"]; backend == "native" {
+			isNative = true
+		}
+	}
+
 	r2Cfg := network.GetR2Config(configAnnotations)
 	var s3Client *s3.Client
 	if r2Cfg != nil {
@@ -307,18 +316,20 @@ func performPush(targetPaths []string) {
 					}
 				}
 
-				// Dual-Strategy: Push natively to OCI
-				basename := filepath.Base(ni.StorePath)
-				tag := strings.SplitN(basename, "-", 2)[0]
-				err = network.PushNarPackage(layer, ni, tag, registry, repository, ociToken)
-				if err != nil {
-					if isRoot {
-						return fmt.Errorf("failed to push OCI Native artifact (%s): %v", r.StorePath, err)
-					} else {
-						mu.Lock()
-						PrintError(fmt.Sprintf("    Failed to push reference OCI Native artifact: %v", err))
-						mu.Unlock()
-						return nil
+				if isNative {
+					// Dual-Strategy: Push natively to OCI
+					basename := filepath.Base(ni.StorePath)
+					tag := strings.SplitN(basename, "-", 2)[0]
+					err = network.PushNarPackage(layer, ni, tag, registry, repository, ociToken)
+					if err != nil {
+						if isRoot {
+							return fmt.Errorf("failed to push OCI Native artifact (%s): %v", r.StorePath, err)
+						} else {
+							mu.Lock()
+							PrintError(fmt.Sprintf("    Failed to push reference OCI Native artifact: %v", err))
+							mu.Unlock()
+							return nil
+						}
 					}
 				}
 
