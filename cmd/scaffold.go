@@ -44,7 +44,7 @@ func runScaffold() {
 		PrintError(fmt.Sprintf("Failed to fetch releases: %v", err))
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var releases []struct {
 		TagName string `json:"tag_name"`
@@ -199,5 +199,5 @@ func patchWranglerToml(proxyDir, indexType string) {
 		s = strings.Replace(s, `# bucket_name = "<bucket-name>" `, fmt.Sprintf(`bucket_name = "%s"`, bucket), 1)
 	}
 
-	os.WriteFile(wranglerPath, []byte(s), 0644)
+	_ = os.WriteFile(wranglerPath, []byte(s), 0644)
 }

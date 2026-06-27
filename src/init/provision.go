@@ -352,7 +352,7 @@ func fetchLatestWorkerScript(backendSuffix string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("fetch releases: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var releases []struct {
 		TagName string `json:"tag_name"`

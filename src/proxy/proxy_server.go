@@ -313,29 +313,29 @@ func (ps *ProxyServer) serveNativeNarinfo(w http.ResponseWriter, r *http.Request
 	fmt.Fprintf(&b, "StorePath: %s\n", anns["vnd.aeroflare.nar.storepath"])
 	fmt.Fprintf(&b, "URL: %s\n", anns["vnd.aeroflare.nar.url"])
 	fmt.Fprintf(&b, "Compression: %s\n", anns["vnd.aeroflare.nar.compression"])
-	b.WriteString(fmt.Sprintf("FileHash: %s\n", anns["vnd.aeroflare.nar.filehash"]))
-	b.WriteString(fmt.Sprintf("FileSize: %s\n", anns["vnd.aeroflare.nar.filesize"]))
-	b.WriteString(fmt.Sprintf("NarHash: %s\n", anns["vnd.aeroflare.nar.narhash"]))
-	b.WriteString(fmt.Sprintf("NarSize: %s\n", anns["vnd.aeroflare.nar.narsize"]))
+	fmt.Fprintf(&b, "FileHash: %s\n", anns["vnd.aeroflare.nar.filehash"])
+	fmt.Fprintf(&b, "FileSize: %s\n", anns["vnd.aeroflare.nar.filesize"])
+	fmt.Fprintf(&b, "NarHash: %s\n", anns["vnd.aeroflare.nar.narhash"])
+	fmt.Fprintf(&b, "NarSize: %s\n", anns["vnd.aeroflare.nar.narsize"])
 
 	if rStr, ok := anns["vnd.aeroflare.nar.references"]; ok && rStr != "" {
-		b.WriteString(fmt.Sprintf("References: %s\n", rStr))
+		fmt.Fprintf(&b, "References: %s\n", rStr)
 	} else {
 		b.WriteString("References:\n")
 	}
 
 	if deriver, ok := anns["vnd.aeroflare.nar.deriver"]; ok && deriver != "" {
-		b.WriteString(fmt.Sprintf("Deriver: %s\n", deriver))
+		fmt.Fprintf(&b, "Deriver: %s\n", deriver)
 	} else {
 		b.WriteString("Deriver:\n")
 	}
 
 	if system, ok := anns["vnd.aeroflare.nar.system"]; ok && system != "" {
-		b.WriteString(fmt.Sprintf("System: %s\n", system))
+		fmt.Fprintf(&b, "System: %s\n", system)
 	}
 
 	if sig, ok := anns["vnd.aeroflare.nar.sig"]; ok && sig != "" {
-		b.WriteString(fmt.Sprintf("Sig: %s\n", sig))
+		fmt.Fprintf(&b, "Sig: %s\n", sig)
 	}
 
 	body := []byte(b.String())
