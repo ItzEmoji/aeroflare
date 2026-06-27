@@ -1,6 +1,9 @@
 package setup
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/nacl/box"
 )
 
 const githubOAuthClientID = "Ov23liIJyLpd2Cse5gne"
@@ -302,6 +307,77 @@ func ensureGitLabProjectExists(token, fullProjectName string) error {
 	if createResp.StatusCode < 200 || createResp.StatusCode >= 300 {
 		body, _ := io.ReadAll(createResp.Body)
 		return fmt.Errorf("failed to create GitLab project: HTTP %d: %s", createResp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// setGitHubSecret encrypts and sets a repository secret on GitHub via Actions Secrets API.
+func setGitHubSecret(token, owner, repo, secretName, secretValue string) error {
+	pubKeyReq, err := http.NewRequest("GET", fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/secrets/public-key", owner, repo), nil)
+	if err != nil {
+		return err
+	}
+	pubKeyReq.Header.Set("Authorization", "token "+token)
+	pubKeyReq.Header.Set("Accept", "application/vnd.github.v3+json")
+	pubKeyReq.Header.Set("User-Agent", "aeroflare/1.0")
+
+	pubKeyResp, err := http.DefaultClient.Do(pubKeyReq)
+	if err != nil {
+		return err
+	}
+	defer pubKeyResp.Body.Close()
+
+	if pubKeyResp.StatusCode != 200 {
+		return fmt.Errorf("failed to get public key: HTTP %d", pubKeyResp.StatusCode)
+	}
+
+	var pubKey struct {
+		KeyId string `json:"key_id"`
+		Key   string `json:"key"`
+	}
+	if err := json.NewDecoder(pubKeyResp.Body).Decode(&pubKey); err != nil {
+		return err
+	}
+
+	decodedPubKey, err := base64.StdEncoding.DecodeString(pubKey.Key)
+	if err != nil || len(decodedPubKey) != 32 {
+		return fmt.Errorf("invalid public key")
+	}
+
+	var recipientKey [32]byte
+	copy(recipientKey[:], decodedPubKey)
+
+	encryptedBytes, err := box.SealAnonymous(nil, []byte(secretValue), &recipientKey, rand.Reader)
+	if err != nil {
+		return err
+	}
+	encryptedValue := base64.StdEncoding.EncodeToString(encryptedBytes)
+
+	payload := map[string]string{
+		"encrypted_value": encryptedValue,
+		"key_id":          pubKey.KeyId,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	putReq, err := http.NewRequest("PUT", fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/secrets/%s", owner, repo, secretName), bytes.NewReader(payloadBytes))
+	if err != nil {
+		return err
+	}
+	putReq.Header.Set("Authorization", "token "+token)
+	putReq.Header.Set("Accept", "application/vnd.github.v3+json")
+	putReq.Header.Set("Content-Type", "application/json")
+	putReq.Header.Set("User-Agent", "aeroflare/1.0")
+
+	putResp, err := http.DefaultClient.Do(putReq)
+	if err != nil {
+		return err
+	}
+	defer putResp.Body.Close()
+
+	if putResp.StatusCode != 201 && putResp.StatusCode != 204 {
+		body, _ := io.ReadAll(putResp.Body)
+		return fmt.Errorf("failed to set secret: HTTP %d: %s", putResp.StatusCode, string(body))
 	}
 
 	return nil

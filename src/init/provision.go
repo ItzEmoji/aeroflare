@@ -299,9 +299,19 @@ jobs:
 	}
 
 	if cfg.GitProvider == GitGitHub {
-		printInfo("Please add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository secrets on GitHub")
 		repoName := fmt.Sprintf("%s-proxy", strings.ReplaceAll(cfg.CacheName, "/", "-"))
-		printInfo(fmt.Sprintf("Settings URL: https://github.com/%s/%s/settings/secrets/actions", cfg.GitUsername, repoName))
+		
+		printInfo("Configuring GitHub Actions secrets...")
+		err1 := setGitHubSecret(cfg.GitToken, cfg.GitUsername, repoName, "CLOUDFLARE_API_TOKEN", cfg.CloudflareToken)
+		err2 := setGitHubSecret(cfg.GitToken, cfg.GitUsername, repoName, "CLOUDFLARE_ACCOUNT_ID", cfg.CloudflareAccountID)
+		
+		if err1 != nil || err2 != nil {
+			printWarning("Failed to set secrets automatically.")
+			printInfo("Please add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository secrets on GitHub")
+			printInfo(fmt.Sprintf("Settings URL: https://github.com/%s/%s/settings/secrets/actions", cfg.GitUsername, repoName))
+		} else {
+			printSuccess("GitHub Actions secrets configured successfully")
+		}
 	}
 
 	return nil
