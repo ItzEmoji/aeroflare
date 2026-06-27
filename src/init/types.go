@@ -10,8 +10,9 @@ import (
 type BackendType string
 
 const (
-	BackendR2  BackendType = "r2"
-	BackendOCI BackendType = "oci"
+	BackendR2     BackendType = "r2"
+	BackendNative BackendType = "native"
+	BackendOCI    BackendType = "oci"
 )
 
 // String returns a human-readable label.
@@ -19,6 +20,8 @@ func (b BackendType) String() string {
 	switch b {
 	case BackendR2:
 		return "Cloudflare R2"
+	case BackendNative:
+		return "Native OCI Tags"
 	case BackendOCI:
 		return "JSON index stored in OCI"
 	default:
