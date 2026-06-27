@@ -45,7 +45,7 @@ func getGitHubUsername(token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("GitHub API returned HTTP %d", resp.StatusCode)
@@ -74,7 +74,7 @@ func getGitLabUsername(token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("GitLab API returned HTTP %d (Ensure your token has 'api' or 'read_user' scope)", resp.StatusCode)
@@ -105,7 +105,7 @@ func createGitHubRepo(token, repoName string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("HTTP request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -115,7 +115,7 @@ func createGitHubRepo(token, repoName string) (string, error) {
 	var result struct {
 		CloneURL string `json:"clone_url"`
 	}
-	json.Unmarshal(respBody, &result)
+	_ = json.Unmarshal(respBody, &result)
 
 	// Embed token in clone URL for authenticated push.
 	cloneURL := strings.Replace(result.CloneURL, "https://", fmt.Sprintf("https://%s@", token), 1)
@@ -139,7 +139,7 @@ func createGitLabRepo(token, repoName string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("HTTP request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -149,7 +149,7 @@ func createGitLabRepo(token, repoName string) (string, error) {
 	var result struct {
 		HTTPUrlToRepo string `json:"http_url_to_repo"`
 	}
-	json.Unmarshal(respBody, &result)
+	_ = json.Unmarshal(respBody, &result)
 
 	cloneURL := strings.Replace(result.HTTPUrlToRepo, "https://", fmt.Sprintf("https://oauth2:%s@", token), 1)
 	return cloneURL, nil
@@ -168,7 +168,7 @@ func githubDeviceFlow() string {
 	if err != nil {
 		return ""
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var deviceResp struct {
 		DeviceCode      string `json:"device_code"`
@@ -242,7 +242,7 @@ func ensureGitLabProjectExists(token, fullProjectName string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == 200 {
 		return nil // exists
