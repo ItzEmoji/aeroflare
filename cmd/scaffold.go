@@ -99,7 +99,7 @@ func runScaffold() {
 	if targetDir == "" {
 		targetDir = "./aeroflare-proxy"
 	}
-	os.MkdirAll(targetDir, 0755)
+	_ = os.MkdirAll(targetDir, 0755)
 
 	// Download and extract.
 	PrintInfo(fmt.Sprintf("Downloading source for release %s...", releaseTag))

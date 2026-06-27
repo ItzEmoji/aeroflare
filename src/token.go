@@ -26,7 +26,7 @@ func ExchangeToken(registry, repository, username, basicAuthToken string) (strin
 	pingReq, _ := http.NewRequest("GET", fmt.Sprintf("%s://%s/v2/", proto, registry), nil)
 	pingClient := &http.Client{Timeout: 5 * time.Second}
 	if pingResp, err := pingClient.Do(pingReq); err == nil {
-		defer pingResp.Body.Close()
+		defer func() { _ = pingResp.Body.Close() }()
 		if pingResp.StatusCode == 401 {
 			authHeader := pingResp.Header.Get("Www-Authenticate")
 			if strings.HasPrefix(authHeader, "Bearer ") {

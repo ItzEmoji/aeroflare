@@ -217,8 +217,8 @@ func PullBlob(digest, outFile, registry, repository, token string) error {
 // (e.g., xn2nlmvng2im9mgrq46y3wkbz4ll1hnp) to ensure O(1) lookups during pulls later.
 func PushNarPackage(layer v1.Layer, ni *narinfo.Narinfo, tag, registry, repository, token string) error {
 	// Create Image
-	img := mutate.MediaType(empty.Image, types.OCIManifestSchema1).(v1.Image)
-	img = mutate.ConfigMediaType(img, types.OCIConfigJSON).(v1.Image)
+	img := mutate.MediaType(empty.Image, types.OCIManifestSchema1)
+	img = mutate.ConfigMediaType(img, types.OCIConfigJSON)
 	
 	layerMediaType, _ := layer.MediaType()
 	img, err := mutate.Append(img, mutate.Addendum{
@@ -366,8 +366,8 @@ func PushNarPackagesBatch(registry, repository, token string, jobs []PushJob, ma
 				return
 			}
 
-			img := mutate.MediaType(empty.Image, types.OCIManifestSchema1).(v1.Image)
-			img = mutate.ConfigMediaType(img, types.OCIConfigJSON).(v1.Image)
+			img := mutate.MediaType(empty.Image, types.OCIManifestSchema1)
+			img = mutate.ConfigMediaType(img, types.OCIConfigJSON)
 			
 			layerMediaType, _ := layer.MediaType()
 			img, err = mutate.Append(img, mutate.Addendum{

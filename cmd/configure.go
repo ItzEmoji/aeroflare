@@ -38,11 +38,12 @@ var configureCmd = &cobra.Command{
 				b = existingAnnotations["aeroflare.backend"]
 			}
 			if b != "" {
-				if b == "r2" {
+				switch b {
+				case "r2":
 					existingBackend = "Cloudflare R2 (Recommended)"
-				} else if b == "native" {
+				case "native":
 					existingBackend = "Native OCI Tags (Experimental)"
-				} else {
+				default:
 					existingBackend = "cache-index.json (Not Recommended)"
 				}
 			}
@@ -89,11 +90,12 @@ var configureCmd = &cobra.Command{
 			),
 		)
 
-		if existingBackend == "Cloudflare R2 (Recommended)" {
+		switch existingBackend {
+		case "Cloudflare R2 (Recommended)":
 			backend = "r2"
-		} else if existingBackend == "Native OCI Tags (Experimental)" {
+		case "Native OCI Tags (Experimental)":
 			backend = "native"
-		} else {
+		default:
 			backend = "json"
 		}
 		publicKey = existingPublicKey
