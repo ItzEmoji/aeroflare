@@ -1,14 +1,15 @@
 package setup
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
-	"net/url"
 )
 
 const githubOAuthClientID = "Ov23liIJyLpd2Cse5gne"
@@ -225,7 +226,11 @@ func githubDeviceFlow() string {
 // gitlabDeviceFlow authenticates via GitLab OAuth Device Flow.
 func gitlabDeviceFlow() string {
 	reqBody := strings.NewReader(fmt.Sprintf("client_id=%s", gitlabOAuthClientID))
-	req, err := http.NewRequest("POST", "https://gitlab.com/oauth/authorize_device", reqBody)
+	
+	ctxInit, cancelInit := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancelInit()
+
+	req, err := http.NewRequestWithContext(ctxInit, "POST", "https://gitlab.com/oauth/authorize_device", reqBody)
 	if err != nil {
 		return ""
 	}
@@ -265,11 +270,12 @@ func gitlabDeviceFlow() string {
 	if expiresIn == 0 {
 		expiresIn = 600
 	}
-	timeout := time.After(time.Duration(expiresIn) * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(expiresIn)*time.Second)
+	defer cancel()
 
 	for {
 		select {
-		case <-timeout:
+		case <-ctx.Done():
 			printError("GitLab OAuth device flow timed out.")
 			return ""
 		case <-time.After(interval):
@@ -279,7 +285,7 @@ func gitlabDeviceFlow() string {
 			"client_id=%s&device_code=%s&grant_type=urn:ietf:params:oauth:grant-type:device_code",
 			gitlabOAuthClientID, deviceResp.DeviceCode,
 		))
-		tokenReq, err := http.NewRequest("POST", "https://gitlab.com/oauth/token", tokenBody)
+		tokenReq, err := http.NewRequestWithContext(ctx, "POST", "https://gitlab.com/oauth/token", tokenBody)
 		if err != nil {
 			continue
 		}
