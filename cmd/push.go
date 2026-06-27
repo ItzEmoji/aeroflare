@@ -11,13 +11,15 @@ import (
 	"time"
 
 	network "aeroflare/src"
-	"aeroflare/src/proxy"
 	"aeroflare/src/prepare/cache"
 	"aeroflare/src/prepare/compress"
+	"aeroflare/src/prepare/narinfo"
 	"aeroflare/src/prepare/prepare"
 	"aeroflare/src/prepare/signing"
+	"aeroflare/src/proxy"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -276,13 +278,58 @@ func performPush(targetPaths []string) {
 					return nil
 				}
 
-				narDigest, err := network.PushBlob(r.NarPath, registry, repository, ociToken)
+				// Parse narinfo once to avoid disk reads for hashing
+				narinfoData, err := os.ReadFile(r.NarinfoPath)
 				if err != nil {
 					if isRoot {
-						return fmt.Errorf("failed to upload NAR file (%s): %v", r.NarPath, err)
+						return fmt.Errorf("failed to read narinfo (%s): %v", r.NarinfoPath, err)
+					}
+					return nil
+				}
+				ni, err := narinfo.Parse(string(narinfoData))
+				if err != nil {
+					if isRoot {
+						return fmt.Errorf("failed to parse narinfo (%s): %v", r.NarinfoPath, err)
+					}
+					return nil
+				}
+
+				// Create the layer ONCE for brutal speed without even hashing the file!
+				layer, narDigest, err := network.NewLayerFast(r.NarPath, types.MediaType("application/vnd.aeroflare.nar.v1+"+ni.Compression), ni)
+				if err != nil {
+					if isRoot {
+						return fmt.Errorf("failed to create NAR layer (%s): %v", r.NarPath, err)
 					} else {
 						mu.Lock()
-						PrintError(fmt.Sprintf("    Failed to upload reference NAR: %v", err))
+						PrintError(fmt.Sprintf("    Failed to create reference NAR layer: %v", err))
+						mu.Unlock()
+						return nil
+					}
+				}
+
+				// Dual-Strategy: Push natively to OCI
+				basename := filepath.Base(ni.StorePath)
+				tag := strings.SplitN(basename, "-", 2)[0]
+				err = network.PushNarPackage(layer, ni, tag, registry, repository, ociToken)
+				if err != nil {
+					if isRoot {
+						return fmt.Errorf("failed to push OCI Native artifact (%s): %v", r.StorePath, err)
+					} else {
+						mu.Lock()
+						PrintError(fmt.Sprintf("    Failed to push reference OCI Native artifact: %v", err))
+						mu.Unlock()
+						return nil
+					}
+				}
+
+				// Strategy 2 Legacy Fallback (the layer was already pushed by PushNarPackage, but we call PushLayer to be perfectly safe, which is a fast no-op if the layer exists)
+				err = network.PushLayer(layer, registry, repository, ociToken)
+				if err != nil {
+					if isRoot {
+						return fmt.Errorf("failed to push fallback NAR layer (%s): %v", r.NarPath, err)
+					} else {
+						mu.Lock()
+						PrintError(fmt.Sprintf("    Failed to push reference fallback NAR layer: %v", err))
 						mu.Unlock()
 						return nil
 					}

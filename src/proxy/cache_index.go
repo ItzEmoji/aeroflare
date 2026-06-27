@@ -20,6 +20,7 @@ import (
 // determine the mode via the "index-type" label:
 //   - "r2": narinfo is served from public-r2-url; only the manifest (not the
 //     large index blob) is fetched.
+//   - "native": narinfo hashes are used as tags in the registry.
 //   - "json" (or absent): the index blob is downloaded and cached locally so
 //     narinfo and NAR lookups can be served from memory.
 type CacheIndex struct {
@@ -37,12 +38,14 @@ type CacheIndex struct {
 	Repository          string
 }
 
-// IndexType returns the current manifest's index-type annotation, defaulting to "json".
 func (ci *CacheIndex) IndexType() string {
 	ci.mu.RLock()
 	defer ci.mu.RUnlock()
 	if ci.ManifestAnnotations == nil {
 		return "json"
+	}
+	if t := ci.ManifestAnnotations["aeroflare.index-type"]; t != "" {
+		return t
 	}
 	if t := ci.ManifestAnnotations["index-type"]; t != "" {
 		return t
@@ -94,7 +97,7 @@ func (ci *CacheIndex) Get(ctx context.Context) (*CacheIndexData, map[string]stri
 		ci.refreshMu.Unlock()
 	} else if needRefresh {
 		if ci.refreshMu.TryLock() {
-			// context.WithoutCancel (Go 1.21+) ensures the background refresh isn't aborted 
+			// context.WithoutCancel (Go 1.21+) ensures the background refresh isn't aborted
 			// if the HTTP request triggering it is completed/closed by the client.
 			bgCtx := context.WithoutCancel(ctx)
 			go func() {
@@ -228,15 +231,16 @@ func (ci *CacheIndex) refresh(ctx context.Context) error {
 	ci.ManifestAnnotations = manifest.Annotations
 	ci.mu.Unlock()
 
-	// In r2 mode the index blob is not needed: narinfo is served from R2 and
-	// NAR digests are parsed from the R2 narinfo on demand.
-	if manifest.Annotations != nil && manifest.Annotations["index-type"] == "r2" {
+	indexType := ci.IndexType()
+
+	// In r2 and native modes the index blob is not needed.
+	if indexType == "r2" || indexType == "native" {
 		ci.mu.Lock()
 		// Clear any stale in-memory index from a previous json-mode run.
 		ci.Data = &CacheIndexData{Entries: make(map[string]IndexEntry)}
 		ci.NarLookups = make(map[string]string)
 		ci.mu.Unlock()
-		slog.Info("Manifest refreshed (r2 mode)", "public_r2_url", ci.PublicR2URL())
+		slog.Info("Manifest refreshed", "mode", indexType, "public_r2_url", ci.PublicR2URL())
 		return nil
 	}
 

@@ -139,7 +139,6 @@ func TestProxyServerEndpoints(t *testing.T) {
 	}
 }
 
-
 func TestBootstrapConfig(t *testing.T) {
 	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -350,11 +349,11 @@ func TestProxyServer_ServePublicKey_NotFound(t *testing.T) {
 // TestProxyServer_ServePublicKey_FromServerField verifies that /public-key uses the PublicKey field when set directly.
 func TestProxyServer_ServePublicKey_FromServerField(t *testing.T) {
 	cacheIndex := &CacheIndex{
-		Data:       &CacheIndexData{Entries: map[string]IndexEntry{}},
-		NarLookups: map[string]string{},
+		Data:                &CacheIndexData{Entries: map[string]IndexEntry{}},
+		NarLookups:          map[string]string{},
 		ManifestAnnotations: map[string]string{"public-key": "  server-configured-key  "},
-		LastFetch:  time.Now(),
-		IndexTTL:   5 * time.Minute,
+		LastFetch:           time.Now(),
+		IndexTTL:            5 * time.Minute,
 	}
 	ps := &ProxyServer{
 		CacheIndex:      cacheIndex,

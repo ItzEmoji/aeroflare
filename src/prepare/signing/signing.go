@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -84,13 +86,26 @@ func (pk *PrivateKey) PublicKey() *PublicKey {
 // The format is: "1;storePath;narHash;narSize;ref1;ref2;..."
 // where references are the basenames (e.g. "abc123-glibc-2.37").
 func Fingerprint(storePath, narHash string, narSize int64, references []string) string {
+	storeDir := filepath.Dir(storePath)
+
+	var absoluteRefs []string
+	for _, ref := range references {
+		if filepath.IsAbs(ref) {
+			absoluteRefs = append(absoluteRefs, ref)
+		} else {
+			absoluteRefs = append(absoluteRefs, fmt.Sprintf("%s/%s", storeDir, ref))
+		}
+	}
+
+	sort.Strings(absoluteRefs)
+
 	parts := []string{
 		"1",
 		storePath,
 		narHash,
 		strconv.FormatInt(narSize, 10),
+		strings.Join(absoluteRefs, ","),
 	}
-	parts = append(parts, references...)
 	return strings.Join(parts, ";")
 }
 

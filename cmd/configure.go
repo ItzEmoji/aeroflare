@@ -33,14 +33,22 @@ var configureCmd = &cobra.Command{
 		tokenMgr := proxy.NewTokenManager(registry, repository, getGithubToken())
 		remoteConf, existingAnnotations, _ := proxy.BootstrapConfigWithAnnotations(context.Background(), nil, registry, repository, tokenMgr)
 		if existingAnnotations != nil {
-			if b := existingAnnotations["aeroflare.backend"]; b != "" {
+			b := existingAnnotations["aeroflare.index-type"]
+			if b == "" {
+				b = existingAnnotations["aeroflare.backend"]
+			}
+			if b != "" {
 				if b == "r2" {
 					existingBackend = "Cloudflare R2 (Recommended)"
+				} else if b == "native" {
+					existingBackend = "Native OCI Tags (Experimental)"
 				} else {
 					existingBackend = "cache-index.json (Not Recommended)"
 				}
 			}
-			if pk := existingAnnotations["public-key"]; pk != "" {
+			if pk := existingAnnotations["aeroflare.public-key"]; pk != "" {
+				existingPublicKey = pk
+			} else if pk := existingAnnotations["public-key"]; pk != "" {
 				existingPublicKey = pk
 			}
 			if b := existingAnnotations["aeroflare.r2.bucket"]; b != "" {
@@ -67,10 +75,11 @@ var configureCmd = &cobra.Command{
 		form := huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
-					Title("Choose your cache backend").
+					Title("Choose your cache backend (index-type)").
 					Options(
 						huh.NewOption("Cloudflare R2 (Recommended)", "r2"),
-						huh.NewOption("cache-index.json (Not Recommended)", "cache-index"),
+						huh.NewOption("Native OCI Tags (Experimental)", "native"),
+						huh.NewOption("cache-index.json (Not Recommended)", "json"),
 					).
 					Value(&backend),
 				huh.NewInput().
@@ -82,14 +91,19 @@ var configureCmd = &cobra.Command{
 
 		if existingBackend == "Cloudflare R2 (Recommended)" {
 			backend = "r2"
+		} else if existingBackend == "Native OCI Tags (Experimental)" {
+			backend = "native"
 		} else {
-			backend = "cache-index"
+			backend = "json"
 		}
 		publicKey = existingPublicKey
 
 		err := form.Run()
 		if err != nil {
-			os.Exit(0)
+			if err.Error() != "user aborted" {
+				PrintError(fmt.Sprintf("Form error: %v", err))
+			}
+			os.Exit(1)
 		}
 
 		if backend == "r2" {
@@ -106,13 +120,16 @@ var configureCmd = &cobra.Command{
 			)
 			err = r2Form.Run()
 			if err != nil {
-				os.Exit(0)
+				if err.Error() != "user aborted" {
+					PrintError(fmt.Sprintf("Form error: %v", err))
+				}
+				os.Exit(1)
 			}
 		}
 
 		annotations := map[string]string{
-			"aeroflare.backend": backend,
-			"public-key":        publicKey,
+			"aeroflare.index-type": backend,
+			"aeroflare.public-key": publicKey,
 		}
 
 		if backend == "r2" {
@@ -128,6 +145,11 @@ var configureCmd = &cobra.Command{
 		if err != nil {
 			PrintError(fmt.Sprintf("Failed to save config: %v", err))
 			os.Exit(1)
+		}
+
+		if backend != "json" {
+			// If switching away from json backend, try to untag cache-index image
+			_ = network.DeleteTag("cache-index", registry, repository, ociToken)
 		}
 
 		PrintSuccess("Configuration successfully saved to cache-config manifest!")

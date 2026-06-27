@@ -95,7 +95,9 @@ func BootstrapConfigWithAnnotations(ctx context.Context, client *http.Client, re
 		return nil, manifest.Annotations, fmt.Errorf("failed decoding blob JSON: %w", err)
 	}
 
-	if pk, ok := manifest.Annotations["public-key"]; ok && pk != "" && config.PublicKey == "" {
+	if pk, ok := manifest.Annotations["aeroflare.public-key"]; ok && pk != "" && config.PublicKey == "" {
+		config.PublicKey = pk
+	} else if pk, ok := manifest.Annotations["public-key"]; ok && pk != "" && config.PublicKey == "" {
 		config.PublicKey = pk
 	}
 
@@ -192,9 +194,9 @@ func StartProxy(ctx context.Context, port int, listenAddr string, registry strin
 	server := &http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
-		// Replaced strict WriteTimeout with IdleTimeout to prevent Slowloris 
+		// Replaced strict WriteTimeout with IdleTimeout to prevent Slowloris
 		// without killing active multi-gigabyte derivations mid-download.
-		IdleTimeout:       120 * time.Second,
+		IdleTimeout: 120 * time.Second,
 	}
 
 	serveErr := make(chan error, 1)
