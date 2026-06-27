@@ -3,12 +3,12 @@ package proxy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strconv"
-	"errors"
 	"strings"
 )
 
@@ -72,7 +72,10 @@ func (ps *ProxyServer) servePublicKey(w http.ResponseWriter, r *http.Request) {
 	ps.CacheIndex.mu.RLock()
 	pubKey := ""
 	if ps.CacheIndex.ManifestAnnotations != nil {
-		pubKey = ps.CacheIndex.ManifestAnnotations["public-key"]
+		pubKey = ps.CacheIndex.ManifestAnnotations["aeroflare.public-key"]
+		if pubKey == "" {
+			pubKey = ps.CacheIndex.ManifestAnnotations["public-key"]
+		}
 	}
 	ps.CacheIndex.mu.RUnlock()
 
@@ -103,7 +106,10 @@ func (ps *ProxyServer) serveApiPublicKey(w http.ResponseWriter) {
 
 	pubKey := ""
 	if annotations != nil {
-		pubKey = annotations["public-key"]
+		pubKey = annotations["aeroflare.public-key"]
+		if pubKey == "" {
+			pubKey = annotations["public-key"]
+		}
 	}
 	if pubKey != "" {
 		pubKey = strings.TrimSpace(pubKey) + "\n"
@@ -139,7 +145,10 @@ func (ps *ProxyServer) serveStatus(w http.ResponseWriter, r *http.Request) {
 	annotations := ps.CacheIndex.ManifestAnnotations
 	ps.CacheIndex.mu.RUnlock()
 
-	if annotations["index-type"] == "r2" || annotations["public-r2-url"] != "" || annotations["aeroflare.r2.public_url"] != "" {
+	indexType := ps.CacheIndex.IndexType()
+	status["index_type"] = indexType
+
+	if indexType == "r2" {
 		publicURL := annotations["public-r2-url"]
 		if publicURL == "" {
 			publicURL = annotations["aeroflare.r2.public_url"]
@@ -176,8 +185,9 @@ func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, r *http.Request, path
 	storeHash := strings.TrimPrefix(path, "/")
 	storeHash = strings.TrimSuffix(storeHash, ".narinfo")
 
-	// r2 mode: redirect the client to the public R2 URL.
-	if ps.CacheIndex.IsR2() {
+	switch ps.CacheIndex.IndexType() {
+	case "r2":
+		// r2 mode: redirect the client to the public R2 URL.
 		publicURL := ps.CacheIndex.PublicR2URL()
 		if publicURL == "" {
 			http.Error(w, "Error: The cache uses R2 but no public-url is configured. It is not possible to access this cache.", http.StatusForbidden)
@@ -186,18 +196,23 @@ func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, r *http.Request, path
 		redirectURL := fmt.Sprintf("%s/%s.narinfo", strings.TrimRight(publicURL, "/"), storeHash)
 		http.Redirect(w, r, redirectURL, http.StatusFound)
 		return
-	}
-
-	// json mode: serve from the cached index.
-	indexData, _ := ps.CacheIndex.Get(r.Context())
-	if indexData != nil {
-		if entry, ok := indexData.Entries[storeHash]; ok && entry.NarInfo != "" {
-			body := []byte(entry.NarInfo)
-			w.Header().Set("Content-Type", "text/x-nix-narinfo")
-			w.Header().Set("Content-Length", strconv.Itoa(len(body)))
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(body)
+	case "native":
+		// native mode: pull narinfo from native OCI manifest
+		if err := ps.serveNativeNarinfo(w, r, storeHash); err == nil {
 			return
+		}
+	case "json":
+		// json mode: serve from the cached index.
+		indexData, _ := ps.CacheIndex.Get(r.Context())
+		if indexData != nil {
+			if entry, ok := indexData.Entries[storeHash]; ok && entry.NarInfo != "" {
+				body := []byte(entry.NarInfo)
+				w.Header().Set("Content-Type", "text/x-nix-narinfo")
+				w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(body)
+				return
+			}
 		}
 	}
 
@@ -219,14 +234,22 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, r *http.Request, path str
 
 	var digest string
 
-	// r2 mode: derive the blob digest from the narinfo's FileHash served by R2.
-	if ps.CacheIndex.IsR2() {
+	switch ps.CacheIndex.IndexType() {
+	case "r2":
+		// r2 mode: derive the blob digest from the narinfo's FileHash served by R2.
 		if d, err := ps.digestFromR2Narinfo(r.Context(), narBasename); err == nil && d != "" {
 			digest = d
 		} else if err != nil {
 			fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to derive digest from R2 narinfo for %s: %v. Trying upstream...\n", narBasename, err)
 		}
-	} else {
+	case "native":
+		// native mode: pull the manifest and use the layer digest
+		if d, err := ps.digestFromNativeManifest(r.Context(), narBasename); err == nil && d != "" {
+			digest = d
+		} else if err != nil {
+			fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to derive digest from native manifest for %s: %v. Trying upstream...\n", narBasename, err)
+		}
+	case "json":
 		// json mode: use the NAR lookup built from the cached index.
 		_, narLookups := ps.CacheIndex.Get(r.Context())
 		if narLookups != nil {
@@ -249,6 +272,120 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, r *http.Request, path str
 	}
 
 	http.Error(w, "NAR Not Found", http.StatusNotFound)
+}
+
+func (ps *ProxyServer) serveNativeNarinfo(w http.ResponseWriter, r *http.Request, storeHash string) error {
+	proto := GetProtocol(ps.Registry)
+	manifestURL := fmt.Sprintf("%s://%s/v2/%s/manifests/%s", proto, ps.Registry, ps.Repository, storeHash)
+	req, err := http.NewRequestWithContext(r.Context(), "GET", manifestURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
+	token, _ := ps.TokenMgr.GetToken(r.Context())
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := ps.HttpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	var manifest struct {
+		Annotations map[string]string `json:"annotations"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
+		return err
+	}
+
+	anns := manifest.Annotations
+	if anns == nil {
+		return fmt.Errorf("no annotations found")
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("StorePath: %s\n", anns["vnd.aeroflare.nar.storepath"]))
+	b.WriteString(fmt.Sprintf("URL: %s\n", anns["vnd.aeroflare.nar.url"]))
+	b.WriteString(fmt.Sprintf("Compression: %s\n", anns["vnd.aeroflare.nar.compression"]))
+	b.WriteString(fmt.Sprintf("FileHash: %s\n", anns["vnd.aeroflare.nar.filehash"]))
+	b.WriteString(fmt.Sprintf("FileSize: %s\n", anns["vnd.aeroflare.nar.filesize"]))
+	b.WriteString(fmt.Sprintf("NarHash: %s\n", anns["vnd.aeroflare.nar.narhash"]))
+	b.WriteString(fmt.Sprintf("NarSize: %s\n", anns["vnd.aeroflare.nar.narsize"]))
+
+	if rStr, ok := anns["vnd.aeroflare.nar.references"]; ok && rStr != "" {
+		b.WriteString(fmt.Sprintf("References: %s\n", rStr))
+	} else {
+		b.WriteString("References:\n")
+	}
+
+	if deriver, ok := anns["vnd.aeroflare.nar.deriver"]; ok && deriver != "" {
+		b.WriteString(fmt.Sprintf("Deriver: %s\n", deriver))
+	} else {
+		b.WriteString("Deriver:\n")
+	}
+
+	if system, ok := anns["vnd.aeroflare.nar.system"]; ok && system != "" {
+		b.WriteString(fmt.Sprintf("System: %s\n", system))
+	}
+
+	if sig, ok := anns["vnd.aeroflare.nar.sig"]; ok && sig != "" {
+		b.WriteString(fmt.Sprintf("Sig: %s\n", sig))
+	}
+
+	body := []byte(b.String())
+	w.Header().Set("Content-Type", "text/x-nix-narinfo")
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
+	return nil
+}
+
+func (ps *ProxyServer) digestFromNativeManifest(ctx context.Context, narBasename string) (string, error) {
+	tag := narBasename
+	if idx := strings.Index(tag, ".nar"); idx != -1 {
+		tag = tag[:idx]
+	}
+
+	proto := GetProtocol(ps.Registry)
+	manifestURL := fmt.Sprintf("%s://%s/v2/%s/manifests/%s", proto, ps.Registry, ps.Repository, tag)
+	req, err := http.NewRequestWithContext(ctx, "GET", manifestURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
+	token, _ := ps.TokenMgr.GetToken(ctx)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := ps.HttpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	var manifest struct {
+		Layers []struct {
+			Digest string `json:"digest"`
+		} `json:"layers"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
+		return "", err
+	}
+	if len(manifest.Layers) == 0 {
+		return "", fmt.Errorf("no layers in manifest")
+	}
+	return manifest.Layers[0].Digest, nil
 }
 
 // digestFromR2Narinfo fetches the narinfo for a NAR from the public R2 URL and
@@ -332,45 +469,45 @@ func (ps *ProxyServer) streamBlob(ctx context.Context, w http.ResponseWriter, di
 	return nil
 }
 func (ps *ProxyServer) proxyUpstream(w http.ResponseWriter, r *http.Request, upstreamPath string) bool {
-        if len(ps.UpstreamCaches) == 0 {
-                return false
-        }
+	if len(ps.UpstreamCaches) == 0 {
+		return false
+	}
 
-        for _, cache := range ps.UpstreamCaches {
-                upstreamURL := fmt.Sprintf("%s%s", strings.TrimSuffix(cache, "/"), upstreamPath)
-                
-                req, err := http.NewRequestWithContext(r.Context(), r.Method, upstreamURL, nil)
-                if err != nil {
-                        continue // Try next upstream
-                }
-                req.Header.Set("User-Agent", "aeroflare/1.0")
+	for _, cache := range ps.UpstreamCaches {
+		upstreamURL := fmt.Sprintf("%s%s", strings.TrimSuffix(cache, "/"), upstreamPath)
 
-                resp, err := ps.HttpClient.Do(req)
-                if err != nil {
-                        continue // Try next upstream on network error
-                }
-                
-                // If it's a 404, we might want to try the next cache. 
-                // If it's a 200 OK, serve it and return.
-                if resp.StatusCode != http.StatusOK {
-                        _ = resp.Body.Close()
-                        continue
-                }
+		req, err := http.NewRequestWithContext(r.Context(), r.Method, upstreamURL, nil)
+		if err != nil {
+			continue // Try next upstream
+		}
+		req.Header.Set("User-Agent", "aeroflare/1.0")
 
-                defer func() { _ = resp.Body.Close() }()
+		resp, err := ps.HttpClient.Do(req)
+		if err != nil {
+			continue // Try next upstream on network error
+		}
 
-                for k, vv := range resp.Header {
-                        for _, v := range vv {
-                                w.Header().Add(k, v)
-                        }
-                }
-                w.WriteHeader(resp.StatusCode)
-                _, err = io.Copy(w, resp.Body)
-                if err != nil && !errors.Is(err, context.Canceled) {
-                        fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for upstream path %s: %v\n", upstreamPath, err)
-                }
-                return true
-        }
+		// If it's a 404, we might want to try the next cache.
+		// If it's a 200 OK, serve it and return.
+		if resp.StatusCode != http.StatusOK {
+			_ = resp.Body.Close()
+			continue
+		}
 
-        return false
+		defer func() { _ = resp.Body.Close() }()
+
+		for k, vv := range resp.Header {
+			for _, v := range vv {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		_, err = io.Copy(w, resp.Body)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for upstream path %s: %v\n", upstreamPath, err)
+		}
+		return true
+	}
+
+	return false
 }

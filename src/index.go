@@ -184,7 +184,8 @@ func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, reg
 	// Push empty config JSON as blob
 	outConfig, _ := os.CreateTemp("", "empty-config-*.json")
 	defer func() { _ = os.Remove(outConfig.Name()) }()
-	_ = os.WriteFile(outConfig.Name(), []byte("{}"), 0644)
+	configContent := fmt.Sprintf(`{"created":"%s"}`, time.Now().UTC().Format(time.RFC3339Nano))
+	_ = os.WriteFile(outConfig.Name(), []byte(configContent), 0644)
 
 	configDigest, err := PushBlob(outConfig.Name(), registry, repository, token)
 	if err != nil {
@@ -212,20 +213,24 @@ func UpdateCacheIndex(receipts []PushReceipt, existingIndex *PushCacheIndex, reg
 
 	manifestAnnotations := map[string]string{}
 	if configAnnotations != nil {
-		if pk := configAnnotations["public-key"]; pk != "" {
-			manifestAnnotations["public-key"] = pk
+		if pk := configAnnotations["aeroflare.public-key"]; pk != "" {
+			manifestAnnotations["aeroflare.public-key"] = pk
+		} else if pk := configAnnotations["public-key"]; pk != "" {
+			manifestAnnotations["aeroflare.public-key"] = pk
 		}
-		if backend := configAnnotations["aeroflare.backend"]; backend != "" {
-			manifestAnnotations["index-type"] = backend
+		if backend := configAnnotations["aeroflare.index-type"]; backend != "" {
+			manifestAnnotations["aeroflare.index-type"] = backend
+		} else if backend := configAnnotations["aeroflare.backend"]; backend != "" {
+			manifestAnnotations["aeroflare.index-type"] = backend
 		}
 	}
 
 	if r2Cfg != nil && r2Cfg.PublicURL != "" {
-		manifestAnnotations["index-type"] = "r2"
+		manifestAnnotations["aeroflare.index-type"] = "r2"
 		manifestAnnotations["public-r2-url"] = r2Cfg.PublicURL
 		manifestAnnotations["aeroflare.r2.public_url"] = r2Cfg.PublicURL
-	} else if manifestAnnotations["index-type"] == "" {
-		manifestAnnotations["index-type"] = "json"
+	} else if manifestAnnotations["aeroflare.index-type"] == "" {
+		manifestAnnotations["aeroflare.index-type"] = "json"
 	}
 
 	if len(manifestAnnotations) > 0 {
@@ -266,7 +271,8 @@ func PushConfigManifest(registry, repository, token string, annotations map[stri
 	// Push empty config JSON as blob
 	outConfig, _ := os.CreateTemp("", "empty-config-*.json")
 	defer func() { _ = os.Remove(outConfig.Name()) }()
-	_ = os.WriteFile(outConfig.Name(), []byte("{}"), 0644)
+	configContent := fmt.Sprintf(`{"created":"%s"}`, time.Now().UTC().Format(time.RFC3339Nano))
+	_ = os.WriteFile(outConfig.Name(), []byte(configContent), 0644)
 
 	configDigest, err := PushBlob(outConfig.Name(), registry, repository, token)
 	if err != nil {
@@ -282,13 +288,6 @@ func PushConfigManifest(registry, repository, token string, annotations map[stri
 			"mediaType": "application/vnd.oci.image.config.v1+json",
 			"digest":    configDigest,
 			"size":      configStat.Size(),
-		},
-		"layers": []map[string]interface{}{
-			{
-				"mediaType": "application/vnd.nix.cache.config.v1+json",
-				"digest":    configDigest,
-				"size":      configStat.Size(),
-			},
 		},
 		"annotations": annotations,
 	}

@@ -55,13 +55,13 @@ func BuildUpstreamURL(baseURL, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	// url.JoinPath returns both the joined path and an error.
 	joinedPath, err := url.JoinPath(u.Path, path)
 	if err != nil {
 		return "", err
 	}
-	
+
 	u.Path = joinedPath
 	return u.String(), nil
 }

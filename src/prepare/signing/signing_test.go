@@ -87,10 +87,10 @@ func TestFingerprint(t *testing.T) {
 		"/nix/store/abc-hello-2.10",
 		"sha256:xyz123",
 		67890,
-		[]string{"def-glibc-2.37", "ghi-zlib-1.2"},
+		[]string{"ghi-zlib-1.2", "def-glibc-2.37"},
 	)
 
-	expected := "1;/nix/store/abc-hello-2.10;sha256:xyz123;67890;def-glibc-2.37;ghi-zlib-1.2"
+	expected := "1;/nix/store/abc-hello-2.10;sha256:xyz123;67890;/nix/store/def-glibc-2.37,/nix/store/ghi-zlib-1.2"
 	if fp != expected {
 		t.Errorf("Fingerprint = %q, want %q", fp, expected)
 	}
@@ -104,7 +104,7 @@ func TestFingerprintNoReferences(t *testing.T) {
 		nil,
 	)
 
-	expected := "1;/nix/store/abc-hello-2.10;sha256:xyz123;67890"
+	expected := "1;/nix/store/abc-hello-2.10;sha256:xyz123;67890;"
 	if fp != expected {
 		t.Errorf("Fingerprint = %q, want %q", fp, expected)
 	}

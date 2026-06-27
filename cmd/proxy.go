@@ -49,7 +49,6 @@ var proxyCmd = &cobra.Command{
 
 		indexDir := getIndexDir(repository)
 
-
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 

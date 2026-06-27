@@ -156,7 +156,7 @@ export default {
 
       if (path === "/api/public-key") {
         const manifestText = await getOciManifestText(env, ctx);
-        const match = manifestText.match(/"public[-_]key"\s*:\s*"([^"]+)"/);
+        const match = manifestText.match(/"(?:aeroflare\.)?public[-_]key"\s*:\s*"([^"]+)"/);
         
         if (match && match[1]) {
           return new Response(match[1] + "\n", { headers: { "Content-Type": "text/plain" }});
