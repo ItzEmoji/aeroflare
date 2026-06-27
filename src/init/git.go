@@ -234,6 +234,7 @@ func gitlabDeviceFlow() string {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		printError(fmt.Sprintf("Failed to initialize GitLab device flow: %v", err))
 		return ""
 	}
 	defer resp.Body.Close()
@@ -243,8 +244,10 @@ func gitlabDeviceFlow() string {
 		UserCode                string `json:"user_code"`
 		VerificationURIComplete string `json:"verification_uri_complete"`
 		Interval                int    `json:"interval"`
+		ExpiresIn               int    `json:"expires_in"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&deviceResp); err != nil {
+		printError(fmt.Sprintf("Failed to initialize GitLab device flow: %v", err))
 		return ""
 	}
 
@@ -258,8 +261,20 @@ func gitlabDeviceFlow() string {
 		interval = 5 * time.Second
 	}
 
+	expiresIn := deviceResp.ExpiresIn
+	if expiresIn == 0 {
+		expiresIn = 600
+	}
+	timeout := time.After(time.Duration(expiresIn) * time.Second)
+
 	for {
-		time.Sleep(interval)
+		select {
+		case <-timeout:
+			printError("GitLab OAuth device flow timed out.")
+			return ""
+		case <-time.After(interval):
+		}
+
 		tokenBody := strings.NewReader(fmt.Sprintf(
 			"client_id=%s&device_code=%s&grant_type=urn:ietf:params:oauth:grant-type:device_code",
 			gitlabOAuthClientID, deviceResp.DeviceCode,
@@ -280,8 +295,11 @@ func gitlabDeviceFlow() string {
 			AccessToken string `json:"access_token"`
 			Error       string `json:"error"`
 		}
-		json.NewDecoder(tokenResp.Body).Decode(&result)
+		err = json.NewDecoder(tokenResp.Body).Decode(&result)
 		tokenResp.Body.Close()
+		if err != nil {
+			continue
+		}
 
 		if result.AccessToken != "" {
 			printSuccess("GitLab authentication successful!")
