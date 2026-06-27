@@ -121,6 +121,7 @@ func runScaffold() {
 				Title("Choose your cache backend").
 				Options(
 					huh.NewOption("Cloudflare R2", "r2"),
+					huh.NewOption("Native OCI Tags", "native"),
 					huh.NewOption("JSON index in OCI", "json"),
 				).
 				Value(&indexType),
