@@ -12,6 +12,7 @@ import (
 )
 
 const githubOAuthClientID = "Ov23liIJyLpd2Cse5gne"
+const gitlabOAuthClientID = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0" // REPLACE_ME_GITLAB_CLIENT_ID
 
 // detectGitHubToken returns a GitHub token from common environment variables.
 func detectGitHubToken() string {
@@ -216,6 +217,79 @@ func githubDeviceFlow() string {
 
 		if result.Error != "authorization_pending" && result.Error != "slow_down" {
 			printError(fmt.Sprintf("GitHub OAuth error: %s", result.Error))
+			return ""
+		}
+	}
+}
+
+// gitlabDeviceFlow authenticates via GitLab OAuth Device Flow.
+func gitlabDeviceFlow() string {
+	reqBody := strings.NewReader(fmt.Sprintf("client_id=%s", gitlabOAuthClientID))
+	req, err := http.NewRequest("POST", "https://gitlab.com/oauth/authorize_device", reqBody)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	var deviceResp struct {
+		DeviceCode              string `json:"device_code"`
+		UserCode                string `json:"user_code"`
+		VerificationURIComplete string `json:"verification_uri_complete"`
+		Interval                int    `json:"interval"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&deviceResp); err != nil {
+		return ""
+	}
+
+	fmt.Println()
+	printInfo(fmt.Sprintf("Open your browser to: %s", deviceResp.VerificationURIComplete))
+	printInfo(fmt.Sprintf("Ensure the code matches: %s", deviceResp.UserCode))
+	printInfo("Waiting for authorization...")
+
+	interval := time.Duration(deviceResp.Interval) * time.Second
+	if interval == 0 {
+		interval = 5 * time.Second
+	}
+
+	for {
+		time.Sleep(interval)
+		tokenBody := strings.NewReader(fmt.Sprintf(
+			"client_id=%s&device_code=%s&grant_type=urn:ietf:params:oauth:grant-type:device_code",
+			gitlabOAuthClientID, deviceResp.DeviceCode,
+		))
+		tokenReq, err := http.NewRequest("POST", "https://gitlab.com/oauth/token", tokenBody)
+		if err != nil {
+			continue
+		}
+		tokenReq.Header.Set("Accept", "application/json")
+		tokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		tokenResp, err := http.DefaultClient.Do(tokenReq)
+		if err != nil {
+			continue
+		}
+
+		var result struct {
+			AccessToken string `json:"access_token"`
+			Error       string `json:"error"`
+		}
+		json.NewDecoder(tokenResp.Body).Decode(&result)
+		tokenResp.Body.Close()
+
+		if result.AccessToken != "" {
+			printSuccess("GitLab authentication successful!")
+			return result.AccessToken
+		}
+
+		if result.Error != "authorization_pending" && result.Error != "slow_down" {
+			printError(fmt.Sprintf("GitLab OAuth error: %s", result.Error))
 			return ""
 		}
 	}
