@@ -185,9 +185,9 @@ func promptCredentials(cfg *InitConfig) error {
 // DisplaySummary shows a configuration summary and asks for confirmation.
 func DisplaySummary(cfg *InitConfig) (bool, error) {
 	fmt.Println()
-	fmt.Println("  ╭──────────────────────────────────────────────╮")
-	fmt.Println("  │  Summary                                     │")
-	fmt.Println("  ├──────────────────────────────────────────────┤")
+	fmt.Println("  ╭────────────────────────────────────────────────────────────╮")
+	fmt.Println("  │  Summary                                                   │")
+	fmt.Println("  ├────────────────────────────────────────────────────────────┤")
 	printField("Cache", cfg.CacheName)
 	printField("Registry", cfg.Registry)
 	printField("Repository", cfg.Repository)
@@ -199,7 +199,7 @@ func DisplaySummary(cfg *InitConfig) (bool, error) {
 	if cfg.GitProvider != GitNone {
 		printField("Git", fmt.Sprintf("%s (%s)", cfg.GitProvider, cfg.GitUsername))
 	}
-	fmt.Println("  ╰──────────────────────────────────────────────╯")
+	fmt.Println("  ╰────────────────────────────────────────────────────────────╯")
 	fmt.Println()
 
 	var confirmed bool
@@ -219,7 +219,10 @@ func DisplaySummary(cfg *InitConfig) (bool, error) {
 }
 
 func printField(label, value string) {
-	fmt.Printf("  \u2502  %-12s %s\n", label+":", value)
+	if len(value) > 45 {
+		value = value[:42] + "..."
+	}
+	fmt.Printf("  \u2502  %-12s %-45s \u2502\n", label+":", value)
 }
 
 func notEmpty(name string) func(string) error {
