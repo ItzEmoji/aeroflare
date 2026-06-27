@@ -110,7 +110,7 @@ func runScaffold() {
 		PrintError(fmt.Sprintf("Failed to download source: %v", err))
 		os.Exit(1)
 	}
-	defer tarResp.Body.Close()
+	defer func() { _ = tarResp.Body.Close() }()
 	if tarResp.StatusCode < 200 || tarResp.StatusCode >= 300 {
 		PrintError(fmt.Sprintf("Failed to download source: GitHub returned %s", tarResp.Status))
 		os.Exit(1)
