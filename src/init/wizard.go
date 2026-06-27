@@ -60,6 +60,7 @@ func promptCoreSettings(cfg *InitConfig) error {
 				Description("How should the cache index be stored?").
 				Options(
 					huh.NewOption("Cloudflare R2 (recommended)", "r2"),
+					huh.NewOption("Native OCI Tags (experimental)", "native"),
 					huh.NewOption("JSON index stored in OCI", "oci"),
 				).
 				Value(&backend),
