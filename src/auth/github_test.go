@@ -116,9 +116,9 @@ func TestPollAccessTokenError(t *testing.T) {
 
 func TestPollAccessTokenClientError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`<html>400 Bad Request</html>`))
+		w.Write([]byte(`{"error": "access_denied"}`))
 	}))
 	defer ts.Close()
 
@@ -131,7 +131,7 @@ func TestPollAccessTokenClientError(t *testing.T) {
 	defer func() { pollTimeUnit = originalTimeUnit }()
 
 	_, err := PollAccessToken("client_id", "device_code", 1)
-	if err == nil || err.Error() != "client error: 400 Bad Request" {
-		t.Fatalf("expected client error 400, got: %v", err)
+	if err == nil || err.Error() != "access_denied" {
+		t.Fatalf("expected access_denied, got: %v", err)
 	}
 }

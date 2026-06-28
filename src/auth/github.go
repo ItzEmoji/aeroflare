@@ -2,6 +2,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -41,13 +42,13 @@ func RequestDeviceCode(clientID string) (*DeviceCodeResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, errors.New("unexpected status code: " + resp.Status)
-	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, errors.New("unexpected status code: " + resp.Status + " body: " + string(body))
 	}
 
 	var result DeviceCodeResponse
@@ -74,23 +75,24 @@ func PollAccessToken(clientID string, deviceCode string, interval int) (string, 
 	}
 	ticker := time.NewTicker(time.Duration(interval) * pollTimeUnit)
 	defer ticker.Stop()
-	timeout := time.After(15 * time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	reqBodyBytes, err := json.Marshal(TokenRequest{
+		ClientID:   clientID,
+		DeviceCode: deviceCode,
+		GrantType:  "urn:ietf:params:oauth:grant-type:device_code",
+	})
+	if err != nil {
+		return "", err
+	}
 
 	for {
 		select {
-		case <-timeout:
+		case <-ctx.Done():
 			return "", errors.New("polling timed out")
 		case <-ticker.C:
-			reqBodyBytes, err := json.Marshal(TokenRequest{
-				ClientID:   clientID,
-				DeviceCode: deviceCode,
-				GrantType:  "urn:ietf:params:oauth:grant-type:device_code",
-			})
-			if err != nil {
-				return "", err
-			}
-
-			req, err := http.NewRequest("POST", githubBaseURL+"/login/oauth/access_token", bytes.NewBuffer(reqBodyBytes))
+			req, err := http.NewRequestWithContext(ctx, "POST", githubBaseURL+"/login/oauth/access_token", bytes.NewBuffer(reqBodyBytes))
 			if err != nil {
 				return "", err
 			}
@@ -105,10 +107,6 @@ func PollAccessToken(clientID string, deviceCode string, interval int) (string, 
 			if resp.StatusCode >= 500 {
 				resp.Body.Close()
 				continue // transient error, retry
-			}
-			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-				resp.Body.Close()
-				return "", errors.New("client error: " + resp.Status)
 			}
 
 			body, err := io.ReadAll(resp.Body)
