@@ -108,7 +108,6 @@ func init() {
 	prepareCmd.Flags().StringVar(&inputFile, "input", "", "File containing store paths (one per line, # for comments)")
 	prepareCmd.Flags().StringVar(&outputDir, "output-dir", "./output", "Output directory for .nar and .narinfo files")
 	prepareCmd.Flags().StringVar(&compression, "compression", "zstd", "Compression type: zstd, xz, gzip, none")
-	prepareCmd.Flags().StringVar(&cacheURL, "cache-url", "https://cache.nixos.org", "Upstream binary cache URL (empty to skip reference checking)")
 	prepareCmd.Flags().IntVar(&workers, "workers", 50, "Number of concurrent workers")
 	prepareCmd.Flags().BoolVar(&prepareRefs, "prepare-refs", false, "Also prepare NAR+narinfo for references not on the upstream cache (one level deep)")
 	prepareCmd.Flags().StringVar(&signingKey, "signing-key", "", "Path to Nix signing private key file (format: name:base64seed, as produced by 'nix key-gen-secret')")
