@@ -28,6 +28,19 @@ func (m *mockManager) Get(key string) (string, error) {
 	return "", secrets.ErrNotFound
 }
 
+func (m *mockManager) List() ([]string, error) {
+	var keys []string
+	for k := range m.data {
+		keys = append(keys, k)
+	}
+	return keys, nil
+}
+
+func (m *mockManager) Delete(key string) error {
+	delete(m.data, key)
+	return nil
+}
+
 func executeCommand(root *cobra.Command, args ...string) (output string, err error) {
 	buf := new(bytes.Buffer)
 	root.SetOut(buf)
@@ -58,7 +71,7 @@ func TestAuthCmdBehavior(t *testing.T) {
 		globalCfUserID = ""
 	}()
 
-	_, err := executeCommand(rootCmd, "auth", "--github-token=test-gh", "--gitlab-token=test-gl", "--cf-token=test-cf", "--cf-user-id=test-id")
+	_, err := executeCommand(rootCmd, "auth", "login", "--github-token=test-gh", "--gitlab-token=test-gl", "--cf-token=test-cf", "--cf-user-id=test-id")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -92,7 +105,7 @@ func TestAuthCmdError(t *testing.T) {
 		globalCfUserID = ""
 	}()
 
-	_, err := executeCommand(rootCmd, "auth", "--github-token=fail")
+	_, err := executeCommand(rootCmd, "auth", "login", "--github-token=fail")
 	if err == nil {
 		t.Fatalf("Expected an error, got nil")
 	}

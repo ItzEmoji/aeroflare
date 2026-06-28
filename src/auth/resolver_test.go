@@ -90,6 +90,19 @@ func (m *mockSecretsManager) Get(key string) (string, error) {
 	return "", secrets.ErrNotFound
 }
 
+func (m *mockSecretsManager) List() ([]string, error) {
+	var keys []string
+	for k := range m.data {
+		keys = append(keys, k)
+	}
+	return keys, nil
+}
+
+func (m *mockSecretsManager) Delete(key string) error {
+	delete(m.data, key)
+	return nil
+}
+
 func TestResolver_SecretsManagerSuccess(t *testing.T) {
 	mock := &mockSecretsManager{
 		data: map[string]string{

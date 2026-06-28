@@ -59,7 +59,7 @@ var proxyCmd = &cobra.Command{
 			cancel()
 		}()
 
-		token := getTokenForRegistry(registry)
+		token := getOptionalTokenForRegistry(registry)
 		actualPort, err := proxy.StartProxy(ctx, port, listenAddr, registry, repository, indexDir, "", indexTTL, upstreams, token)
 		if err != nil {
 			PrintError(fmt.Sprintf("Proxy server failed: %v", err))

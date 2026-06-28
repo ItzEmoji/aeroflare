@@ -15,7 +15,7 @@ func isTerminal() bool {
 	return (stat.Mode() & os.ModeCharDevice) != 0
 }
 
-func RequireGithubToken() string {
+func GetGithubToken() string {
 	if globalGithubToken != "" {
 		return globalGithubToken
 	}
@@ -29,8 +29,14 @@ func RequireGithubToken() string {
 	manager := getSecretsManager()
 	if token, err := manager.Get("github-token"); err == nil && token != "" {
 		return token
-	} else if err != nil && err != secrets.ErrNotFound {
-		fmt.Fprintf(os.Stderr, "Warning: failed to read from keychain: %v\n", err)
+	}
+	return ""
+}
+
+func RequireGithubToken() string {
+	token := GetGithubToken()
+	if token != "" {
+		return token
 	}
 	
 	if isTerminal() {
@@ -38,7 +44,7 @@ func RequireGithubToken() string {
 		return runInteractiveGithubAuth()
 	}
 	
-	PrintError("GitHub token required. Please set GITHUB_TOKEN or run 'aeroflare auth'.")
+	PrintError("GitHub token required. Please set GITHUB_TOKEN or run 'aeroflare auth login'.")
 	os.Exit(1)
 	return ""
 }
@@ -63,7 +69,7 @@ func RequireGitlabToken() string {
 		return runInteractiveGitlabAuth()
 	}
 	
-	PrintError("GitLab token required. Please set GITLAB_TOKEN or run 'aeroflare auth'.")
+	PrintError("GitLab token required. Please set GITLAB_TOKEN or run 'aeroflare auth login'.")
 	os.Exit(1)
 	return ""
 }
@@ -106,26 +112,21 @@ func RequireCloudflareToken() (string, string) {
 		return runInteractiveCloudflareAuth()
 	}
 	
-	PrintError("Cloudflare credentials required. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, or run 'aeroflare auth'.")
+	PrintError("Cloudflare credentials required. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, or run 'aeroflare auth login'.")
 	os.Exit(1)
 	return "", ""
 }
 
-func RequireOCIToken(registry string) (string, string) {
-	// For generic OCI we don't have global flags. 
-	// Env var fallback could check standard docker config, but we will keep it simple here.
+func GetOCIToken(registry string) (string, string) {
 	manager := getSecretsManager()
-	
-	user, errUser := manager.Get(fmt.Sprintf("oci-%s-username", registry))
-	if errUser != nil && errUser != secrets.ErrNotFound {
-		fmt.Fprintf(os.Stderr, "Warning: failed to read from keychain: %v\n", errUser)
-	}
-	pass, errPass := manager.Get(fmt.Sprintf("oci-%s-token", registry))
-	if errPass != nil && errPass != secrets.ErrNotFound {
-		fmt.Fprintf(os.Stderr, "Warning: failed to read from keychain: %v\n", errPass)
-	}
-	
-	if errUser == nil && errPass == nil && user != "" && pass != "" {
+	user, _ := manager.Get(fmt.Sprintf("oci-%s-username", registry))
+	pass, _ := manager.Get(fmt.Sprintf("oci-%s-token", registry))
+	return user, pass
+}
+
+func RequireOCIToken(registry string) (string, string) {
+	user, pass := GetOCIToken(registry)
+	if user != "" && pass != "" {
 		return user, pass
 	}
 	
@@ -134,7 +135,7 @@ func RequireOCIToken(registry string) (string, string) {
 		return runInteractiveOCIAuth(registry)
 	}
 	
-	PrintError(fmt.Sprintf("Credentials required for registry %s. Run 'aeroflare auth' to set them.", registry))
+	PrintError(fmt.Sprintf("Credentials required for registry %s. Run 'aeroflare auth login' to set them.", registry))
 	os.Exit(1)
 	return "", ""
 }
@@ -148,6 +149,24 @@ func getTokenForRegistry(registry string) string {
 	} else if registry != "" {
 		_, token := RequireOCIToken(registry)
 		os.Setenv("oci_token", token)
+		return token
+	}
+	return ""
+}
+
+func getOptionalTokenForRegistry(registry string) string {
+	if registry == "ghcr.io" {
+		token := GetGithubToken()
+		if token != "" {
+			os.Setenv("oci_token", token)
+			os.Setenv("GITHUB_TOKEN", token)
+		}
+		return token
+	} else if registry != "" {
+		_, token := GetOCIToken(registry)
+		if token != "" {
+			os.Setenv("oci_token", token)
+		}
 		return token
 	}
 	return ""

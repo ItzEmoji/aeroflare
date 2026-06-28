@@ -19,6 +19,11 @@ func getSecretsManager() secrets.Manager {
 var authCmd = &cobra.Command{
 	Use:   "auth",
 	Short: "Manage Aeroflare authentication secrets",
+}
+
+var authLoginCmd = &cobra.Command{
+	Use:   "login",
+	Short: "Authenticate interactively",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager := getSecretsManager()
 		
@@ -52,6 +57,47 @@ var authCmd = &cobra.Command{
 	},
 }
 
+var authListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List saved authentication credentials",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		manager := getSecretsManager()
+		keys, err := manager.List()
+		if err != nil {
+			PrintError(err.Error())
+			return err
+		}
+		
+		if len(keys) == 0 {
+			fmt.Println("No credentials saved.")
+			return nil
+		}
+		
+		fmt.Println("Saved credentials:")
+		for _, key := range keys {
+			fmt.Printf(" - %s\n", key)
+		}
+		return nil
+	},
+}
+
+var authRemoveCmd = &cobra.Command{
+	Use:   "remove [key]",
+	Short: "Remove a saved credential",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		manager := getSecretsManager()
+		key := args[0]
+		err := manager.Delete(key)
+		if err != nil {
+			PrintError(err.Error())
+			return err
+		}
+		fmt.Printf("Removed %s\n", key)
+		return nil
+	},
+}
+
 var authSetCmd = &cobra.Command{
 	Use:   "set [key] [value]",
 	Short: "Set an arbitrary secret",
@@ -69,6 +115,9 @@ var authSetCmd = &cobra.Command{
 }
 
 func init() {
+	authCmd.AddCommand(authLoginCmd)
+	authCmd.AddCommand(authListCmd)
+	authCmd.AddCommand(authRemoveCmd)
 	authCmd.AddCommand(authSetCmd)
 	rootCmd.AddCommand(authCmd)
 }
