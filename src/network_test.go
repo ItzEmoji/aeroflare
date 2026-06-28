@@ -226,7 +226,7 @@ func TestExchangeToken_UsesHttpForLocalhost(t *testing.T) {
 	defer ts.Close()
 
 	u := strings.TrimPrefix(ts.URL, "http://")
-	
+
 	token, err := ExchangeToken(u, "my-org/nix-cache", "token", "test-pat")
 	if err != nil {
 		t.Fatalf("ExchangeToken failed for localhost registry: %v", err)

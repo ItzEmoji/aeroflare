@@ -64,16 +64,16 @@ type InitConfig struct {
 	CloudflareAccountID string
 	CloudflareToken     string
 
-	GitToken   string
+	GitToken    string
 	GitUsername string
 
 	WorkerName string
 	R2Bucket   string
 
 	// Internal fields populated during provisioning.
-	OCIToken  string
-	ScriptTag string // Worker script tag from CF deployment, used for Workers Builds.
-	CfTokenID string // Cloudflare API token ID, used for Workers Builds.
+	OCIToken    string
+	ScriptTag   string // Worker script tag from CF deployment, used for Workers Builds.
+	CfTokenID   string // Cloudflare API token ID, used for Workers Builds.
 	GitCloneURL string // URL for pushing to the created git repository.
 }
 

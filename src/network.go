@@ -26,19 +26,34 @@ import (
 	"time"
 )
 
-var optimizedTransport = &http.Transport{
-	Proxy: http.ProxyFromEnvironment,
-	DialContext: (&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}).DialContext,
-	ForceAttemptHTTP2:     true,
-	MaxIdleConns:          1000,
-	MaxIdleConnsPerHost:   100,
-	MaxConnsPerHost:       100,
-	IdleConnTimeout:       90 * time.Second,
-	TLSHandshakeTimeout:   10 * time.Second,
-	ExpectContinueTimeout: 1 * time.Second,
+var DebugLogger bool
+
+type loggingTransport struct {
+	Transport http.RoundTripper
+}
+
+func (t *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if DebugLogger {
+		fmt.Printf("[DEBUG] %s %s\n", req.Method, req.URL.String())
+	}
+	return t.Transport.RoundTrip(req)
+}
+
+var optimizedTransport = &loggingTransport{
+	Transport: &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          1000,
+		MaxIdleConnsPerHost:   100,
+		MaxConnsPerHost:       100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	},
 }
 
 type fileLayer struct {
@@ -219,7 +234,7 @@ func PushNarPackage(layer v1.Layer, ni *narinfo.Narinfo, tag, registry, reposito
 	// Create Image
 	img := mutate.MediaType(empty.Image, types.OCIManifestSchema1)
 	img = mutate.ConfigMediaType(img, types.OCIConfigJSON)
-	
+
 	layerMediaType, _ := layer.MediaType()
 	img, err := mutate.Append(img, mutate.Addendum{
 		Layer:     layer,
@@ -368,7 +383,7 @@ func PushNarPackagesBatch(registry, repository, token string, jobs []PushJob, ma
 
 			img := mutate.MediaType(empty.Image, types.OCIManifestSchema1)
 			img = mutate.ConfigMediaType(img, types.OCIConfigJSON)
-			
+
 			layerMediaType, _ := layer.MediaType()
 			img, err = mutate.Append(img, mutate.Addendum{
 				Layer:     layer,

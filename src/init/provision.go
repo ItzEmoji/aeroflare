@@ -140,7 +140,7 @@ func checkRepositoryVisibility(cfg *InitConfig) error {
 	if len(parts) >= 1 {
 		owner = parts[0]
 	}
-	
+
 	printInfo(fmt.Sprintf("Note: GitHub requires package visibility to be set to public manually at https://github.com/%s?tab=packages", owner))
 	return nil
 }
@@ -301,11 +301,11 @@ jobs:
 
 	if cfg.GitProvider == GitGitHub {
 		repoName := fmt.Sprintf("%s-proxy", strings.ReplaceAll(cfg.CacheName, "/", "-"))
-		
+
 		printInfo("Configuring GitHub Actions secrets...")
 		err1 := setGitHubSecret(cfg.GitToken, cfg.GitUsername, repoName, "CLOUDFLARE_API_TOKEN", cfg.CloudflareToken)
 		err2 := setGitHubSecret(cfg.GitToken, cfg.GitUsername, repoName, "CLOUDFLARE_ACCOUNT_ID", cfg.CloudflareAccountID)
-		
+
 		if err1 != nil || err2 != nil {
 			printWarning("Failed to set secrets automatically.")
 			printInfo("Please add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository secrets on GitHub")
