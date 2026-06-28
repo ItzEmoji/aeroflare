@@ -50,7 +50,11 @@ func (r *Resolver) Resolve() (string, error) {
 	if manager == nil {
 		manager = secrets.NewManager()
 	}
-	if val, err := manager.Get(r.secretKey); err == nil && val != "" {
+	val, err := manager.Get(r.secretKey)
+	if err != nil && err != secrets.ErrNotFound {
+		return "", err
+	}
+	if err == nil && val != "" {
 		return val, nil
 	}
 
