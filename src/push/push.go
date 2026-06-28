@@ -77,7 +77,7 @@ func ParseConfig(args []string, storePath string, inputFile string, stdin io.Rea
 	}
 
 	if len(targetPaths) == 0 && len(args) == 0 {
-		return nil, errors.New("no store paths found. Provide --store-path, --input, or pipe paths via stdin.")
+		return nil, errors.New("no store paths found: provide --store-path, --input, or pipe paths via stdin")
 	}
 	targetPaths = append(targetPaths, args...)
 
@@ -125,7 +125,7 @@ func RunPush(plan *PushPlan) error {
 	registry, repository := network.GetRegistryAndRepository()
 	ociToken := network.GetToken(registry, repository)
 	if ociToken == "" {
-		return errors.New("Authentication token missing (oci_token, GITHUB_TOKEN or GH_TOKEN)")
+		return errors.New("authentication token missing (oci_token, GITHUB_TOKEN or GH_TOKEN)")
 	}
 
 	compType, err := compress.ParseType(plan.Config.Compression)
@@ -137,14 +137,14 @@ func RunPush(plan *PushPlan) error {
 	if plan.Config.SigningKey != "" {
 		signKey, err = signing.LoadPrivateKey(plan.Config.SigningKey)
 		if err != nil {
-			return fmt.Errorf("Error loading key: %v", err)
+			return fmt.Errorf("error loading key: %v", err)
 		}
 	}
 
 	// Create a temporary directory if files should not be kept
 	outputDir, err := os.MkdirTemp("", "aeroflare-push-*")
 	if err != nil {
-		return fmt.Errorf("Error creating temporary directory: %v", err)
+		return fmt.Errorf("error creating temporary directory: %v", err)
 	}
 
 	if !plan.Config.KeepFiles {
@@ -240,7 +240,7 @@ func RunPush(plan *PushPlan) error {
 		var initErr error
 		s3Client, initErr = r2Cfg.NewClient(ctx)
 		if initErr != nil {
-			return fmt.Errorf("Failed to init R2 client: %v", initErr)
+			return fmt.Errorf("failed to init R2 client: %v", initErr)
 		}
 		fmt.Printf("R2 Object Storage enabled (Bucket: %s)\n", r2Cfg.Bucket)
 	}
@@ -267,13 +267,13 @@ func RunPush(plan *PushPlan) error {
 			var prepErr error
 			res, prepErr = prepare.Prepare(ctx, chunk[0], cfg)
 			if prepErr != nil {
-				return fmt.Errorf("Error during preparation: %v", prepErr)
+				return fmt.Errorf("error during preparation: %v", prepErr)
 			}
 			results = append(results, res)
 		} else {
 			res, prepErr := prepare.PrepareBatch(ctx, chunk, cfg)
 			if prepErr != nil {
-				return fmt.Errorf("Error during batch preparation: %v", prepErr)
+				return fmt.Errorf("error during batch preparation: %v", prepErr)
 			}
 			results = res
 		}
@@ -453,7 +453,7 @@ func RunPush(plan *PushPlan) error {
 
 	printStep(3, 3, "Updating cache index...")
 	if err := network.UpdateCacheIndex(receipts, existingIndex, registry, repository, ociToken, plan.Config.SigningKey, r2Cfg, configAnnotations); err != nil {
-		return fmt.Errorf("Failed to update cache index: %v", err)
+		return fmt.Errorf("failed to update cache index: %v", err)
 	}
 	printSuccess("Cache index updated")
 

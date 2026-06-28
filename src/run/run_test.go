@@ -18,11 +18,11 @@ func TestDisplaySummary(t *testing.T) {
 	}
 	DisplaySummary(cfg)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	if !strings.Contains(output, "│  Command: echo hello") {

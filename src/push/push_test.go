@@ -49,9 +49,13 @@ func TestParseConfig_InputFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpFile.Name())
-	tmpFile.WriteString("/file/path1\n/file/path2\n")
-	tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	if _, err := tmpFile.WriteString("/file/path1\n/file/path2\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := ParseConfig([]string{}, "", tmpFile.Name(), nil)
 	if err != nil {
