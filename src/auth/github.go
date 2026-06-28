@@ -14,6 +14,7 @@ var githubBaseURL = "https://github.com"
 
 type DeviceCodeRequest struct {
 	ClientID string `json:"client_id"`
+	Scope    string `json:"scope,omitempty"`
 }
 
 type DeviceCodeResponse struct {
@@ -28,7 +29,10 @@ func RequestDeviceCode(clientID string) (*DeviceCodeResponse, error) {
 }
 
 func requestDeviceCode(clientID, baseURL string) (*DeviceCodeResponse, error) {
-	reqBodyBytes, err := json.Marshal(DeviceCodeRequest{ClientID: clientID})
+	reqBodyBytes, err := json.Marshal(DeviceCodeRequest{
+		ClientID: clientID,
+		Scope:    "repo write:packages",
+	})
 	if err != nil {
 		return nil, err
 	}
