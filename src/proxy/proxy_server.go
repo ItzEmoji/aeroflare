@@ -281,7 +281,7 @@ func (ps *ProxyServer) serveNativeNarinfo(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
+	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json")
 	token, _ := ps.TokenMgr.GetToken(r.Context())
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -299,42 +299,58 @@ func (ps *ProxyServer) serveNativeNarinfo(w http.ResponseWriter, r *http.Request
 
 	var manifest struct {
 		Annotations map[string]string `json:"annotations"`
+		Labels      map[string]string `json:"labels"`
+		Config      struct {
+			Digest string `json:"digest"`
+		} `json:"config"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
 		return err
 	}
 
-	anns := manifest.Annotations
-	if anns == nil {
-		return fmt.Errorf("no annotations found")
+	var labels map[string]string
+
+	if manifest.Annotations != nil && manifest.Annotations["vnd.aeroflare.nar.storepath"] != "" {
+		labels = manifest.Annotations
+	} else if manifest.Labels != nil && manifest.Labels["vnd.aeroflare.nar.storepath"] != "" {
+		labels = manifest.Labels
+	} else if manifest.Config.Digest != "" {
+		configLabels, err := ps.fetchConfigLabels(r.Context(), manifest.Config.Digest)
+		if err == nil && configLabels != nil {
+			labels = configLabels
+		}
+	}
+
+	if labels == nil {
+		return fmt.Errorf("no narinfo labels found in manifest or config")
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "StorePath: %s\n", anns["vnd.aeroflare.nar.storepath"])
-	fmt.Fprintf(&b, "URL: %s\n", anns["vnd.aeroflare.nar.url"])
-	fmt.Fprintf(&b, "Compression: %s\n", anns["vnd.aeroflare.nar.compression"])
-	fmt.Fprintf(&b, "FileHash: %s\n", anns["vnd.aeroflare.nar.filehash"])
-	fmt.Fprintf(&b, "FileSize: %s\n", anns["vnd.aeroflare.nar.filesize"])
-	fmt.Fprintf(&b, "NarHash: %s\n", anns["vnd.aeroflare.nar.narhash"])
-	fmt.Fprintf(&b, "NarSize: %s\n", anns["vnd.aeroflare.nar.narsize"])
+	fmt.Fprintf(&b, "StorePath: %s\n", labels["vnd.aeroflare.nar.storepath"])
+	fmt.Fprintf(&b, "URL: %s\n", labels["vnd.aeroflare.nar.url"])
+	fmt.Fprintf(&b, "Compression: %s\n", labels["vnd.aeroflare.nar.compression"])
+	fmt.Fprintf(&b, "FileHash: %s\n", labels["vnd.aeroflare.nar.filehash"])
+	fmt.Fprintf(&b, "FileSize: %s\n", labels["vnd.aeroflare.nar.filesize"])
+	fmt.Fprintf(&b, "NarHash: %s\n", labels["vnd.aeroflare.nar.narhash"])
+	fmt.Fprintf(&b, "NarSize: %s\n", labels["vnd.aeroflare.nar.narsize"])
 
-	if rStr, ok := anns["vnd.aeroflare.nar.references"]; ok && rStr != "" {
+	if rStr, ok := labels["vnd.aeroflare.nar.references"]; ok && rStr != "" {
 		fmt.Fprintf(&b, "References: %s\n", rStr)
 	} else {
 		b.WriteString("References:\n")
 	}
 
-	if deriver, ok := anns["vnd.aeroflare.nar.deriver"]; ok && deriver != "" {
+	if deriver, ok := labels["vnd.aeroflare.nar.deriver"]; ok && deriver != "" {
 		fmt.Fprintf(&b, "Deriver: %s\n", deriver)
 	} else {
 		b.WriteString("Deriver:\n")
 	}
 
-	if system, ok := anns["vnd.aeroflare.nar.system"]; ok && system != "" {
+	if system, ok := labels["vnd.aeroflare.nar.system"]; ok && system != "" {
 		fmt.Fprintf(&b, "System: %s\n", system)
 	}
 
-	if sig, ok := anns["vnd.aeroflare.nar.sig"]; ok && sig != "" {
+	if sig, ok := labels["vnd.aeroflare.nar.sig"]; ok && sig != "" {
 		fmt.Fprintf(&b, "Sig: %s\n", sig)
 	}
 
@@ -358,7 +374,7 @@ func (ps *ProxyServer) digestFromNativeManifest(ctx context.Context, narBasename
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
+	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json")
 	token, _ := ps.TokenMgr.GetToken(ctx)
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -386,6 +402,62 @@ func (ps *ProxyServer) digestFromNativeManifest(ctx context.Context, narBasename
 		return "", fmt.Errorf("no layers in manifest")
 	}
 	return manifest.Layers[0].Digest, nil
+}
+
+func (ps *ProxyServer) fetchConfigLabels(ctx context.Context, configDigest string) (map[string]string, error) {
+	proto := GetProtocol(ps.Registry)
+	url := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, ps.Registry, ps.Repository, configDigest)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	token, _ := ps.TokenMgr.GetToken(ctx)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := ps.HttpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("config blob HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var configData struct {
+		Config struct {
+			Labels      map[string]string `json:"Labels"`
+			LabelsLower map[string]string `json:"labels"`
+		} `json:"config"`
+		Labels      map[string]string `json:"Labels"`
+		LabelsLower map[string]string `json:"labels"`
+	}
+
+	if err := json.Unmarshal(body, &configData); err != nil {
+		return nil, err
+	}
+
+	if len(configData.Config.Labels) > 0 {
+		return configData.Config.Labels, nil
+	}
+	if len(configData.Labels) > 0 {
+		return configData.Labels, nil
+	}
+	if len(configData.Config.LabelsLower) > 0 {
+		return configData.Config.LabelsLower, nil
+	}
+	if len(configData.LabelsLower) > 0 {
+		return configData.LabelsLower, nil
+	}
+
+	return nil, nil
 }
 
 // digestFromR2Narinfo fetches the narinfo for a NAR from the public R2 URL and

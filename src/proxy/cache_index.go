@@ -240,7 +240,11 @@ func (ci *CacheIndex) refresh(ctx context.Context) error {
 		ci.Data = &CacheIndexData{Entries: make(map[string]IndexEntry)}
 		ci.NarLookups = make(map[string]string)
 		ci.mu.Unlock()
-		slog.Info("Manifest refreshed", "mode", indexType, "public_r2_url", ci.PublicR2URL())
+		if indexType == "r2" {
+			slog.Info("Manifest refreshed", "mode", indexType, "public_r2_url", ci.PublicR2URL())
+		} else {
+			slog.Info("Manifest refreshed", "mode", indexType)
+		}
 		return nil
 	}
 
