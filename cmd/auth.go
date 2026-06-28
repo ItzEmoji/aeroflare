@@ -46,7 +46,8 @@ var authCmd = &cobra.Command{
 		}
 		
 		if githubToken == "" && cfToken == "" {
-			fmt.Println("Interactive mode not fully implemented in CLI yet, please use flags.")
+			runInteractiveAuth()
+			return
 		}
 	},
 }
