@@ -10,13 +10,19 @@ import (
 var ErrTokenNotFound = errors.New("token not found in flags, environment, or secrets manager")
 
 type Resolver struct {
-	secretKey string
-	flagValue string
-	envVars   []string
+	secretKey      string
+	flagValue      string
+	envVars        []string
+	secretsManager secrets.Manager
 }
 
 func NewResolver(secretKey string) *Resolver {
 	return &Resolver{secretKey: secretKey}
+}
+
+func (r *Resolver) WithSecretsManager(manager secrets.Manager) *Resolver {
+	r.secretsManager = manager
+	return r
 }
 
 func (r *Resolver) WithFlag(val string) *Resolver {
@@ -40,7 +46,10 @@ func (r *Resolver) Resolve() (string, error) {
 		}
 	}
 
-	manager := secrets.NewManager()
+	manager := r.secretsManager
+	if manager == nil {
+		manager = secrets.NewManager()
+	}
 	if val, err := manager.Get(r.secretKey); err == nil && val != "" {
 		return val, nil
 	}
