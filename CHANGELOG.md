@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/ItzEmoji/aeroflare/compare/v1.4.0...v1.4.1) (2026-06-28)
+
+
+### Bug Fixes
+
+* push command ([#21](https://github.com/ItzEmoji/aeroflare/issues/21)) ([8d9f81c](https://github.com/ItzEmoji/aeroflare/commit/8d9f81c45ac4d54bd299bad574019dd52db47d2f))
+
 ## [1.4.0](https://github.com/ItzEmoji/aeroflare/compare/v1.3.2...v1.4.0) (2026-06-27)
 
 
