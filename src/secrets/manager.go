@@ -51,7 +51,11 @@ func (m *defaultManager) Set(key, value string) error {
 	
 	data, err := os.ReadFile(file)
 	if err == nil {
-		json.Unmarshal(data, &secrets)
+		if len(data) > 0 {
+			if err := json.Unmarshal(data, &secrets); err != nil {
+				return err
+			}
+		}
 	}
 	
 	secrets[key] = value
@@ -61,7 +65,11 @@ func (m *defaultManager) Set(key, value string) error {
 		return err
 	}
 	
-	return os.WriteFile(file, out, 0600)
+	tmpFile := file + ".tmp"
+	if err := os.WriteFile(tmpFile, out, 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmpFile, file)
 }
 
 func (m *defaultManager) Get(key string) (string, error) {
