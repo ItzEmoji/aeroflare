@@ -18,7 +18,6 @@ var (
 	inputFile   string
 	outputDir   string
 	compression string
-	cacheURL    string
 	workers     int
 	prepareRefs bool
 	signingKey  string
