@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"aeroflare/src/secrets"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zalando/go-keyring"
 )
 
 var VerboseCount int
@@ -100,8 +102,11 @@ func init() {
 
 func getGithubToken() string {
 	manager := secrets.NewManager()
-	if val, err := manager.Get("github-token"); err == nil && val != "" {
+	val, err := manager.Get("github-token")
+	if err == nil && val != "" {
 		return val
+	} else if err != nil && err != keyring.ErrNotFound && !errors.Is(err, os.ErrNotExist) {
+		PrintError("Warning: failed to read github-token from secret manager: " + err.Error())
 	}
 	
 	token := os.Getenv("GITHUB_TOKEN")
