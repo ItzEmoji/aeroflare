@@ -87,7 +87,7 @@ func ExchangeToken(registry, repository, username, basicAuthToken string) (strin
 
 // GetToken attempts to get a valid token, exchanging a GitHub/GitLab PAT if necessary
 func GetToken(registry, repository string) string {
-	if t := os.Getenv("oci_token"); t != "" && !strings.HasPrefix(t, "ghp_") && !strings.HasPrefix(t, "github_pat_") && !strings.HasPrefix(t, "glpat-") {
+	if t := os.Getenv("oci_token"); t != "" && !strings.HasPrefix(t, "ghp_") && !strings.HasPrefix(t, "github_pat_") && !strings.HasPrefix(t, "glpat-") && !strings.HasPrefix(t, "gho_") && !strings.HasPrefix(t, "ghu_") && !strings.HasPrefix(t, "ghs_") {
 		return t // Token seems to be a valid Bearer token already
 	}
 
