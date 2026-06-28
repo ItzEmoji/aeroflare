@@ -2,7 +2,6 @@ package auth
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -42,6 +41,10 @@ func RequestDeviceCode(clientID string) (*DeviceCodeResponse, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, errors.New("unexpected status code: " + resp.Status)
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -65,17 +68,18 @@ type TokenResponse struct {
 	Error       string `json:"error"`
 }
 
-func PollAccessToken(ctx context.Context, clientID, deviceCode string, interval int) (string, error) {
+func PollAccessToken(clientID string, deviceCode string, interval int) (string, error) {
 	if interval <= 0 {
 		interval = 5
 	}
 	ticker := time.NewTicker(time.Duration(interval) * pollTimeUnit)
 	defer ticker.Stop()
+	timeout := time.After(15 * time.Minute)
 
 	for {
 		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
+		case <-timeout:
+			return "", errors.New("polling timed out")
 		case <-ticker.C:
 			reqBodyBytes, err := json.Marshal(TokenRequest{
 				ClientID:   clientID,
@@ -86,7 +90,7 @@ func PollAccessToken(ctx context.Context, clientID, deviceCode string, interval 
 				return "", err
 			}
 
-			req, err := http.NewRequestWithContext(ctx, "POST", githubBaseURL+"/login/oauth/access_token", bytes.NewBuffer(reqBodyBytes))
+			req, err := http.NewRequest("POST", githubBaseURL+"/login/oauth/access_token", bytes.NewBuffer(reqBodyBytes))
 			if err != nil {
 				return "", err
 			}
@@ -96,6 +100,15 @@ func PollAccessToken(ctx context.Context, clientID, deviceCode string, interval 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				continue // retry on network error
+			}
+
+			if resp.StatusCode >= 500 {
+				resp.Body.Close()
+				continue // transient error, retry
+			}
+			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+				resp.Body.Close()
+				return "", errors.New("client error: " + resp.Status)
 			}
 
 			body, err := io.ReadAll(resp.Body)

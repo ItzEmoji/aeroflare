@@ -1,16 +1,11 @@
 package auth
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
-
-func init() {
-	pollTimeUnit = time.Millisecond
-}
 
 func TestRequestDeviceCode(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,10 +48,11 @@ func TestPollAccessTokenSuccess(t *testing.T) {
 	githubBaseURL = ts.URL
 	defer func() { githubBaseURL = originalURL }()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	originalTimeUnit := pollTimeUnit
+	pollTimeUnit = time.Millisecond
+	defer func() { pollTimeUnit = originalTimeUnit }()
 
-	token, err := PollAccessToken(ctx, "client_id", "device_code", 1)
+	token, err := PollAccessToken("client_id", "device_code", 1)
 	if err != nil {
 		t.Fatalf("expected success, got error: %v", err)
 	}
@@ -65,10 +61,18 @@ func TestPollAccessTokenSuccess(t *testing.T) {
 	}
 }
 
-func TestPollAccessTokenContextCancel(t *testing.T) {
+func TestPollAccessTokenTransientError(t *testing.T) {
+	requests := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if requests == 1 {
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusBadGateway)
+			w.Write([]byte(`<html>502 Bad Gateway</html>`))
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"error": "authorization_pending"}`))
+		w.Write([]byte(`{"access_token": "gho_12345"}`))
 	}))
 	defer ts.Close()
 
@@ -76,15 +80,16 @@ func TestPollAccessTokenContextCancel(t *testing.T) {
 	githubBaseURL = ts.URL
 	defer func() { githubBaseURL = originalURL }()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(5 * time.Millisecond)
-		cancel()
-	}()
+	originalTimeUnit := pollTimeUnit
+	pollTimeUnit = time.Millisecond
+	defer func() { pollTimeUnit = originalTimeUnit }()
 
-	_, err := PollAccessToken(ctx, "client_id", "device_code", 1)
-	if err != context.Canceled {
-		t.Fatalf("expected context canceled, got: %v", err)
+	token, err := PollAccessToken("client_id", "device_code", 1)
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+	if token != "gho_12345" {
+		t.Fatalf("expected token gho_12345, got: %s", token)
 	}
 }
 
@@ -99,18 +104,21 @@ func TestPollAccessTokenError(t *testing.T) {
 	githubBaseURL = ts.URL
 	defer func() { githubBaseURL = originalURL }()
 
-	ctx := context.Background()
-	_, err := PollAccessToken(ctx, "client_id", "device_code", 1)
+	originalTimeUnit := pollTimeUnit
+	pollTimeUnit = time.Millisecond
+	defer func() { pollTimeUnit = originalTimeUnit }()
+
+	_, err := PollAccessToken("client_id", "device_code", 1)
 	if err == nil || err.Error() != "expired_token" {
 		t.Fatalf("expected expired_token error, got: %v", err)
 	}
 }
 
-func TestPollAccessTokenMalformed(t *testing.T) {
+func TestPollAccessTokenClientError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte(`<html>502 Bad Gateway</html>`))
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`<html>400 Bad Request</html>`))
 	}))
 	defer ts.Close()
 
@@ -118,9 +126,12 @@ func TestPollAccessTokenMalformed(t *testing.T) {
 	githubBaseURL = ts.URL
 	defer func() { githubBaseURL = originalURL }()
 
-	ctx := context.Background()
-	_, err := PollAccessToken(ctx, "client_id", "device_code", 1)
-	if err == nil {
-		t.Fatalf("expected json unmarshal error, got nil")
+	originalTimeUnit := pollTimeUnit
+	pollTimeUnit = time.Millisecond
+	defer func() { pollTimeUnit = originalTimeUnit }()
+
+	_, err := PollAccessToken("client_id", "device_code", 1)
+	if err == nil || err.Error() != "client error: 400 Bad Request" {
+		t.Fatalf("expected client error 400, got: %v", err)
 	}
 }
