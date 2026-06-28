@@ -25,8 +25,7 @@ var pushCmd = &cobra.Command{
 	Short: "Push a build to the cache",
 	Run: func(cmd *cobra.Command, args []string) {
 		registry, _ := network.GetRegistryAndRepository()
-		token := getTokenForRegistry(registry)
-		os.Setenv("oci_token", token)
+		getTokenForRegistry(registry)
 
 		cfg, err := push.ParseConfig(args, pushStorePath, pushInputFile, os.Stdin)
 		if err != nil {
