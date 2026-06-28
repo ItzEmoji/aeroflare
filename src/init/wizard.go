@@ -71,11 +71,17 @@ func promptCoreSettings(cfg *InitConfig) error {
 
 	backendVal := viper.GetString("backend")
 	if backendVal != "" {
+		if backendVal != "r2" && backendVal != "native" && backendVal != "oci" {
+			return fmt.Errorf("invalid backend configured: %s. Must be 'r2', 'native', or 'oci'", backendVal)
+		}
 		backend = backendVal
 	}
 
 	gitProviderVal := viper.GetString("git-provider")
 	if gitProviderVal != "" {
+		if gitProviderVal != "none" && gitProviderVal != "github" && gitProviderVal != "gitlab" {
+			return fmt.Errorf("invalid git provider configured: %s. Must be 'none', 'github', or 'gitlab'", gitProviderVal)
+		}
 		gitProvider = gitProviderVal
 	}
 
