@@ -1,16 +1,12 @@
 package cmd
 
 import (
-	"bytes"
-	"context"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
-	"strings"
 
 	network "aeroflare/src"
-	"aeroflare/src/proxy"
+	"aeroflare/src/push"
+	"aeroflare/src/run"
 	"github.com/spf13/cobra"
 )
 
@@ -20,50 +16,18 @@ var runCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		registry, repository := network.GetRegistryAndRepository()
-
 		indexDir := getIndexDir(repository)
 
-		// Start proxy on random port in background
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		cfg := &run.RunConfig{
+			Command: args,
+		}
 
-		port, err := proxy.StartProxy(ctx, 0, "127.0.0.1", registry, repository, indexDir, "", 300, []string{"https://cache.nixos.org"}, getGithubToken())
+		run.DisplaySummary(cfg)
+
+		targetPaths, err := run.ExecuteCommand(cfg, registry, repository, indexDir, getGithubToken())
 		if err != nil {
-			PrintError(fmt.Sprintf("Failed to start proxy: %v", err))
+			PrintError(err.Error())
 			os.Exit(1)
-		}
-
-		PrintInfo(fmt.Sprintf("Started background proxy on 127.0.0.1:%d", port))
-
-		var stdoutBuf bytes.Buffer
-		cmdToRun := exec.Command(args[0], args[1:]...)
-		cmdToRun.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
-		cmdToRun.Stderr = os.Stderr
-		cmdToRun.Stdin = os.Stdin
-
-		// Add substituter to NIX_CONFIG
-		env := os.Environ()
-		nixConfig := os.Getenv("NIX_CONFIG")
-		if nixConfig != "" {
-			nixConfig += "\n"
-		}
-		nixConfig += fmt.Sprintf("extra-substituters = http://127.0.0.1:%d", port)
-		env = append(env, "NIX_CONFIG="+nixConfig)
-		cmdToRun.Env = env
-
-		err = cmdToRun.Run()
-		if err != nil {
-			PrintError(fmt.Sprintf("Command failed: %v", err))
-			os.Exit(1)
-		}
-
-		var targetPaths []string
-		lines := strings.Split(stdoutBuf.String(), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line != "" && !strings.HasPrefix(line, "#") && strings.HasPrefix(line, "/nix/store/") {
-				targetPaths = append(targetPaths, line)
-			}
 		}
 
 		if len(targetPaths) == 0 {
@@ -71,10 +35,33 @@ var runCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("\nFound %d store paths to push.\n", len(targetPaths))
+		fmt.Printf("\nFound %d store paths to push from run command output.\n", len(targetPaths))
 
-		// Push
-		performPush(targetPaths)
+		// Trigger Push
+		pushCfg := &push.PushConfig{
+			TargetPaths: targetPaths,
+			Compression: pushCompression,
+			CacheURL:    pushCacheURL,
+			Workers:     pushWorkers,
+			PrepareRefs: pushPrepareRefs,
+			SigningKey:  pushSigningKey,
+			KeepFiles:   pushKeepFiles,
+			ForcePush:   pushForcePush,
+			Verbosity:   VerboseCount,
+		}
+
+		plan, err := push.Preflight(pushCfg)
+		if err != nil {
+			PrintError(err.Error())
+			os.Exit(1)
+		}
+
+		push.DisplaySummary(plan)
+
+		if err := push.RunPush(plan); err != nil {
+			PrintError(err.Error())
+			os.Exit(1)
+		}
 	},
 }
 

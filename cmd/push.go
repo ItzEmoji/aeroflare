@@ -1,27 +1,10 @@
 package cmd
 
 import (
-	"bufio"
-	"context"
-	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
-	"sync"
-	"time"
 
-	network "aeroflare/src"
-	"aeroflare/src/prepare/cache"
-	"aeroflare/src/prepare/compress"
-	"aeroflare/src/prepare/narinfo"
-	"aeroflare/src/prepare/prepare"
-	"aeroflare/src/prepare/signing"
-	"aeroflare/src/proxy"
-
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/google/go-containerregistry/pkg/v1/types"
+	"aeroflare/src/push"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -40,386 +23,34 @@ var pushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push a build to the cache",
 	Run: func(cmd *cobra.Command, args []string) {
-		var targetPaths []string
-		if pushStorePath != "" {
-			targetPaths = append(targetPaths, pushStorePath)
-		}
-		if pushInputFile != "" {
-			filePaths, err := prepare.ParseInputFile(pushInputFile)
-			if err != nil {
-				PrintError(fmt.Sprintf("Error parsing input file: %v", err))
-				os.Exit(1)
-			}
-			targetPaths = append(targetPaths, filePaths...)
-		}
-
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			scanner := bufio.NewScanner(os.Stdin)
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if line != "" && !strings.HasPrefix(line, "#") {
-					targetPaths = append(targetPaths, line)
-				}
-			}
-		}
-
-		if len(targetPaths) == 0 {
-			PrintError("No store paths found. Provide --store-path, --input, or pipe paths via stdin.")
-			_ = cmd.Usage()
-			os.Exit(1)
-		}
-
-		performPush(targetPaths)
-	},
-}
-
-func performPush(targetPaths []string) {
-	startTime := time.Now()
-	var totalUploaded int
-
-	// Fetch registry and token
-	registry, repository := network.GetRegistryAndRepository()
-	ociToken := network.GetToken(registry, repository)
-	if ociToken == "" {
-		PrintError("Authentication token missing (oci_token, GITHUB_TOKEN or GH_TOKEN)")
-		os.Exit(1)
-	}
-
-	compType, err := compress.ParseType(pushCompression)
-	if err != nil {
-		PrintError(err.Error())
-		os.Exit(1)
-	}
-
-	var signKey *signing.PrivateKey
-	if pushSigningKey != "" {
-		signKey, err = signing.LoadPrivateKey(pushSigningKey)
+		cfg, err := push.ParseConfig(args, pushStorePath, pushInputFile, os.Stdin)
 		if err != nil {
-			PrintError(fmt.Sprintf("Error loading key: %v", err))
-			os.Exit(1)
-		}
-	}
-
-	// Create a temporary directory if files should not be kept
-	outputDir, err := os.MkdirTemp("", "aeroflare-push-*")
-	if err != nil {
-		PrintError(fmt.Sprintf("Error creating temporary directory: %v", err))
-		os.Exit(1)
-	}
-
-	if !pushKeepFiles {
-		defer func() { _ = os.RemoveAll(outputDir) }()
-	} else {
-		fmt.Printf("Generated files will be kept in: %s\n", outputDir)
-	}
-
-	cfg := &prepare.Config{
-		OutputDir:          outputDir,
-		Compression:        compType,
-		CacheURL:           pushCacheURL,
-		Workers:            pushWorkers,
-		PrepareMissingRefs: pushPrepareRefs,
-		SigningKey:         signKey,
-	}
-
-	ctx := context.Background()
-
-	existingIndex, err := network.FetchCacheIndex(registry, repository, ociToken)
-	if err != nil {
-		PrintWarning(fmt.Sprintf("failed to fetch cache index: %v", err))
-		existingIndex = &network.PushCacheIndex{Entries: make(map[string]network.PushCacheEntry)}
-	}
-	if existingIndex.Entries == nil {
-		existingIndex.Entries = make(map[string]network.PushCacheEntry)
-	}
-
-	var filteredPaths []string
-	if pushForcePush {
-		filteredPaths = targetPaths
-	} else {
-		for _, p := range targetPaths {
-			basename := filepath.Base(p)
-			parts := strings.SplitN(basename, "-", 2)
-			if len(parts) >= 2 && existingIndex.Entries[parts[0]].NarDigest != "" {
-				fmt.Printf("Skipping %s (already in cache index)\n", p)
-				continue
-			}
-			filteredPaths = append(filteredPaths, p)
-		}
-
-		if len(filteredPaths) > 0 && pushCacheURL != "" {
-			c := cache.New(pushCacheURL, cache.WithMaxConns(pushWorkers))
-
-			var hashes []string
-			for _, p := range filteredPaths {
-				basename := filepath.Base(p)
-				parts := strings.SplitN(basename, "-", 2)
-				if len(parts) >= 2 {
-					hashes = append(hashes, parts[0])
-				}
-			}
-
-			existsMap, err := c.ExistsBatch(ctx, hashes, pushWorkers)
-			if err != nil {
-				PrintWarning(fmt.Sprintf("upstream cache check failed: %v", err))
-			} else {
-				var trulyFiltered []string
-				for _, p := range filteredPaths {
-					basename := filepath.Base(p)
-					parts := strings.SplitN(basename, "-", 2)
-					if len(parts) >= 2 && existsMap[parts[0]] {
-						fmt.Printf("Skipping %s (already in upstream cache)\n", p)
-						continue
-					}
-					trulyFiltered = append(trulyFiltered, p)
-				}
-				filteredPaths = trulyFiltered
-			}
-		}
-	}
-
-	if len(filteredPaths) == 0 {
-		fmt.Println("No new paths to push.")
-		return
-	}
-	tokenMgr := proxy.NewTokenManager(registry, repository, "")
-	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, nil, registry, repository, tokenMgr)
-
-	isNative := false
-	if configAnnotations != nil {
-		if backend := configAnnotations["aeroflare.index-type"]; backend == "native" {
-			isNative = true
-		} else if backend := configAnnotations["aeroflare.backend"]; backend == "native" {
-			isNative = true
-		}
-	}
-
-	r2Cfg := network.GetR2Config(configAnnotations)
-	var s3Client *s3.Client
-	if r2Cfg != nil {
-		var initErr error
-		s3Client, initErr = r2Cfg.NewClient(ctx)
-		if initErr != nil {
-			PrintError(fmt.Sprintf("Failed to init R2 client: %v", initErr))
-			os.Exit(1)
-		}
-		fmt.Printf("R2 Object Storage enabled (Bucket: %s)\n", r2Cfg.Bucket)
-	}
-
-	var receipts []network.PushReceipt
-
-	chunkSize := 100
-	for i := 0; i < len(filteredPaths); i += chunkSize {
-		end := i + chunkSize
-		if end > len(filteredPaths) {
-			end = len(filteredPaths)
-		}
-		chunk := filteredPaths[i:end]
-
-		numChunks := (len(filteredPaths) + chunkSize - 1) / chunkSize
-		currentChunk := (i / chunkSize) + 1
-		fmt.Printf("\n--- Processing chunk %d/%d ---\n\n", currentChunk, numChunks)
-
-		var results []*prepare.Result
-
-		fmt.Println("Step 1/2: Preparing (Generating NAR and narinfo files)")
-		if len(chunk) == 1 {
-			fmt.Printf("Path: %s\n\n", chunk[0])
-			res, err := prepare.Prepare(ctx, chunk[0], cfg)
-			if err != nil {
-				PrintError(fmt.Sprintf("Error during preparation: %v", err))
-				os.Exit(1)
-			}
-			results = append(results, res)
-		} else {
-			fmt.Printf("Paths: %d\n\n", len(chunk))
-			res, err := prepare.PrepareBatch(ctx, chunk, cfg)
-			if err != nil {
-				PrintError(fmt.Sprintf("Error during batch preparation: %v", err))
-				os.Exit(1)
-			}
-			results = res
-		}
-
-		fmt.Println("Step 2/2: Uploading to OCI registry")
-		pushedPaths := make(map[string]bool)
-
-		type pushTask struct {
-			r      *prepare.Result
-			isRoot bool
-		}
-		var tasks []pushTask
-
-		var collect func(r *prepare.Result, isRoot bool)
-		collect = func(r *prepare.Result, isRoot bool) {
-			if pushedPaths[r.StorePath] {
-				return
-			}
-			pushedPaths[r.StorePath] = true
-
-			tasks = append(tasks, pushTask{r: r, isRoot: isRoot})
-
-			for _, missingRef := range r.MissingRefResults {
-				collect(missingRef, false)
-			}
-		}
-
-		for _, r := range results {
-			collect(r, true)
-		}
-
-		var mu sync.Mutex
-		eg, egCtx := errgroup.WithContext(ctx)
-		eg.SetLimit(pushWorkers)
-
-		for _, t := range tasks {
-			t := t // capture loop variable
-			eg.Go(func() error {
-				r := t.r
-				isRoot := t.isRoot
-
-				narStat, err := os.Stat(r.NarPath)
-				if err != nil {
-					if isRoot {
-						return fmt.Errorf("failed to stat NAR file (%s): %v", r.NarPath, err)
-					}
-					return nil
-				}
-
-				// Parse narinfo once to avoid disk reads for hashing
-				narinfoData, err := os.ReadFile(r.NarinfoPath)
-				if err != nil {
-					if isRoot {
-						return fmt.Errorf("failed to read narinfo (%s): %v", r.NarinfoPath, err)
-					}
-					return nil
-				}
-				ni, err := narinfo.Parse(string(narinfoData))
-				if err != nil {
-					if isRoot {
-						return fmt.Errorf("failed to parse narinfo (%s): %v", r.NarinfoPath, err)
-					}
-					return nil
-				}
-
-				// Create the layer ONCE for brutal speed without even hashing the file!
-				layer, narDigest, err := network.NewLayerFast(r.NarPath, types.MediaType("application/vnd.aeroflare.nar.v1+"+ni.Compression), ni)
-				if err != nil {
-					if isRoot {
-						return fmt.Errorf("failed to create NAR layer (%s): %v", r.NarPath, err)
-					} else {
-						mu.Lock()
-						PrintError(fmt.Sprintf("    Failed to create reference NAR layer: %v", err))
-						mu.Unlock()
-						return nil
-					}
-				}
-
-				if isNative {
-					// Dual-Strategy: Push natively to OCI
-					basename := filepath.Base(ni.StorePath)
-					tag := strings.SplitN(basename, "-", 2)[0]
-					err = network.PushNarPackage(layer, ni, tag, registry, repository, ociToken)
-					if err != nil {
-						if isRoot {
-							return fmt.Errorf("failed to push OCI Native artifact (%s): %v", r.StorePath, err)
-						} else {
-							mu.Lock()
-							PrintError(fmt.Sprintf("    Failed to push reference OCI Native artifact: %v", err))
-							mu.Unlock()
-							return nil
-						}
-					}
-				}
-
-				// Strategy 2 Legacy Fallback (the layer was already pushed by PushNarPackage, but we call PushLayer to be perfectly safe, which is a fast no-op if the layer exists)
-				err = network.PushLayer(layer, registry, repository, ociToken)
-				if err != nil {
-					if isRoot {
-						return fmt.Errorf("failed to push fallback NAR layer (%s): %v", r.NarPath, err)
-					} else {
-						mu.Lock()
-						PrintError(fmt.Sprintf("    Failed to push reference fallback NAR layer: %v", err))
-						mu.Unlock()
-						return nil
-					}
-				}
-
-				if r2Cfg != nil && s3Client != nil {
-					err = r2Cfg.UploadNarinfo(egCtx, s3Client, r.StorePath, r.NarinfoPath)
-					if err != nil {
-						if isRoot {
-							return fmt.Errorf("failed to upload Narinfo file to R2 (%s): %v", r.NarinfoPath, err)
-						} else {
-							mu.Lock()
-							PrintError(fmt.Sprintf("    Failed to upload reference Narinfo to R2: %v", err))
-							mu.Unlock()
-							return nil
-						}
-					}
-				} else {
-					_, err = network.PushBlob(r.NarinfoPath, registry, repository, ociToken)
-					if err != nil {
-						if isRoot {
-							return fmt.Errorf("failed to upload Narinfo file (%s): %v", r.NarinfoPath, err)
-						} else {
-							mu.Lock()
-							PrintError(fmt.Sprintf("    Failed to upload reference Narinfo: %v", err))
-							mu.Unlock()
-							return nil
-						}
-					}
-				}
-
-				pkgName := filepath.Base(r.StorePath)
-
-				mu.Lock()
-				fmt.Println("✔ " + pkgName)
-				totalUploaded++
-
-				receipts = append(receipts, network.PushReceipt{
-					StorePath:   r.StorePath,
-					NarinfoPath: r.NarinfoPath,
-					NarDigest:   narDigest,
-					NarSize:     narStat.Size(),
-					IsRoot:      isRoot,
-				})
-				mu.Unlock()
-
-				return nil
-			})
-		}
-
-		if err := eg.Wait(); err != nil {
 			PrintError(err.Error())
 			os.Exit(1)
 		}
-	}
 
-	fmt.Println("\nUpdating cache index...")
-	if err := network.UpdateCacheIndex(receipts, existingIndex, registry, repository, ociToken, pushSigningKey, r2Cfg, configAnnotations); err != nil {
-		PrintError(fmt.Sprintf("Failed to update cache index: %v", err))
-		os.Exit(1)
-	}
-	fmt.Println("✔ Cache index updated")
+		cfg.Compression = pushCompression
+		cfg.CacheURL = pushCacheURL
+		cfg.Workers = pushWorkers
+		cfg.PrepareRefs = pushPrepareRefs
+		cfg.SigningKey = pushSigningKey
+		cfg.KeepFiles = pushKeepFiles
+		cfg.ForcePush = pushForcePush
+		cfg.Verbosity = VerboseCount
 
-	duration := time.Since(startTime)
-
-	rootsUploaded := 0
-	for _, r := range receipts {
-		if r.IsRoot {
-			rootsUploaded++
+		plan, err := push.Preflight(cfg)
+		if err != nil {
+			PrintError(err.Error())
+			os.Exit(1)
 		}
-	}
-	fmt.Println("\nSummary")
-	fmt.Println("────────────────────────────────")
-	fmt.Println()
-	fmt.Printf("Packages uploaded: %d\n", totalUploaded)
-	fmt.Printf("GC roots:          %d\n", rootsUploaded)
-	fmt.Printf("Duration:          %s\n\n", duration.Round(time.Millisecond))
 
-	fmt.Println("Done.")
+		push.DisplaySummary(plan)
+
+		if err := push.RunPush(plan); err != nil {
+			PrintError(err.Error())
+			os.Exit(1)
+		}
+	},
 }
 
 func init() {

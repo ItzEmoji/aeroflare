@@ -226,8 +226,6 @@ func githubDeviceFlow() string {
 	}
 }
 
-
-
 // ensureGitLabProjectExists checks if the base project exists and creates it if it doesn't.
 func ensureGitLabProjectExists(token, fullProjectName string) error {
 	apiPath := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s", url.PathEscape(fullProjectName))

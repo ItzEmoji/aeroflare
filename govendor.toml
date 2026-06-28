@@ -108,39 +108,43 @@ schema = 3
     go = "1.19"
     packages = ["github.com/catppuccin/go"]
   [mod."github.com/charmbracelet/bubbles"]
-    version = "v0.21.1-0.20250623103423-23b8fd6302d7"
-    hash = "sha256-UpFrV82xWIydxE4wPEQ3GK56+L9d/PDCkBAOYTifKlw="
-    go = "1.23.0"
+    version = "v1.0.0"
+    hash = "sha256-Vz9QgctlzJqggPwfi48Lbn38ZJXu3Y71byp5uuuzUvU="
+    go = "1.24.2"
     packages = ["github.com/charmbracelet/bubbles/cursor", "github.com/charmbracelet/bubbles/filepicker", "github.com/charmbracelet/bubbles/help", "github.com/charmbracelet/bubbles/key", "github.com/charmbracelet/bubbles/runeutil", "github.com/charmbracelet/bubbles/spinner", "github.com/charmbracelet/bubbles/textarea", "github.com/charmbracelet/bubbles/textarea/memoization", "github.com/charmbracelet/bubbles/textinput", "github.com/charmbracelet/bubbles/viewport"]
   [mod."github.com/charmbracelet/bubbletea"]
-    version = "v1.3.6"
-    hash = "sha256-79MpQk+92RDXnNc2hSct8EDf0AhV6MZpvFMmmrVC/bs="
-    go = "1.23.0"
+    version = "v1.3.10"
+    hash = "sha256-7wr85TLszu1CHNEMv+o4w+r24Z0xdzCgecPv+ZtRX/A="
+    go = "1.24.0"
     packages = ["github.com/charmbracelet/bubbletea"]
   [mod."github.com/charmbracelet/colorprofile"]
-    version = "v0.2.3-0.20250311203215-f60798e515dc"
-    hash = "sha256-D9E/bMOyLXAUVOHA1/6o3i+vVmLfwIMOWib6sU7A6+Q="
-    go = "1.18"
+    version = "v0.4.1"
+    hash = "sha256-d/NjM/ybG+bGRRRMMcjbPCFGFS5noZRMaL05Ix5r/II="
+    go = "1.24.2"
     packages = ["github.com/charmbracelet/colorprofile"]
   [mod."github.com/charmbracelet/huh"]
     version = "v1.0.0"
     hash = "sha256-vDqcsW9uBPDt0FaOA7Bij+Q9CkozggstOZ0r557TaC4="
     go = "1.23.0"
     packages = ["github.com/charmbracelet/huh", "github.com/charmbracelet/huh/internal/accessibility", "github.com/charmbracelet/huh/internal/selector"]
+  [mod."github.com/charmbracelet/huh/spinner"]
+    version = "v0.0.0-20260223110133-9dc45e34a40b"
+    hash = "sha256-oDlrZK6vXg22cGsFC9X8CWmkolqAQxyZX80i73xCoPA="
+    go = "1.24.2"
   [mod."github.com/charmbracelet/lipgloss"]
     version = "v1.1.0"
     hash = "sha256-RHsRT2EZ1nDOElxAK+6/DC9XAaGVjDTgPvRh3pyCfY4="
     go = "1.18"
     packages = ["github.com/charmbracelet/lipgloss"]
   [mod."github.com/charmbracelet/x/ansi"]
-    version = "v0.9.3"
-    hash = "sha256-Bzum17p7UQZeNxL155Pho/+GXj1DElB9Bp3O194CYf8="
-    go = "1.23.0"
-    packages = ["github.com/charmbracelet/x/ansi", "github.com/charmbracelet/x/ansi/kitty", "github.com/charmbracelet/x/ansi/parser"]
+    version = "v0.11.6"
+    hash = "sha256-UToZIkqXl9MEppcRgbeBqaaMeAzRkGa0w3lVUs6sxWI="
+    go = "1.24.2"
+    packages = ["github.com/charmbracelet/x/ansi", "github.com/charmbracelet/x/ansi/parser"]
   [mod."github.com/charmbracelet/x/cellbuf"]
-    version = "v0.0.13"
-    hash = "sha256-ubgBd82jcS5L4i6rCFLOB1BXGrDEu6wWlciJA0gsH2g="
-    go = "1.18"
+    version = "v0.0.15"
+    hash = "sha256-0S60XaWhKZG+TB3Kqe1oMn2Okwdq53nym8XayVSHHiM="
+    go = "1.24.2"
     packages = ["github.com/charmbracelet/x/cellbuf"]
   [mod."github.com/charmbracelet/x/exp/strings"]
     version = "v0.0.0-20240722160745-212f7b056ed0"
@@ -148,10 +152,34 @@ schema = 3
     go = "1.19"
     packages = ["github.com/charmbracelet/x/exp/strings"]
   [mod."github.com/charmbracelet/x/term"]
-    version = "v0.2.1"
-    hash = "sha256-VBkCZLI90PhMasftGw3403IqoV7d3E5WEGAIVrN5xQM="
-    go = "1.18"
+    version = "v0.2.2"
+    hash = "sha256-KF7IU1Luxl/sZP6XjomWB2e3lxSUS4/5AahhapGir/4="
+    go = "1.24.0"
     packages = ["github.com/charmbracelet/x/term"]
+  [mod."github.com/clipperhouse/displaywidth"]
+    version = "v0.9.0"
+    hash = "sha256-9CNyTZPSncKQ7Y0my9DR4WYXDjtDHYNL512D691WDAM="
+    go = "1.18"
+    packages = ["github.com/clipperhouse/displaywidth"]
+  [mod."github.com/clipperhouse/stringish"]
+    version = "v0.1.1"
+    hash = "sha256-Mp8M1CRbwr6dcJ4BD9tXD5I78ZgCFEm0GDxJv0GYReg="
+    go = "1.18"
+    packages = ["github.com/clipperhouse/stringish"]
+  [mod."github.com/clipperhouse/uax29/v2"]
+    version = "v2.5.0"
+    hash = "sha256-Men4JLhiuEtAx8ZSzId5ciRWhud68o3k/B48ppwyxkM="
+    go = "1.18"
+    packages = ["github.com/clipperhouse/uax29/v2/graphemes"]
+  [mod."github.com/docker/cli"]
+    version = "v29.5.3+incompatible"
+    hash = "sha256-UcKvGHHpa5BZ3cpG79NI2Rwu8mmCV8DQ9JHqScZWv30="
+    packages = ["github.com/docker/cli/cli/config", "github.com/docker/cli/cli/config/configfile", "github.com/docker/cli/cli/config/credentials", "github.com/docker/cli/cli/config/memorystore", "github.com/docker/cli/cli/config/types"]
+  [mod."github.com/docker/docker-credential-helpers"]
+    version = "v0.9.3"
+    hash = "sha256-HkmdB771ekeXa+XUzvmHIIfejS0E5k0zv3LVFuOevt4="
+    go = "1.21"
+    packages = ["github.com/docker/docker-credential-helpers/client", "github.com/docker/docker-credential-helpers/credentials"]
   [mod."github.com/dustin/go-humanize"]
     version = "v1.0.1"
     hash = "sha256-yuvxYYngpfVkUg9yAmG99IUVmADTQA0tMbBXe0Fq0Mc="
@@ -162,6 +190,11 @@ schema = 3
     hash = "sha256-OWSqN1+IoL73rWXWdbbcahZu8n2al90Y3eT5Z0vgHvU="
     go = "1.16"
     packages = ["github.com/erikgeiser/coninput"]
+  [mod."github.com/google/go-containerregistry"]
+    version = "v0.21.7"
+    hash = "sha256-LyHukzZEVrcQSjprkakCi9Wg0DzFlP5QP9Cl7N8iydU="
+    go = "1.25.0"
+    packages = ["github.com/google/go-containerregistry/internal/and", "github.com/google/go-containerregistry/internal/compression", "github.com/google/go-containerregistry/internal/gzip", "github.com/google/go-containerregistry/internal/limit", "github.com/google/go-containerregistry/internal/redact", "github.com/google/go-containerregistry/internal/retry", "github.com/google/go-containerregistry/internal/retry/wait", "github.com/google/go-containerregistry/internal/verify", "github.com/google/go-containerregistry/internal/zstd", "github.com/google/go-containerregistry/pkg/authn", "github.com/google/go-containerregistry/pkg/compression", "github.com/google/go-containerregistry/pkg/logs", "github.com/google/go-containerregistry/pkg/name", "github.com/google/go-containerregistry/pkg/v1", "github.com/google/go-containerregistry/pkg/v1/empty", "github.com/google/go-containerregistry/pkg/v1/match", "github.com/google/go-containerregistry/pkg/v1/mutate", "github.com/google/go-containerregistry/pkg/v1/partial", "github.com/google/go-containerregistry/pkg/v1/remote", "github.com/google/go-containerregistry/pkg/v1/remote/internal/authchallenge", "github.com/google/go-containerregistry/pkg/v1/remote/transport", "github.com/google/go-containerregistry/pkg/v1/stream", "github.com/google/go-containerregistry/pkg/v1/tarball", "github.com/google/go-containerregistry/pkg/v1/types"]
   [mod."github.com/inconshreveable/mousetrap"]
     version = "v1.1.0"
     hash = "sha256-XWlYH0c8IcxAwQTnIi6WYqq44nOKUylSWxWO/vi+8pE="
@@ -173,8 +206,8 @@ schema = 3
     go = "1.24"
     packages = ["github.com/klauspost/compress", "github.com/klauspost/compress/fse", "github.com/klauspost/compress/huff0", "github.com/klauspost/compress/internal/cpuinfo", "github.com/klauspost/compress/internal/le", "github.com/klauspost/compress/internal/snapref", "github.com/klauspost/compress/zstd", "github.com/klauspost/compress/zstd/internal/xxhash"]
   [mod."github.com/lucasb-eyer/go-colorful"]
-    version = "v1.2.0"
-    hash = "sha256-Gg9dDJFCTaHrKHRR1SrJgZ8fWieJkybljybkI9x0gyE="
+    version = "v1.3.0"
+    hash = "sha256-6BKrJsfmxie+YFAWzTYVPQfrwjQEXRo+J8LY+50C1BU="
     go = "1.12"
     packages = ["github.com/lucasb-eyer/go-colorful"]
   [mod."github.com/mattn/go-isatty"]
@@ -187,9 +220,9 @@ schema = 3
     hash = "sha256-JlWckeGaWG+bXK8l8WEdZqmSiTwCA8b1qbmBKa/Fj3E="
     packages = ["github.com/mattn/go-localereader"]
   [mod."github.com/mattn/go-runewidth"]
-    version = "v0.0.16"
-    hash = "sha256-NC+ntvwIpqDNmXb7aixcg09il80ygq6JAnW0Gb5b/DQ="
-    go = "1.9"
+    version = "v0.0.19"
+    hash = "sha256-GpnbKplhX410Q/eIdknvWbYZgdav1keN+7wNUeOSMHE="
+    go = "1.20"
     packages = ["github.com/mattn/go-runewidth"]
   [mod."github.com/mitchellh/hashstructure/v2"]
     version = "v2.0.2"
@@ -211,19 +244,34 @@ schema = 3
     hash = "sha256-hGo275DJlyLtcifSLpWnk8jardOksdeX9lH4lBeE3gI="
     go = "1.17"
     packages = ["github.com/muesli/termenv"]
+  [mod."github.com/opencontainers/go-digest"]
+    version = "v1.0.0"
+    hash = "sha256-cfVDjHyWItmUGZ2dzQhCHgmOmou8v7N+itDkLZVkqkQ="
+    go = "1.13"
+    packages = ["github.com/opencontainers/go-digest"]
+  [mod."github.com/opencontainers/image-spec"]
+    version = "v1.1.1"
+    hash = "sha256-bxBjtl+6846Ed3QHwdssOrNvlHV6b+Dn17zPISSQGP8="
+    go = "1.18"
+    packages = ["github.com/opencontainers/image-spec/specs-go", "github.com/opencontainers/image-spec/specs-go/v1"]
   [mod."github.com/rivo/uniseg"]
     version = "v0.4.7"
     hash = "sha256-rDcdNYH6ZD8KouyyiZCUEy8JrjOQoAkxHBhugrfHjFo="
     go = "1.18"
     packages = ["github.com/rivo/uniseg"]
+  [mod."github.com/sirupsen/logrus"]
+    version = "v1.9.4"
+    hash = "sha256-ltRvmtM3XTCAFwY0IesfRqYIivyXPPuvkFjL4ARh1wg="
+    go = "1.17"
+    packages = ["github.com/sirupsen/logrus"]
   [mod."github.com/spf13/cobra"]
     version = "v1.10.2"
     hash = "sha256-nbRCTFiDCC2jKK7AHi79n7urYCMP5yDZnWtNVJrDi+k="
     go = "1.15"
     packages = ["github.com/spf13/cobra"]
   [mod."github.com/spf13/pflag"]
-    version = "v1.0.9"
-    hash = "sha256-YAjyYpq5BXCosVJtvYLWFG1t4gma2ylzc7ILLoj/hD8="
+    version = "v1.0.10"
+    hash = "sha256-uDPnWjHpSrzXr17KEYEA1yAbizfcsfo5AyztY2tS6ZU="
     go = "1.12"
     packages = ["github.com/spf13/pflag"]
   [mod."github.com/ulikunitz/xz"]
@@ -236,18 +284,27 @@ schema = 3
     hash = "sha256-GyCDxxMQhXA3Pi/TsWXpA8cX5akEoZV7CFx4RO3rARU="
     go = "1.19"
     packages = ["github.com/xo/terminfo"]
+  [mod."golang.org/x/crypto"]
+    version = "v0.53.0"
+    hash = "sha256-TWcccM4d5t0ZbDyHXEm4elxKk5uzlo29i85lVHSZcNw="
+    go = "1.25.0"
+    packages = ["golang.org/x/crypto/blake2b", "golang.org/x/crypto/curve25519", "golang.org/x/crypto/internal/alias", "golang.org/x/crypto/internal/poly1305", "golang.org/x/crypto/nacl/box", "golang.org/x/crypto/nacl/secretbox", "golang.org/x/crypto/salsa20/salsa"]
   [mod."golang.org/x/sync"]
-    version = "v0.15.0"
-    hash = "sha256-Jf4ehm8H8YAWY6mM151RI5CbG7JcOFtmN0AZx4bE3UE="
-    go = "1.23.0"
+    version = "v0.21.0"
+    hash = "sha256-2n7PVb1krz7UpnXYGVmCrxV0fZBnjQdVVt6eVudEPYY="
+    go = "1.25.0"
     packages = ["golang.org/x/sync/errgroup"]
   [mod."golang.org/x/sys"]
-    version = "v0.33.0"
-    hash = "sha256-wlOzIOUgAiGAtdzhW/KPl/yUVSH/lvFZfs5XOuJ9LOQ="
-    go = "1.23.0"
-    packages = ["golang.org/x/sys/unix", "golang.org/x/sys/windows"]
+    version = "v0.46.0"
+    hash = "sha256-NzRXMSEk6upeudJvUEPVnw6clJ3d8UdC/vdfANWAc8g="
+    go = "1.25.0"
+    packages = ["golang.org/x/sys/cpu", "golang.org/x/sys/unix", "golang.org/x/sys/windows"]
   [mod."golang.org/x/text"]
-    version = "v0.23.0"
-    hash = "sha256-TiYX1K4DYpP1dEV06whOm43xyOntjrPFi+VAdncoeCY="
-    go = "1.23.0"
+    version = "v0.38.0"
+    hash = "sha256-PzREcn7yzTAJ0WBvyYL/2/r+tfoeKTY/E5HVXi/CJsU="
+    go = "1.25.0"
     packages = ["golang.org/x/text/transform"]
+  [mod."gotest.tools/v3"]
+    version = "v3.5.2"
+    hash = "sha256-eAxnRrF2bQugeFYzGLOr+4sLyCPOpaTWpoZsIKNP1WE="
+    go = "1.17"

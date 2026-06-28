@@ -8,7 +8,7 @@ import (
 // AeroflareTheme returns a custom theme with brand colors and rounded borders.
 func AeroflareTheme() *huh.Theme {
 	t := huh.ThemeBase()
-	
+
 	cyan := lipgloss.Color("#00FFFF")
 	gray := lipgloss.Color("#555555")
 

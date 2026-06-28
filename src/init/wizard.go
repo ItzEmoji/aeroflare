@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
+	"aeroflare/src/ui"
 )
 
 // RunWizard collects all configuration from the user through an interactive wizard.
@@ -184,23 +185,21 @@ func promptCredentials(cfg *InitConfig) error {
 
 // DisplaySummary shows a configuration summary and asks for confirmation.
 func DisplaySummary(cfg *InitConfig) (bool, error) {
-	fmt.Println()
-	fmt.Println("  ╭────────────────────────────────────────────────────────────╮")
-	fmt.Println("  │  Summary                                                   │")
-	fmt.Println("  ├────────────────────────────────────────────────────────────┤")
-	printField("Cache", cfg.CacheName)
-	printField("Registry", cfg.Registry)
-	printField("Repository", cfg.Repository)
-	printField("Backend", cfg.Backend.String())
-	printField("Worker", cfg.WorkerName)
+	fields := []ui.BoxField{
+		{Label: "Cache", Value: cfg.CacheName},
+		{Label: "Registry", Value: cfg.Registry},
+		{Label: "Repository", Value: cfg.Repository},
+		{Label: "Backend", Value: cfg.Backend.String()},
+		{Label: "Worker", Value: cfg.WorkerName},
+	}
 	if cfg.Backend == BackendR2 {
-		printField("R2 Bucket", cfg.R2Bucket)
+		fields = append(fields, ui.BoxField{Label: "R2 Bucket", Value: cfg.R2Bucket})
 	}
 	if cfg.GitProvider != GitNone {
-		printField("Git", fmt.Sprintf("%s (%s)", cfg.GitProvider, cfg.GitUsername))
+		fields = append(fields, ui.BoxField{Label: "Git", Value: fmt.Sprintf("%s (%s)", cfg.GitProvider, cfg.GitUsername)})
 	}
-	fmt.Println("  ╰────────────────────────────────────────────────────────────╯")
-	fmt.Println()
+
+	ui.PrintSummaryBox("Summary", fields)
 
 	var confirmed bool
 	err := huh.NewForm(
@@ -216,13 +215,6 @@ func DisplaySummary(cfg *InitConfig) (bool, error) {
 		return false, nil
 	}
 	return confirmed, nil
-}
-
-func printField(label, value string) {
-	if len(value) > 45 {
-		value = value[:42] + "..."
-	}
-	fmt.Printf("  \u2502  %-12s %-45s \u2502\n", label+":", value)
 }
 
 func notEmpty(name string) func(string) error {

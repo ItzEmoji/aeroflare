@@ -22,7 +22,7 @@ func ExchangeToken(registry, repository, username, basicAuthToken string) (strin
 	// Discover realm and service via /v2/ endpoint
 	realm := fmt.Sprintf("%s://%s/token", proto, registry)
 	service := registry
-	
+
 	pingReq, _ := http.NewRequest("GET", fmt.Sprintf("%s://%s/v2/", proto, registry), nil)
 	pingClient := &http.Client{Timeout: 5 * time.Second}
 	if pingResp, err := pingClient.Do(pingReq); err == nil {
@@ -43,7 +43,7 @@ func ExchangeToken(registry, repository, username, basicAuthToken string) (strin
 	}
 
 	scope := fmt.Sprintf("repository:%s:pull,push", repository)
-	
+
 	u, err := url.Parse(realm)
 	if err != nil {
 		return "", err
