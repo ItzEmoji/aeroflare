@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	network "aeroflare/src"
 	"aeroflare/src/push"
 	"github.com/spf13/cobra"
 )
@@ -23,6 +24,10 @@ var pushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push a build to the cache",
 	Run: func(cmd *cobra.Command, args []string) {
+		registry, _ := network.GetRegistryAndRepository()
+		token := getTokenForRegistry(registry)
+		os.Setenv("oci_token", token)
+
 		cfg, err := push.ParseConfig(args, pushStorePath, pushInputFile, os.Stdin)
 		if err != nil {
 			PrintError(err.Error())

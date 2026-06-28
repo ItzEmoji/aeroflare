@@ -51,10 +51,12 @@ func TestAuthCmdBehavior(t *testing.T) {
 	defer func() { SecretsManager = nil }() // reset
 
 	// Reset variables since they are package level
-	globalGithubToken = ""
-	globalGitlabToken = ""
-	globalCfToken = ""
-	globalCfUserID = ""
+	defer func() {
+		globalGithubToken = ""
+		globalGitlabToken = ""
+		globalCfToken = ""
+		globalCfUserID = ""
+	}()
 
 	_, err := executeCommand(rootCmd, "auth", "--github-token=test-gh", "--gitlab-token=test-gl", "--cf-token=test-cf", "--cf-user-id=test-id")
 	if err != nil {
@@ -83,10 +85,12 @@ func TestAuthCmdError(t *testing.T) {
 	SecretsManager = mock
 	defer func() { SecretsManager = nil }()
 
-	globalGithubToken = ""
-	globalGitlabToken = ""
-	globalCfToken = ""
-	globalCfUserID = ""
+	defer func() {
+		globalGithubToken = ""
+		globalGitlabToken = ""
+		globalCfToken = ""
+		globalCfUserID = ""
+	}()
 
 	_, err := executeCommand(rootCmd, "auth", "--github-token=fail")
 	if err == nil {
