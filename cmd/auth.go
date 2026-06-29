@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 	
 	"aeroflare/src/secrets"
-	"aeroflare/src/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -60,62 +58,7 @@ var authLoginCmd = &cobra.Command{
 	},
 }
 
-var authListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List saved authentication credentials",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		manager := getSecretsManager()
-		keys, err := manager.List()
-		if err != nil {
-			PrintError(err.Error())
-			return err
-		}
-		
-		if len(keys) == 0 {
-			fmt.Println("No credentials saved.")
-			return nil
-		}
-		
-		var rows [][]string
-		for _, key := range keys {
-			service := "Custom"
-			info := "Secret"
-
-			if key == "github-token" {
-				service = "GitHub"
-				info = "Token"
-			} else if key == "gitlab-token" {
-				service = "GitLab"
-				info = "Token"
-			} else if key == "cf-token" {
-				service = "Cloudflare"
-				info = "API Token"
-			} else if key == "cf-user-id" {
-				service = "Cloudflare"
-				info = "Account ID"
-			} else if strings.HasPrefix(key, "oci-") {
-				service = "OCI Registry"
-				parts := strings.Split(key, "-")
-				if len(parts) >= 3 {
-					// oci-<registry>-username or oci-<registry>-token
-					registry := strings.Join(parts[1:len(parts)-1], "-")
-					suffix := parts[len(parts)-1]
-					if suffix == "username" {
-						info = "Username (" + registry + ")"
-					} else if suffix == "token" {
-						info = "Token (" + registry + ")"
-					}
-				}
-			}
-
-			rows = append(rows, []string{service, info, key})
-		}
-
-		fmt.Println("Saved credentials:")
-		ui.PrintTable([]string{"Service", "Info", "Key"}, rows)
-		return nil
-	},
-}
+// (authListCmd has been moved to auth_list.go)
 
 var authRemoveCmd = &cobra.Command{
 	Use:   "remove [key]",
