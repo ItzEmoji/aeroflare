@@ -1,15 +1,13 @@
 package auth_test
 
 import (
-	"os"
 	"testing"
 	"aeroflare/src/auth"
 	"aeroflare/src/secrets"
 )
 
 func TestResolver_FlagPriority(t *testing.T) {
-	os.Setenv("TEST_ENV_VAR", "env-value")
-	defer os.Unsetenv("TEST_ENV_VAR")
+	t.Setenv("TEST_ENV_VAR", "env-value")
 
 	mock := &mockSecretsManager{
 		data: map[string]string{
@@ -32,8 +30,7 @@ func TestResolver_FlagPriority(t *testing.T) {
 }
 
 func TestResolver_EnvPriority(t *testing.T) {
-	os.Setenv("TEST_ENV_VAR", "env-value")
-	defer os.Unsetenv("TEST_ENV_VAR")
+	t.Setenv("TEST_ENV_VAR", "env-value")
 	
 	mock := &mockSecretsManager{
 		data: map[string]string{
@@ -123,8 +120,7 @@ func TestResolver_SecretsManagerSuccess(t *testing.T) {
 }
 
 func TestResolveGithubToken(t *testing.T) {
-	os.Setenv("GITHUB_TOKEN", "test-gh-token")
-	defer os.Unsetenv("GITHUB_TOKEN")
+	t.Setenv("GITHUB_TOKEN", "test-gh-token")
 
 	token, err := auth.ResolveGithubToken()
 	if err != nil || token != "test-gh-token" {
@@ -133,11 +129,37 @@ func TestResolveGithubToken(t *testing.T) {
 }
 
 func TestResolveRegistryToken(t *testing.T) {
-	os.Setenv("GITHUB_TOKEN", "test-gh-token")
-	defer os.Unsetenv("GITHUB_TOKEN")
+	t.Setenv("GITHUB_TOKEN", "test-gh-token")
 
 	token, err := auth.ResolveRegistryToken("ghcr.io")
 	if err != nil || token != "test-gh-token" {
 		t.Errorf("expected test-gh-token for ghcr.io, got %s, err: %v", token, err)
+	}
+}
+
+func TestResolveGitlabToken(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "test-gl-token")
+
+	token, err := auth.ResolveGitlabToken()
+	if err != nil || token != "test-gl-token" {
+		t.Errorf("expected test-gl-token, got %s, err: %v", token, err)
+	}
+}
+
+func TestResolveRegistryToken_Gitlab(t *testing.T) {
+	t.Setenv("GITLAB_TOKEN", "test-gl-token")
+
+	token, err := auth.ResolveRegistryToken("registry.gitlab.com")
+	if err != nil || token != "test-gl-token" {
+		t.Errorf("expected test-gl-token for registry.gitlab.com, got %s, err: %v", token, err)
+	}
+}
+
+func TestResolveRegistryToken_GenericOCI(t *testing.T) {
+	t.Setenv("oci_token", "test-oci-token")
+
+	token, err := auth.ResolveRegistryToken("docker.io")
+	if err != nil || token != "test-oci-token" {
+		t.Errorf("expected test-oci-token for docker.io, got %s, err: %v", token, err)
 	}
 }
