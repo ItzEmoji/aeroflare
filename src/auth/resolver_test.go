@@ -121,3 +121,23 @@ func TestResolver_SecretsManagerSuccess(t *testing.T) {
 		t.Errorf("expected secret-value, got %s", val)
 	}
 }
+
+func TestResolveGithubToken(t *testing.T) {
+	os.Setenv("GITHUB_TOKEN", "test-gh-token")
+	defer os.Unsetenv("GITHUB_TOKEN")
+
+	token, err := auth.ResolveGithubToken()
+	if err != nil || token != "test-gh-token" {
+		t.Errorf("expected test-gh-token, got %s, err: %v", token, err)
+	}
+}
+
+func TestResolveRegistryToken(t *testing.T) {
+	os.Setenv("GITHUB_TOKEN", "test-gh-token")
+	defer os.Unsetenv("GITHUB_TOKEN")
+
+	token, err := auth.ResolveRegistryToken("ghcr.io")
+	if err != nil || token != "test-gh-token" {
+		t.Errorf("expected test-gh-token for ghcr.io, got %s, err: %v", token, err)
+	}
+}

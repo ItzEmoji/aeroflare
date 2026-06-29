@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"aeroflare/src/secrets"
@@ -59,4 +60,28 @@ func (r *Resolver) Resolve() (string, error) {
 	}
 
 	return "", ErrTokenNotFound
+}
+
+func ResolveGithubToken() (string, error) {
+	return NewResolver("github-token").
+		WithEnv("GITHUB_TOKEN", "GH_TOKEN").
+		Resolve()
+}
+
+func ResolveGitlabToken() (string, error) {
+	return NewResolver("gitlab-token").
+		WithEnv("GITLAB_TOKEN").
+		Resolve()
+}
+
+func ResolveRegistryToken(registry string) (string, error) {
+	if registry == "ghcr.io" {
+		return ResolveGithubToken()
+	} else if registry == "registry.gitlab.com" {
+		return ResolveGitlabToken()
+	}
+	// Note: We use WithEnv here in case an explicit oci_token is provided for generic registries
+	return NewResolver(fmt.Sprintf("oci-%s-token", registry)).
+		WithEnv("oci_token").
+		Resolve()
 }
