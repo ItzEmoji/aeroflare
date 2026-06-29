@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -20,7 +21,11 @@ func RequireGithubToken() string {
 		return globalGithubToken
 	}
 	
-	if token, err := auth.ResolveGithubToken(getSecretsManager()); err == nil && token != "" {
+	token, err := auth.ResolveGithubToken(getSecretsManager())
+	if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
+		fmt.Fprintf(os.Stderr, "Warning: failed to read token from keychain: %v\n", err)
+	}
+	if token != "" {
 		return token
 	}
 	
@@ -39,7 +44,11 @@ func RequireGitlabToken() string {
 		return globalGitlabToken
 	}
 	
-	if token, err := auth.ResolveGitlabToken(getSecretsManager()); err == nil && token != "" {
+	token, err := auth.ResolveGitlabToken(getSecretsManager())
+	if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
+		fmt.Fprintf(os.Stderr, "Warning: failed to read token from keychain: %v\n", err)
+	}
+	if token != "" {
 		return token
 	}
 	
@@ -56,18 +65,26 @@ func RequireGitlabToken() string {
 func RequireCloudflareToken() (string, string) {
 	apiToken := globalCfToken
 	if apiToken == "" {
-		apiToken, _ = auth.NewResolver("cf-token").
+		var err error
+		apiToken, err = auth.NewResolver("cf-token").
 			WithEnv("CLOUDFLARE_API_TOKEN").
 			WithSecretsManager(getSecretsManager()).
 			Resolve()
+		if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
+			fmt.Fprintf(os.Stderr, "Warning: failed to read token from keychain: %v\n", err)
+		}
 	}
 	
 	userID := globalCfUserID
 	if userID == "" {
-		userID, _ = auth.NewResolver("cf-user-id").
+		var err error
+		userID, err = auth.NewResolver("cf-user-id").
 			WithEnv("CLOUDFLARE_ACCOUNT_ID").
 			WithSecretsManager(getSecretsManager()).
 			Resolve()
+		if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
+			fmt.Fprintf(os.Stderr, "Warning: failed to read token from keychain: %v\n", err)
+		}
 	}
 	
 	if apiToken != "" && userID != "" {
@@ -85,12 +102,18 @@ func RequireCloudflareToken() (string, string) {
 }
 
 func GetOCIToken(registry string) (string, string) {
-	user, _ := auth.NewResolver(fmt.Sprintf("oci-%s-username", registry)).
+	user, errUser := auth.NewResolver(fmt.Sprintf("oci-%s-username", registry)).
 		WithSecretsManager(getSecretsManager()).
 		Resolve()
-	pass, _ := auth.NewResolver(fmt.Sprintf("oci-%s-token", registry)).
+	if errUser != nil && !errors.Is(errUser, auth.ErrTokenNotFound) {
+		fmt.Fprintf(os.Stderr, "Warning: failed to read token from keychain: %v\n", errUser)
+	}
+	pass, errPass := auth.NewResolver(fmt.Sprintf("oci-%s-token", registry)).
 		WithSecretsManager(getSecretsManager()).
 		Resolve()
+	if errPass != nil && !errors.Is(errPass, auth.ErrTokenNotFound) {
+		fmt.Fprintf(os.Stderr, "Warning: failed to read token from keychain: %v\n", errPass)
+	}
 	return user, pass
 }
 
