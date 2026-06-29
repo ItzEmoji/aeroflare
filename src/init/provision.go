@@ -102,9 +102,9 @@ func createOCIRepository(cfg *InitConfig) error {
 		}
 	}
 
-	ociToken := network.GetToken(cfg.Registry, cfg.Repository)
+	ociToken := network.GetToken(cfg.Registry, cfg.Repository, cfg.GitToken)
 	if ociToken == "" {
-		return fmt.Errorf("no OCI authentication token found \u2014 set GITHUB_TOKEN or GH_TOKEN")
+		return fmt.Errorf("no OCI authentication token found \u2014 configure your environment or secrets manager")
 	}
 	cfg.OCIToken = ociToken
 

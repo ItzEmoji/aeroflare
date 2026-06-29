@@ -17,7 +17,7 @@ var configureCmd = &cobra.Command{
 	Short: "Interactively configure cache backend and settings",
 	Run: func(cmd *cobra.Command, args []string) {
 		registry, repository := network.GetRegistryAndRepository()
-		ociToken := network.GetToken(registry, repository)
+		ociToken := network.GetToken(registry, repository, "")
 		if ociToken == "" {
 			PrintError("Authentication token missing (oci_token, GITHUB_TOKEN or GH_TOKEN)")
 			os.Exit(1)

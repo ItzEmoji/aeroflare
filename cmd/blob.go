@@ -15,7 +15,7 @@ var pushBlobCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		registry, repository := network.GetRegistryAndRepository()
 
-		ociToken := network.GetToken(registry, repository)
+		ociToken := network.GetToken(registry, repository, "")
 		if ociToken == "" {
 			PrintError("oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
 			os.Exit(1)
@@ -41,7 +41,7 @@ var pullBlobCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		registry, repository := network.GetRegistryAndRepository()
 
-		ociToken := network.GetToken(registry, repository)
+		ociToken := network.GetToken(registry, repository, "")
 		if ociToken == "" {
 			PrintError("oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
 			os.Exit(1)

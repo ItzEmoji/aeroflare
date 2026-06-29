@@ -26,7 +26,7 @@ var cleanIndexCmd = &cobra.Command{
 			return
 		}
 
-		ociToken := network.GetToken(registry, repository)
+		ociToken := network.GetToken(registry, repository, "")
 		if ociToken == "" {
 			PrintError("oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
 			os.Exit(1)

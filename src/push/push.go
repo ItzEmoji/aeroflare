@@ -123,7 +123,7 @@ func RunPush(plan *PushPlan) error {
 
 	// Fetch registry and token
 	registry, repository := network.GetRegistryAndRepository()
-	ociToken := network.GetToken(registry, repository)
+	ociToken := network.GetToken(registry, repository, "")
 	if ociToken == "" {
 		return errors.New("authentication token missing (oci_token, GITHUB_TOKEN or GH_TOKEN)")
 	}

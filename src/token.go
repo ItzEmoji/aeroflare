@@ -88,10 +88,14 @@ func ExchangeToken(registry, repository, username, basicAuthToken string) (strin
 }
 
 // GetToken attempts to get a valid token, exchanging a GitHub/GitLab PAT if necessary
-func GetToken(registry, repository string) string {
-	token, err := auth.ResolveRegistryToken(registry)
-	if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
-		fmt.Fprintf(os.Stderr, "Warning: failed to resolve registry token: %v\n", err)
+func GetToken(registry, repository, explicitToken string) string {
+	token := explicitToken
+	if token == "" {
+		var err error
+		token, err = auth.ResolveRegistryToken(registry)
+		if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
+			fmt.Fprintf(os.Stderr, "Warning: failed to resolve registry token: %v\n", err)
+		}
 	}
 	
 	if token == "" {
