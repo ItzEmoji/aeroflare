@@ -1,5 +1,65 @@
 # Changelog
 
+## [1.5.0](https://github.com/ItzEmoji/aeroflare/compare/v1.4.1...v1.5.0) (2026-07-01)
+
+
+### Features
+
+* add auth CLI commands ([ca68a16](https://github.com/ItzEmoji/aeroflare/commit/ca68a163fc373a0ca83101cf91d97460e5b800f4))
+* add auth list advanced parsing, json export, and auth import command ([70e599d](https://github.com/ItzEmoji/aeroflare/commit/70e599d68ff22f680afbdef69b7ea5f1d51285a0))
+* add auth subcommands (list, login, remove) and keychain visibility ([d37da75](https://github.com/ItzEmoji/aeroflare/commit/d37da75cb479e333c94580d1337ca6b0895df09b))
+* add beautiful nushell-style tables for auth list ([a8b22c3](https://github.com/ItzEmoji/aeroflare/commit/a8b22c32460ce4ed32d0a7435edbba6b3d9ad557))
+* add config setup ([ecf2dfd](https://github.com/ItzEmoji/aeroflare/commit/ecf2dfd09a89f16a69f943c85f3cc3db8e89d2bc))
+* add settings command ([9687292](https://github.com/ItzEmoji/aeroflare/commit/968729218305457869c15acf4499ecb385791950))
+* **auth:** add registry-aware token resolvers ([2f922fc](https://github.com/ItzEmoji/aeroflare/commit/2f922fc37cb1b5418b5247d712d4508280c40be0))
+* **auth:** centralize credential resolution logic in auth_resolve.go ([55cc9d5](https://github.com/ItzEmoji/aeroflare/commit/55cc9d571e93bb83579babd5fc560310a4e0550d))
+* **auth:** implement GitHub device authorization flow ([2ac2d1d](https://github.com/ItzEmoji/aeroflare/commit/2ac2d1dc43f44fa28db2e7f12e54acc3d4bcfc3c))
+* **auth:** implement interactive setup wizard via huh ([0b5c786](https://github.com/ItzEmoji/aeroflare/commit/0b5c786ff6aef23cdce6a93270ad5a8e43db347e))
+* **auth:** implement token resolver builder ([67e9738](https://github.com/ItzEmoji/aeroflare/commit/67e9738a4d07a7cc97845e0d810d6047d6af5b1e))
+* check and warn if github token is missing write:packages scope ([23a4fc5](https://github.com/ItzEmoji/aeroflare/commit/23a4fc5fe8aacd4f27f1c2fc92e6d8e9adecfe74))
+* implement unified secret manager with fallback ([5e03ac0](https://github.com/ItzEmoji/aeroflare/commit/5e03ac05a48c848820632d29ae1e4bbecb086cff))
+* initialize viper and auto-generate config ([99f9bd1](https://github.com/ItzEmoji/aeroflare/commit/99f9bd13504b5390501d2fc67156366fb5dac85a))
+* integrate secret manager with github token retrieval ([182aa83](https://github.com/ItzEmoji/aeroflare/commit/182aa83f01c264c81274cb707ed14f544659f3d7))
+* integrate themes via viper config ([c1a38be](https://github.com/ItzEmoji/aeroflare/commit/c1a38beda9ef37e3511f30f1e59ede4826a69382))
+* use viper config to skip wizard prompts ([ffd4a19](https://github.com/ItzEmoji/aeroflare/commit/ffd4a1906e7b0bd3956fb8d8b32b7fdc04779800))
+
+
+### Bug Fixes
+
+* address final review findings ([addf567](https://github.com/ItzEmoji/aeroflare/commit/addf567543b2e77324704c070b001ee260fe31a6))
+* address reviewer feedback for getGithubToken ([3888100](https://github.com/ItzEmoji/aeroflare/commit/3888100b3e1e23f21a131b82aa1c6f105d965e36))
+* address reviewer feedback on secrets manager fallback and concurrency ([69fe56e](https://github.com/ItzEmoji/aeroflare/commit/69fe56e23a0ce58c8efb573f98c142c60f52b8ca))
+* address task 2 remaining review findings ([60d3ea0](https://github.com/ItzEmoji/aeroflare/commit/60d3ea01cf39c66cfda639b76db470ef0ae77815))
+* address task 2 review findings ([f03f9cc](https://github.com/ItzEmoji/aeroflare/commit/f03f9cc04ef0243b2bb1c4eb39f32a5f73c2a701))
+* address task 2 review findings (attempt 2) ([b9a6c03](https://github.com/ItzEmoji/aeroflare/commit/b9a6c03a74f497932bc4e81d8ddb2c646ac38881))
+* address task 4 review findings ([e9518f6](https://github.com/ItzEmoji/aeroflare/commit/e9518f619c28a78ad6732836d1fad84130d0d786))
+* address task 4 review findings (attempt 2) ([78b0211](https://github.com/ItzEmoji/aeroflare/commit/78b021177ccd996f557c4f25ec4cf91c4a142743))
+* address task 4 review findings (attempt 3) ([f7ca510](https://github.com/ItzEmoji/aeroflare/commit/f7ca510f5b08e3cd4f3d2b0da741a3fa7a5dfe96))
+* address task 4 review findings (attempt 4) ([ea5b228](https://github.com/ItzEmoji/aeroflare/commit/ea5b22891e6a67f58f05f0f0783c2b8761ef5867))
+* address task 4 review findings (attempt 5) ([3f3159c](https://github.com/ItzEmoji/aeroflare/commit/3f3159cc3e665ed9a1fb0212271855a894e25282))
+* auth wizard error handling and success messages ([8ce9d4d](https://github.com/ItzEmoji/aeroflare/commit/8ce9d4d53cf9342577f7f60dd4d8cbb4d1cab9ff))
+* **auth:** add GH_TOKEN test and update signature for OCI generic secret tests ([d2bbdda](https://github.com/ItzEmoji/aeroflare/commit/d2bbdda2d7c701f30a316aedc7690a3d7940ab84))
+* **auth:** add workflow scope to interactive github auth login ([1c27414](https://github.com/ItzEmoji/aeroflare/commit/1c274143ebbf43b27622a843d716f41e241dc087))
+* **auth:** fix device auth network issues and test races ([e5863fd](https://github.com/ItzEmoji/aeroflare/commit/e5863fd08ed6e99e8ab2ae6771707c28b798e2f9))
+* **auth:** handle manager errors, refactor for testability, and add behavioral tests ([06d8c3a](https://github.com/ItzEmoji/aeroflare/commit/06d8c3a2c215fd6875bf2024fa538c5a46f8fb7e))
+* **auth:** handle swallowed errors in wizard forms ([af697f7](https://github.com/ItzEmoji/aeroflare/commit/af697f78bf1f4e938aacf68744aa621b9b79f2e3))
+* ensure github oauth tokens (gho_) trigger token exchange ([ed50827](https://github.com/ItzEmoji/aeroflare/commit/ed5082770c92753af02559a5076aec4eef69e8e5))
+* ensure PATs exported via oci_token are properly exchanged for GHCR ([e313b06](https://github.com/ItzEmoji/aeroflare/commit/e313b062ac187e55c3d408e23d1ec2afbb0c056f))
+* export oci_token in getTokenForRegistry so push backend sees the resolved token ([5e5de41](https://github.com/ItzEmoji/aeroflare/commit/5e5de411a27a771ce233cff2749ab566116e9e65))
+* fixed support for oci-registry for now. ([96375f9](https://github.com/ItzEmoji/aeroflare/commit/96375f95b7c135e96ab29ebea3921e08e7b0904b))
+* implement auth resolver review findings for Task 3 ([fad8711](https://github.com/ItzEmoji/aeroflare/commit/fad8711fdcd842151a785130d3799fce03641b49))
+* **init:** add workflow scope to github oauth and warn if missing ([c2f36c3](https://github.com/ItzEmoji/aeroflare/commit/c2f36c3f7ceee76af7d79a401f2b1432721ce0f2))
+* **init:** prevent environment variable pollution in setup ([fed0f18](https://github.com/ItzEmoji/aeroflare/commit/fed0f18164551e94d1afbd2f100b96bd261f17e3))
+* **init:** update network.GetToken signature and callers ([78f5bf9](https://github.com/ItzEmoji/aeroflare/commit/78f5bf9175151b71428d65b8f06605d87f860341))
+* **init:** use auth.Resolver for token detection in wizard ([a09d202](https://github.com/ItzEmoji/aeroflare/commit/a09d2028989661b07ec8fd8ab113d7868212b6cc))
+* **init:** use x-access-token for github git push and improve git error logging ([59a586f](https://github.com/ItzEmoji/aeroflare/commit/59a586fa1d28634bd42680d0422a0a61512ea1d0))
+* mock keyring in tests and encapsulate ErrNotFound ([7e2d21b](https://github.com/ItzEmoji/aeroflare/commit/7e2d21baf1dc2d85a3ed813da3915304fd7107c2))
+* **network:** use registry-aware auth resolver in GetToken ([162713b](https://github.com/ItzEmoji/aeroflare/commit/162713b0bff2478b1084047bf4e14a4c98faef0c))
+* **network:** use registry-aware auth resolver in GetToken ([7f5dde1](https://github.com/ItzEmoji/aeroflare/commit/7f5dde1f0e918c757d59f34444ea584a7fc04a62))
+* proxy add native type ([#23](https://github.com/ItzEmoji/aeroflare/issues/23)) ([05b7e9c](https://github.com/ItzEmoji/aeroflare/commit/05b7e9c58fefc8926b180be15b519da90d700ac8))
+* request write:packages scope in device flow and fix token manager prefix checks ([a772183](https://github.com/ItzEmoji/aeroflare/commit/a7721831ec37abd35d667488551cc26b85df127e))
+* restore getGithubToken and token resolution logic ([adb5aec](https://github.com/ItzEmoji/aeroflare/commit/adb5aecf8c3c9521a38efdc817bba3eddc057475))
+
 ## [1.4.1](https://github.com/ItzEmoji/aeroflare/compare/v1.4.0...v1.4.1) (2026-06-28)
 
 
