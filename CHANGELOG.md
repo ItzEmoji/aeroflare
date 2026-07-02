@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/ItzEmoji/aeroflare/compare/v1.5.0...v1.6.0) (2026-07-02)
+
+
+### Features
+
+* docs ([7314018](https://github.com/ItzEmoji/aeroflare/commit/7314018184880e81ae2b679f2f0a41f8186210f3))
+
+
+### Bug Fixes
+
+* delete default pages and set intro.mdx as homepage to fix build ([a6aa292](https://github.com/ItzEmoji/aeroflare/commit/a6aa292e9f9ad489de70e9b6140dc63041c1198e))
+
 ## [1.5.0](https://github.com/ItzEmoji/aeroflare/compare/v1.4.1...v1.5.0) (2026-07-01)
 
 
