@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.7.0](https://github.com/ItzEmoji/aeroflare/compare/v1.6.0...v1.7.0) (2026-07-07)
+
+
+### Features
+
+* core CacheBackend interface and factory ([58f70a4](https://github.com/ItzEmoji/aeroflare/commit/58f70a42844982b390cdb9c92d261c889414b6af))
+* introduce generic OCI utilities for Aeroflare annotations ([c7ba176](https://github.com/ItzEmoji/aeroflare/commit/c7ba1769cb6687f0139c7f289c2cc2d02eb6dc24))
+* json CacheBackend implementation ([2408ec8](https://github.com/ItzEmoji/aeroflare/commit/2408ec8baf7578a7929293b7dafa942e6fa33ce8))
+* native CacheBackend implementation ([2c9365c](https://github.com/ItzEmoji/aeroflare/commit/2c9365c42d0b35e8abe0cea83059e718813a1d40))
+* r2 CacheBackend implementation with chunked OCI manifest ([bc08427](https://github.com/ItzEmoji/aeroflare/commit/bc084270d814a2a5dfd18ed01b4ae22427d4d9e5))
+
+
+### Bug Fixes
+
+* address reviewer feedback for native backend ([37882e0](https://github.com/ItzEmoji/aeroflare/commit/37882e0d9d8b7391a3ab0c2d56cf2aa2bb1793c6))
+* address reviewer feedback for r2 backend ([f7a7d6a](https://github.com/ItzEmoji/aeroflare/commit/f7a7d6af1bd67c13d88b89a127630268fbb718a1))
+* fixed 401-errors with the registry. ([e09ea9c](https://github.com/ItzEmoji/aeroflare/commit/e09ea9cbd10c8d55bf64e1c42a2dcd11883c0800))
+* fixed layout ([f86cff7](https://github.com/ItzEmoji/aeroflare/commit/f86cff7517d049d54870b156f7f8eaca7e93ddf7))
+* handle json backend issues from review ([c3233ad](https://github.com/ItzEmoji/aeroflare/commit/c3233ad8447e8c58c3b1a8d6f6f7c2ab486765b8))
+* harden network, index, and push paths against partial failures ([f93bd14](https://github.com/ItzEmoji/aeroflare/commit/f93bd1458e5944df4a5921b8e975c6316ac5b989))
+* make generated CLI reference MDX-safe ([38cea0f](https://github.com/ItzEmoji/aeroflare/commit/38cea0fcd82e61c71980e1c6d8b7910368167a3b))
+* native backend type ([545631c](https://github.com/ItzEmoji/aeroflare/commit/545631c3ef6e6fd7d733630d180f4f9dc79746d6))
+* point gen_docs at docs/ and honor output-dir arg ([2293da8](https://github.com/ItzEmoji/aeroflare/commit/2293da85370ee284d77c3bc550e0e2e1047bd264))
+* resolve unused variable compilation error in push.go ([d76f25f](https://github.com/ItzEmoji/aeroflare/commit/d76f25fa19ef012f2bcbd05409b5a450391cd6ba))
+* robustness improvments ([8ef7c98](https://github.com/ItzEmoji/aeroflare/commit/8ef7c98363db625e6e03be81de82a66ed423c224))
+
 ## [1.6.0](https://github.com/ItzEmoji/aeroflare/compare/v1.5.0...v1.6.0) (2026-07-02)
 
 
