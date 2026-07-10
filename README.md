@@ -38,8 +38,6 @@ nix run github:ItzEmoji/aeroflare -- run -- nix build .#default --print-out-path
 Build your flake outputs and push them to an OCI cache from CI. Nix must already
 be on the runner — the action does not install it.
 
-### Configless
-
 One cache, builds listed inline:
 
 ```yaml
@@ -60,87 +58,21 @@ jobs:
             .#packages.x86_64-linux.foo
 ```
 
-`ghcr.io` authenticates with the workflow's `github.token` automatically. For any
-other registry, pass `cache-token`.
+`ghcr.io` authenticates with the workflow's `github.token` automatically; any
+other registry takes a `cache-token`. By default only store paths missing from
+`https://cache.nixos.org` are uploaded, so your cache holds your artifacts
+rather than a copy of nixpkgs.
 
-### Upstream caches
+Linux runners only (`x86_64` or `aarch64`). Pin to `v1.8.0` or later — earlier
+releases ship no binaries, and the action will tell you so.
 
-By default only store paths missing from `https://cache.nixos.org` are uploaded,
-so your cache holds your artifacts rather than a copy of nixpkgs. Name other
-upstreams to skip their paths too:
+For several caches, a `.aeroflare-ci.yaml` config file, GitLab CI, or any other
+runner, see the documentation:
 
-```yaml
-        with:
-          cache: ghcr.io;${{ github.repository_owner }}/nix-cache
-          upstream-cache: |
-            https://cache.nixos.org
-            https://nix-community.cachix.org
-```
-
-An explicit `upstream-cache` **replaces** the default — list `cache.nixos.org`
-yourself if you still want its paths skipped.
-
-To upload the full closure, making the cache self-contained:
-
-```yaml
-        with:
-          upstream-cache: none
-```
-
-On a re-run, only the paths a cache does not already hold are uploaded — see
-[Incremental Caching](docs/docs/explanation/incremental-caching.md) for how
-upstream filtering and registry blob deduplication combine to get there.
-
-### With a config file
-
-Several caches, or settings you would rather keep in the repo:
-
-```yaml
-      - uses: ItzEmoji/aeroflare@v1
-        with:
-          config: .aeroflare-ci.yaml
-        env:
-          AEROFLARE_TOKEN_DOCKER_IO: ${{ secrets.DOCKERHUB_TOKEN }}
-```
-
-`config` cannot be combined with `builds`/`cache` — an inline list replaces the
-file's list rather than extending it. In config mode `cache-token` is ignored;
-give each registry its own `AEROFLARE_TOKEN_<HOST>` variable.
-
-Every key is validated against a [JSON schema](schema/aeroflare-ci.schema.json);
-see the [CI Configuration Schema](docs/docs/reference/ci-configuration.md) for
-the full reference.
-
-The action wraps the `aeroflare-ci` binary, which is CI-agnostic. See
-[CI Integration](docs/docs/how-to/ci-integration.md) for GitLab CI and other
-runners, and [The `aeroflare-ci` Runner](docs/docs/explanation/aeroflare-ci.md)
-for its resolution, token, and exit-code rules.
-
-```yaml
-# .aeroflare-ci.yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/ItzEmoji/aeroflare/v1/schema/aeroflare-ci.schema.json
-builds:
-  - .#default
-caches:
-  - ghcr.io;itzemoji/nix-cache
-  - docker.io;myorg/nix-cache
-compression: zstd
-upstream-cache: https://cache.nixos.org
-```
-
-Every build is pushed to every cache. `config` cannot be combined with `builds`
-or `cache` — an inline list replaces the file's list, so the action rejects the
-ambiguity rather than silently discarding your config.
-
-In config mode each registry's push token comes from a job-level environment
-variable named `AEROFLARE_TOKEN_<HOST>`, where `<HOST>` is the registry
-uppercased with `.` and `:` replaced by `_`.
-
-### Requirements
-
-- Linux runners only (`x86_64` or `aarch64`).
-- Pin to `v1.8.0` or later. Earlier releases ship no binaries, and the action
-  will tell you so.
+- [CI Integration](https://aeroflare.pages.dev/docs/how-to/ci-integration) — `config` mode, multiple caches, GitLab CI, generic runners
+- [CI Configuration Schema](https://aeroflare.pages.dev/docs/reference/ci-configuration) — every `.aeroflare-ci.yaml` key, type, and default
+- [The `aeroflare-ci` Runner](https://aeroflare.pages.dev/docs/explanation/aeroflare-ci) — precedence, token resolution, exit codes
+- [Incremental Caching](https://aeroflare.pages.dev/docs/explanation/incremental-caching) — what is skipped on a re-run, and why
 
 ### Verifying the binaries yourself
 
