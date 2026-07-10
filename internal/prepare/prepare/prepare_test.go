@@ -241,7 +241,7 @@ func TestPrepareWithMockCache(t *testing.T) {
 	cfg := &Config{
 		OutputDir:   t.TempDir(),
 		Compression: compress.Zstd,
-		CacheURL:    server.URL,
+		CacheURLs:   []string{server.URL},
 		Workers:     5,
 	}
 
@@ -450,7 +450,7 @@ func TestPrepareWithMissingRefsPrepared(t *testing.T) {
 	cfg := &Config{
 		OutputDir:          t.TempDir(),
 		Compression:        compress.Zstd,
-		CacheURL:           server.URL,
+		CacheURLs:          []string{server.URL},
 		Workers:            5,
 		PrepareMissingRefs: true,
 	}

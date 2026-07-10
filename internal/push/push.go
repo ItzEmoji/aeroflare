@@ -195,10 +195,15 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 		fmt.Printf("Generated files will be kept in: %s\n", outputDir)
 	}
 
+	var upstreamURLs []string
+	if plan.Config.CacheURL != "" {
+		upstreamURLs = []string{plan.Config.CacheURL}
+	}
+
 	cfg := &prepare.Config{
 		OutputDir:          outputDir,
 		Compression:        compType,
-		CacheURL:           plan.Config.CacheURL,
+		CacheURLs:          upstreamURLs,
 		Workers:            plan.Config.Workers,
 		PrepareMissingRefs: plan.Config.PrepareRefs,
 		SigningKey:         signKey,

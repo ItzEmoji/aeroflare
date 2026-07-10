@@ -90,7 +90,7 @@ func Run(spec RunSpec, w io.Writer) bool {
 		Compression: spec.Compression,
 		Workers:     spec.Workers,
 		SigningKey:  keyPath,
-		CacheURL:    "",
+		CacheURLs:   nil,
 	})
 	if err != nil {
 		fmt.Fprintf(w, "✗ prepare: %v\n", err)

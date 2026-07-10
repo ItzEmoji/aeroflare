@@ -23,8 +23,8 @@ import (
 type PrepareConfig struct {
 	Compression string // zstd, xz, gzip, none
 	Workers     int
-	SigningKey  string // path to a Nix signing key, or "" for unsigned
-	CacheURL    string // "" = prepare the full closure (no upstream filtering)
+	SigningKey  string   // path to a Nix signing key, or "" for unsigned
+	CacheURLs   []string // empty = prepare the full closure (no upstream filtering)
 	KeepFiles   bool
 }
 
@@ -68,7 +68,7 @@ func flattenTasks(results []*prepare.Result) []preparedTask {
 }
 
 // Prepare walks the closure of paths and generates all NAR/narinfo artifacts once.
-// With cfg.CacheURL == "" the entire closure is prepared (no upstream filtering).
+// With cfg.CacheURLs empty the entire closure is prepared (no upstream filtering).
 func Prepare(paths []string, cfg PrepareConfig) (*PreparedSet, error) {
 	compType, err := compress.ParseType(cfg.Compression)
 	if err != nil {
@@ -91,7 +91,7 @@ func Prepare(paths []string, cfg PrepareConfig) (*PreparedSet, error) {
 	pcfg := &prepare.Config{
 		OutputDir:          outputDir,
 		Compression:        compType,
-		CacheURL:           cfg.CacheURL,
+		CacheURLs:          cfg.CacheURLs,
 		Workers:            cfg.Workers,
 		PrepareMissingRefs: true,
 		SigningKey:         signKey,

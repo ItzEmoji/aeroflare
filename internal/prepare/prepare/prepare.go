@@ -22,7 +22,7 @@ import (
 type Config struct {
 	OutputDir          string              // directory to write .nar and .narinfo files
 	Compression        compress.Type       // compression algorithm
-	CacheURL           string              // upstream binary cache URL (e.g. https://cache.nixos.org)
+	CacheURLs          []string            // upstream binary caches; empty disables reference filtering
 	Workers            int                 // number of concurrent workers for cache checking
 	PrepareMissingRefs bool                // if true, also generate NAR+narinfo for references not on the upstream cache, recursively
 	SigningKey         *signing.PrivateKey // if non-nil, narinfo files are signed with this key
@@ -301,16 +301,16 @@ func collectReferenceHashes(infos map[string]*store.PathInfo) ([]string, map[str
 	return hashes, hashToPath
 }
 
-// checkRefBatch checks existence of the given hashes on the upstream cache
-// configured in cfg. If no cache URL is configured or there are no hashes to
-// check, it returns an empty map (meaning: treat everything as unknown).
+// checkRefBatch checks existence of the given hashes against the upstream caches
+// configured in cfg. With no caches configured or no hashes to check it returns
+// an empty map, meaning: treat everything as unknown, upload it.
 func checkRefBatch(ctx context.Context, hashes []string, cfg *Config) (map[string]bool, error) {
-	if cfg.CacheURL == "" || len(hashes) == 0 {
+	if len(cfg.CacheURLs) == 0 || len(hashes) == 0 {
 		return make(map[string]bool), nil
 	}
 
-	c := cache.New(cfg.CacheURL, cache.WithMaxConns(cfg.Workers))
-	return c.ExistsBatch(ctx, hashes, cfg.Workers)
+	g := cache.NewGroup(cfg.CacheURLs, cache.WithMaxConns(cfg.Workers))
+	return g.ExistsBatch(ctx, hashes, cfg.Workers)
 }
 
 // checkReferences checks the given references against the upstream cache and

@@ -49,10 +49,15 @@ var prepareCmd = &cobra.Command{
 			}
 		}
 
+		var upstreamURLs []string
+		if upstreamCache != "" {
+			upstreamURLs = []string{upstreamCache}
+		}
+
 		cfg := &prepare.Config{
 			OutputDir:          outputDir,
 			Compression:        compType,
-			CacheURL:           upstreamCache,
+			CacheURLs:          upstreamURLs,
 			Workers:            workers,
 			PrepareMissingRefs: prepareRefs,
 			SigningKey:         signKey,
