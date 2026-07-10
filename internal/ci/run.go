@@ -39,10 +39,7 @@ func Run(spec RunSpec, w io.Writer) bool {
 		return false
 	}
 
-	var upstreams []string
-	if spec.UpstreamCache != "" && spec.UpstreamCache != "none" {
-		upstreams = append(upstreams, spec.UpstreamCache)
-	}
+	upstreams := spec.UpstreamCaches
 
 	// The proxy is a build-only substituter: it accelerates `nix build` by
 	// serving already-cached paths from the primary cache. It has no role in

@@ -72,13 +72,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	var upstreamCaches []string
+	if *upstream != "" {
+		upstreamCaches = []string{*upstream}
+	}
+
 	spec, err := ci.Resolve(fc, ci.Inputs{
-		Builds:        builds,
-		Caches:        caches,
-		Compression:   *compression,
-		SigningKey:    *signingKey,
-		Workers:       *workers,
-		UpstreamCache: *upstream,
+		Builds:         builds,
+		Caches:         caches,
+		Compression:    *compression,
+		SigningKey:     *signingKey,
+		Workers:        *workers,
+		UpstreamCaches: upstreamCaches,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "aeroflare-ci: %v\n", err)
