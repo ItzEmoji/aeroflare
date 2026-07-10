@@ -87,6 +87,10 @@ To upload the full closure, making the cache self-contained:
           upstream-cache: none
 ```
 
+On a re-run, only the paths a cache does not already hold are uploaded — see
+[Incremental Caching](docs/docs/explanation/incremental-caching.md) for how
+upstream filtering and registry blob deduplication combine to get there.
+
 ### With a config file
 
 Several caches, or settings you would rather keep in the repo:
@@ -98,6 +102,16 @@ Several caches, or settings you would rather keep in the repo:
         env:
           AEROFLARE_TOKEN_DOCKER_IO: ${{ secrets.DOCKERHUB_TOKEN }}
 ```
+
+`config` cannot be combined with `builds`/`cache` — an inline list replaces the
+file's list rather than extending it. In config mode `cache-token` is ignored;
+give each registry its own `AEROFLARE_TOKEN_<HOST>` variable.
+
+The action wraps the `aeroflare-ci` binary, which is CI-agnostic. See
+[CI Integration](docs/docs/how-to/ci-integration.md) for the full config-file
+reference, GitLab CI, and other runners, and
+[The `aeroflare-ci` Runner](docs/docs/explanation/aeroflare-ci.md) for its
+resolution, token, and exit-code rules.
 
 ```yaml
 # .aeroflare-ci.yaml
