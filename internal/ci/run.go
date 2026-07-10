@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
+	"github.com/itzemoji/aeroflare/internal/prepare/cache"
 	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/internal/push"
 )
@@ -17,6 +19,11 @@ func summaryLine(buildsTotal, buildsOK, pushesTotal, pushesOK, paths int) string
 	}
 	return fmt.Sprintf("summary: builds %d/%d  pushes %d/%d  paths %d  —  %s",
 		buildsOK, buildsTotal, pushesOK, pushesTotal, paths, status)
+}
+
+// nothingToPushLine renders the all-roots-already-upstream outcome.
+func nothingToPushLine(paths int) string {
+	return fmt.Sprintf("all %d build outputs are already upstream, nothing to push", paths)
 }
 
 // Run executes the smart pipeline: start a proxy substituter at the primary cache,
@@ -41,6 +48,16 @@ func Run(spec RunSpec, w io.Writer) bool {
 
 	upstreams := spec.UpstreamCaches
 
+	// One group, consulted twice: once for the build outputs below, and again
+	// inside prepare for their transitive references. A path skipped as a root
+	// is therefore also skipped as somebody's dependency.
+	var checker upstreamChecker
+	if len(upstreams) > 0 {
+		group := cache.NewGroup(upstreams, cache.WithMaxConns(spec.Workers))
+		group.SetWarnWriter(w)
+		checker = group
+	}
+
 	// The proxy is a build-only substituter: it accelerates `nix build` by
 	// serving already-cached paths from the primary cache. It has no role in
 	// prepare (which reads local store paths) or push (which uploads directly to
@@ -57,7 +74,7 @@ func Run(spec RunSpec, w io.Writer) bool {
 	}
 	up := "none"
 	if len(upstreams) > 0 {
-		up = upstreams[0]
+		up = strings.Join(upstreams, ", ")
 	}
 	fmt.Fprintf(w, "proxy 127.0.0.1:%d → %s  (upstream: %s)\n\n", port, primary.Raw, up)
 
@@ -83,11 +100,26 @@ func Run(spec RunSpec, w io.Writer) bool {
 		return false
 	}
 
-	prepared, err := push.Prepare(union, push.PrepareConfig{
+	roots, skipped, err := filterRoots(context.Background(), union, checker, spec.Workers)
+	if err != nil {
+		fmt.Fprintf(w, "✗ upstream check: %v\n", err)
+		fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, len(spec.Caches), 0, 0))
+		return false
+	}
+	if skipped > 0 {
+		fmt.Fprintf(w, "skip     %d build outputs already upstream\n", skipped)
+	}
+	if len(roots) == 0 {
+		fmt.Fprintf(w, "%s\n", nothingToPushLine(len(union)))
+		fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, 0, 0, 0))
+		return buildsOK == buildsTotal
+	}
+
+	prepared, err := push.Prepare(roots, push.PrepareConfig{
 		Compression: spec.Compression,
 		Workers:     spec.Workers,
 		SigningKey:  keyPath,
-		CacheURLs:   nil,
+		CacheURLs:   upstreams,
 	})
 	if err != nil {
 		fmt.Fprintf(w, "✗ prepare: %v\n", err)

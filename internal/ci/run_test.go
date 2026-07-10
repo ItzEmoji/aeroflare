@@ -24,3 +24,22 @@ func TestSummaryLine_Failure(t *testing.T) {
 		t.Errorf("expected FAILED marker, got %q", got)
 	}
 }
+
+func TestNothingToPushLine(t *testing.T) {
+	got := nothingToPushLine(12)
+	if !strings.Contains(got, "12") {
+		t.Errorf("expected the path count, got %q", got)
+	}
+	if !strings.Contains(got, "already upstream") {
+		t.Errorf("expected an already-upstream note, got %q", got)
+	}
+}
+
+// Every root already upstream is a success, not a failure: there is genuinely
+// nothing to do.
+func TestSummaryLine_NoPushesIsStillOK(t *testing.T) {
+	got := summaryLine(2, 2, 0, 0, 0)
+	if !strings.Contains(got, "OK") {
+		t.Errorf("expected OK, got %q", got)
+	}
+}
