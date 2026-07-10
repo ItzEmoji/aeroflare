@@ -40,3 +40,17 @@ func TestEnvOr(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestSplitEnvList_UpstreamCaches(t *testing.T) {
+	got := splitEnvList("https://cache.nixos.org\nhttps://my.cache\n")
+	if len(got) != 2 || got[0] != "https://cache.nixos.org" || got[1] != "https://my.cache" {
+		t.Errorf("got %v, want two upstream URLs", got)
+	}
+}
+
+func TestSplitEnvList_SingleNone(t *testing.T) {
+	got := splitEnvList("none")
+	if len(got) != 1 || got[0] != "none" {
+		t.Errorf("got %v, want [none]", got)
+	}
+}

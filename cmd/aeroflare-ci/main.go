@@ -44,14 +44,14 @@ func envOr(key, def string) string {
 }
 
 func main() {
-	var builds, caches stringList
+	var builds, caches, upstreams stringList
 	fs := flag.NewFlagSet("aeroflare-ci", flag.ContinueOnError)
 	fs.Var(&builds, "build", "flake installable to build (repeatable)")
 	fs.Var(&caches, "cache", "<registry>;<repository> push target (repeatable)")
 	configPath := fs.String("config", envOr("AEROFLARE_CI_CONFIG", ".aeroflare-ci.yaml"), "config file path")
 	compression := fs.String("compression", os.Getenv("AEROFLARE_CI_COMPRESSION"), "compression: zstd, xz, gzip, none")
 	signingKey := fs.String("signing-key", os.Getenv("AEROFLARE_CI_SIGNING_KEY"), "signing key path or env var name")
-	upstream := fs.String("upstream-cache", os.Getenv("AEROFLARE_CI_UPSTREAM_CACHE"), "upstream cache URL, 'none' to disable ref filtering")
+	fs.Var(&upstreams, "upstream-cache", "upstream cache URL (repeatable), or 'none' to disable filtering")
 	workers := fs.Int("workers", 0, "concurrent workers (0 = default 50)")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		os.Exit(2)
@@ -63,6 +63,9 @@ func main() {
 	if len(caches) == 0 {
 		caches = splitEnvList(os.Getenv("AEROFLARE_CI_CACHES"))
 	}
+	if len(upstreams) == 0 {
+		upstreams = splitEnvList(os.Getenv("AEROFLARE_CI_UPSTREAM_CACHE"))
+	}
 
 	// An explicit --config must exist; the default path is optional.
 	required := *configPath != ".aeroflare-ci.yaml"
@@ -72,18 +75,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	var upstreamCaches []string
-	if *upstream != "" {
-		upstreamCaches = []string{*upstream}
-	}
-
 	spec, err := ci.Resolve(fc, ci.Inputs{
 		Builds:         builds,
 		Caches:         caches,
 		Compression:    *compression,
 		SigningKey:     *signingKey,
 		Workers:        *workers,
-		UpstreamCaches: upstreamCaches,
+		UpstreamCaches: upstreams,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "aeroflare-ci: %v\n", err)
