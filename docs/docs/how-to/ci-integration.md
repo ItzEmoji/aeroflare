@@ -144,6 +144,9 @@ The schema also rejects `upstream-cache: []`, which the binary alone would read
 as "unset" and quietly replace with the default. Write `upstream-cache: none` if
 you mean no filtering.
 
+Every key, its type, and its default is listed in the
+[CI Configuration Schema](../reference/ci-configuration.md).
+
 ## GitLab CI
 
 There is no `gh` CLI and no attestation flow outside GitHub, so install

@@ -107,11 +107,14 @@ Several caches, or settings you would rather keep in the repo:
 file's list rather than extending it. In config mode `cache-token` is ignored;
 give each registry its own `AEROFLARE_TOKEN_<HOST>` variable.
 
+Every key is validated against a [JSON schema](schema/aeroflare-ci.schema.json);
+see the [CI Configuration Schema](docs/docs/reference/ci-configuration.md) for
+the full reference.
+
 The action wraps the `aeroflare-ci` binary, which is CI-agnostic. See
-[CI Integration](docs/docs/how-to/ci-integration.md) for the full config-file
-reference, GitLab CI, and other runners, and
-[The `aeroflare-ci` Runner](docs/docs/explanation/aeroflare-ci.md) for its
-resolution, token, and exit-code rules.
+[CI Integration](docs/docs/how-to/ci-integration.md) for GitLab CI and other
+runners, and [The `aeroflare-ci` Runner](docs/docs/explanation/aeroflare-ci.md)
+for its resolution, token, and exit-code rules.
 
 ```yaml
 # .aeroflare-ci.yaml

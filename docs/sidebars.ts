@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
         'how-to/running-proxy',
         'how-to/cache-population',
         'how-to/authentication',
+        'how-to/ci-integration',
       ],
     },
     {
@@ -56,6 +57,7 @@ const sidebars: SidebarsConfig = {
           ],
         },
         'reference/configuration',
+        'reference/ci-configuration',
         'reference/repository-layout',
         {
           type: 'category',
@@ -75,6 +77,8 @@ const sidebars: SidebarsConfig = {
       items: [
         'explanation/architecture',
         'explanation/oci-integration',
+        'explanation/aeroflare-ci',
+        'explanation/incremental-caching',
         'internals/architecture',
         'internals/subsystems',
         'internals/proxy-implementations',
