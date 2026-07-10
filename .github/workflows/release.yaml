@@ -26,10 +26,6 @@ jobs:
           config-file: .github/release-please-config.json
           manifest-file: version.json
 
-  # release-please creates the release as a draft (see release-please-config.json)
-  # and forces the tag into existence. This job attaches the binaries and then
-  # publishes the draft. A failed build therefore leaves an unpublished draft
-  # rather than a published release with no assets.
   build:
     needs: release
     if: ${{ needs.release.outputs.release_created == 'true' }}
@@ -39,15 +35,13 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      # The binaries embed version.json via //go:embed, so build the tagged tree
-      # rather than whatever main happens to point at now.
+
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.release.outputs.tag_name }}
       - uses: actions/setup-go@v6
         with:
           go-version: stable
-
       - name: Build release binaries
         run: |
           set -euo pipefail
@@ -66,21 +60,13 @@ jobs:
               rm "stage/$bin"
             done
           done
-          (cd dist && sha256sum ./*.tar.zst > SHA256SUMS)
-
-      - name: Attest build provenance
+          
+      - name: Attest artifacts
         id: attest
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest@v4
         with:
           subject-path: dist/*.tar.zst
 
-      # Ship the Sigstore bundle so consumers can verify without querying the
-      # attestation API. The trusted root is deliberately not shipped: it rotates,
-      # and `gh attestation trusted-root` fetches the current one.
-      - name: Stage provenance bundle
-        run: cp "${{ steps.attest.outputs.bundle-path }}" dist/provenance.jsonl
-
-      # Omitting `draft:` publishes the draft release after the upload.
       - name: Upload assets and publish release
         uses: softprops/action-gh-release@v3
         with:
@@ -88,18 +74,18 @@ jobs:
           files: dist/*
           fail_on_unmatched_files: true
 
-      # `uses: ItzEmoji/aeroflare@v1` needs a moving major tag. Derive the major
-      # from version.json so a future 2.x needs no edit here. Pushes made with
-      # GITHUB_TOKEN do not trigger workflows, which is what we want.
       - name: Move the major version tag
         env:
           TAG: ${{ needs.release.outputs.tag_name }}
         run: |
           set -euo pipefail
-          version=$(jq -er '.["."]' version.json)
-          major="v${version%%.*}"
-          git config user.name  "github-actions[bot]"
+
+          major="${TAG%%.*}"
+
+          git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f "$major" "$TAG"
-          git push -f origin "refs/tags/$major"
-          echo "moved $major -> $TAG"
+
+          git tag --force "$major" "$TAG"
+          git push --force origin "refs/tags/$major"
+
+          echo "Moved $major -> $TAG"

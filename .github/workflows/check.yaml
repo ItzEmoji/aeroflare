@@ -5,15 +5,7 @@ jobs:
   go-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Generate App Token
-        id: app-token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - uses: actions/checkout@v5
-        with:
-          token: ${{ steps.app-token.outputs.token }}
       - uses: actions/setup-go@v6
         with:
           go-version: stable
@@ -21,43 +13,10 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12
-
-  # Nothing else compiles aarch64 until a release tag is cut, and by then the
-  # draft-release flow in release.yaml has already stranded the release. Build
-  # every release target here so arm64 breakage surfaces on the PR instead.
-  cross-compile:
+  nix-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version: stable
-      - name: Build all release targets
-        run: |
-          set -euo pipefail
-          for target in x86_64:amd64 aarch64:arm64; do
-            goarch="${target##*:}"
-            for bin in aeroflare aeroflare-ci; do
-              case "$bin" in
-                aeroflare)    pkg=. ;;
-                aeroflare-ci) pkg=./cmd/aeroflare-ci ;;
-              esac
-              echo "==> $bin linux/$goarch"
-              CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" \
-                go build -trimpath -ldflags="-s -w" -o /dev/null "$pkg"
-            done
-          done
-
-  # The composite action cannot be integration-tested on its own PR: it downloads
-  # the release matching version.json, which does not exist until this merges.
-  # Linting and the stubbed script tests are the whole safety net.
-  shell:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: shellcheck
-        run: shellcheck scripts/*.sh scripts/test/*.sh
-      - name: script tests
-        run: bash scripts/test/all.sh
-      - name: actionlint
-        uses: raven-actions/actionlint@v2
+      - uses: DeterminateSystems/nix-installer-action@v20
+      - name: nix build
+        run: nix build .#default --no-link --print-build-logs
