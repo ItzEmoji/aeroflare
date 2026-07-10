@@ -29,8 +29,11 @@ inputs:
     required: false
   upstream-cache:
     description: |
-      Upstream cache used to skip already-cached paths.
-      Defaults to https://cache.nixos.org. Use `none` to disable filtering.
+      Upstream cache(s) used to skip already-cached paths, newline- or
+      comma-separated. Defaults to https://cache.nixos.org. An explicit value
+      replaces the default rather than extending it — list cache.nixos.org
+      yourself if you still want it. Use `none` (alone) to disable filtering
+      and upload the full closure.
     required: false
   signing-key:
     description: |

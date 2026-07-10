@@ -40,9 +40,16 @@
       "description": "Concurrent upload workers."
     },
     "upstream-cache": {
-      "type": "string",
       "default": "https://cache.nixos.org",
-      "description": "Upstream cache whose paths are skipped. Use 'none' to disable filtering."
+      "description": "Upstream cache(s) whose paths are skipped, as a string or a list. Defaults to https://cache.nixos.org. An explicit value replaces the default rather than extending it, so list cache.nixos.org yourself if you still want it. Use 'none' (alone) to disable filtering.",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      ]
     }
   }
 }

@@ -63,6 +63,30 @@ jobs:
 `ghcr.io` authenticates with the workflow's `github.token` automatically. For any
 other registry, pass `cache-token`.
 
+### Upstream caches
+
+By default only store paths missing from `https://cache.nixos.org` are uploaded,
+so your cache holds your artifacts rather than a copy of nixpkgs. Name other
+upstreams to skip their paths too:
+
+```yaml
+        with:
+          cache: ghcr.io;${{ github.repository_owner }}/nix-cache
+          upstream-cache: |
+            https://cache.nixos.org
+            https://nix-community.cachix.org
+```
+
+An explicit `upstream-cache` **replaces** the default — list `cache.nixos.org`
+yourself if you still want its paths skipped.
+
+To upload the full closure, making the cache self-contained:
+
+```yaml
+        with:
+          upstream-cache: none
+```
+
 ### With a config file
 
 Several caches, or settings you would rather keep in the repo:
