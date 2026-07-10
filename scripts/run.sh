@@ -45,13 +45,21 @@ else
   fi
 fi
 
+# upstream-cache is optional and, like builds, may be a newline- or
+# comma-separated list: emit one --upstream-cache per entry.
+if [ -n "${INPUT_UPSTREAM_CACHE:-}" ]; then
+  mapfile -t upstream_cache_entries < <(split_list "$INPUT_UPSTREAM_CACHE")
+  for u in "${upstream_cache_entries[@]}"; do
+    args+=(--upstream-cache "$u")
+  done
+fi
+
 # --- scalars: append only when set, so the binary's defaults still apply -----
 # Full `if` blocks, not `[ -n "$x" ] && args+=(...)`: the latter is safe under
 # `set -e` (a failing test is exempt as a non-final member of an && list) but it
 # trips shellcheck SC2015 and misleads readers.
 if [ -n "${INPUT_COMPRESSION:-}" ];    then args+=(--compression    "$INPUT_COMPRESSION");    fi
 if [ -n "${INPUT_WORKERS:-}" ];        then args+=(--workers        "$INPUT_WORKERS");        fi
-if [ -n "${INPUT_UPSTREAM_CACHE:-}" ]; then args+=(--upstream-cache "$INPUT_UPSTREAM_CACHE"); fi
 if [ -n "${INPUT_SIGNING_KEY:-}" ];    then args+=(--signing-key    "$INPUT_SIGNING_KEY");    fi
 
 exec "$bin" "${args[@]}"

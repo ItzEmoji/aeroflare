@@ -48,6 +48,29 @@ assert_contains "passes --workers"     "ARG:--workers"     "$out"
 assert_contains "workers value"        "ARG:8"             "$out"
 assert_contains "passes --upstream-cache" "ARG:--upstream-cache" "$out"
 assert_contains "passes --signing-key"    "ARG:--signing-key"    "$out"
+assert_eq "single upstream-cache emits exactly 1 --upstream-cache" \
+  "1" "$(grep -c '^ARG:--upstream-cache$' <<<"$out")"
+assert_contains "upstream-cache none value" "ARG:none" "$out"
+
+# --- upstream-cache: newline- and comma-separated lists ---------------------
+out=$(run_sh INPUT_CACHE='ghcr.io;me/cache' INPUT_BUILDS='.#default' \
+             INPUT_UPSTREAM_CACHE=$'https://a\nhttps://b')
+assert_eq "newline-separated upstream-cache emits 2 flags" \
+  "2" "$(grep -c '^ARG:--upstream-cache$' <<<"$out")"
+assert_contains "newline-separated first entry"  "ARG:https://a" "$out"
+assert_contains "newline-separated second entry" "ARG:https://b" "$out"
+
+out=$(run_sh INPUT_CACHE='ghcr.io;me/cache' INPUT_BUILDS='.#default' \
+             INPUT_UPSTREAM_CACHE='https://a,https://b')
+assert_eq "comma-separated upstream-cache emits 2 flags" \
+  "2" "$(grep -c '^ARG:--upstream-cache$' <<<"$out")"
+assert_contains "comma-separated first entry"  "ARG:https://a" "$out"
+assert_contains "comma-separated second entry" "ARG:https://b" "$out"
+
+# --- upstream-cache: unset produces no flag ---------------------------------
+out=$(run_sh INPUT_CACHE='ghcr.io;me/cache' INPUT_BUILDS='.#default')
+assert_eq "no --upstream-cache when unset" \
+  "0" "$(grep -c '^ARG:--upstream-cache$' <<<"$out")"
 
 # --- config mode ------------------------------------------------------------
 out=$(run_sh INPUT_CONFIG=.aeroflare-ci.yaml)
