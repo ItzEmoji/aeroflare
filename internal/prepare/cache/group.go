@@ -33,6 +33,7 @@ func NewGroup(baseURLs []string, opts ...Option) *Group {
 }
 
 // SetWarnWriter redirects per-member failure warnings. Defaults to os.Stderr.
+// It is not safe to call concurrently with ExistsBatch and is intended to be called once at construction time.
 func (g *Group) SetWarnWriter(w io.Writer) { g.warn = w }
 
 // Len reports the number of member caches.

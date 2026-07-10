@@ -106,7 +106,7 @@ func Run(spec RunSpec, w io.Writer) bool {
 		fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, len(spec.Caches), 0, 0))
 		return false
 	}
-	if skipped > 0 {
+	if skipped > 0 && len(roots) > 0 {
 		fmt.Fprintf(w, "skip     %d build outputs already upstream\n", skipped)
 	}
 	if len(roots) == 0 {
@@ -132,21 +132,21 @@ func Run(spec RunSpec, w io.Writer) bool {
 
 	pushesTotal := len(spec.Caches)
 	pushesOK := 0
-	for _, cache := range spec.Caches {
-		token := ResolveToken(cache.Registry)
+	for _, c := range spec.Caches {
+		token := ResolveToken(c.Registry)
 		if token == "" {
-			fmt.Fprintf(w, "✗ push    → %s   auth: no token (set %s)\n", cache.Raw, TokenEnvVar(cache.Registry))
+			fmt.Fprintf(w, "✗ push    → %s   auth: no token (set %s)\n", c.Raw, TokenEnvVar(c.Registry))
 			continue
 		}
 		reporter := NewPlainReporter(w, "  ")
-		target := push.Target{Registry: cache.Registry, Repository: cache.Repository, Token: token}
+		target := push.Target{Registry: c.Registry, Repository: c.Repository, Token: token}
 		res, err := prepared.PushTo(target, reporter)
 		if err != nil {
-			fmt.Fprintf(w, "✗ push    → %s   %v\n", cache.Raw, err)
+			fmt.Fprintf(w, "✗ push    → %s   %v\n", c.Raw, err)
 			continue
 		}
 		pushesOK++
-		fmt.Fprintf(w, "✓ push    → %s   (%d pushed)\n", cache.Raw, res.Uploaded)
+		fmt.Fprintf(w, "✓ push    → %s   (%d pushed)\n", c.Raw, res.Uploaded)
 	}
 
 	fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, pushesTotal, pushesOK, pathCount))
