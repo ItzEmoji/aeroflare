@@ -74,12 +74,17 @@ func TestFilterRoots_DropsAllWhenAllUpstream(t *testing.T) {
 // An unparseable path cannot be classified, so it must be uploaded. Dropping it
 // would silently lose a build output.
 func TestFilterRoots_KeepsUnparseablePath(t *testing.T) {
-	f := &fakeChecker{present: map[string]bool{}}
-	kept, _, err := filterRoots(context.Background(), []string{"not-a-store-path"}, f, 4)
+	// Use "/nix/store/nodash" which has no dash in the basename, so ParsePath fails.
+	unparseable := "/nix/store/nodash"
+	// Populate present with a hash that would skip a path if it parsed. Since
+	// the path is unparseable, it's kept despite a matching hash being available,
+	// proving the parseErr branch is taken.
+	f := &fakeChecker{present: map[string]bool{"00000000000000000000000000000000": true}}
+	kept, _, err := filterRoots(context.Background(), []string{unparseable}, f, 4)
 	if err != nil {
 		t.Fatalf("filterRoots: %v", err)
 	}
-	if len(kept) != 1 || kept[0] != "not-a-store-path" {
+	if len(kept) != 1 || kept[0] != unparseable {
 		t.Errorf("kept = %v, want the unparseable path retained", kept)
 	}
 }
