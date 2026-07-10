@@ -117,6 +117,37 @@ func LoadFile(path string, required bool) (FileConfig, bool, error) {
 	return fc, true, nil
 }
 
+// actionInputNames are the GitHub Action's input keys. A build entry starting
+// with one of these followed by a colon is almost certainly a YAML indentation
+// mistake rather than a flake installable.
+var actionInputNames = []string{
+	"builds", "cache", "cache-token", "compression", "config",
+	"signing-key", "token", "upstream-cache", "workers",
+}
+
+// validateBuilds rejects build entries that are really a mis-indented action
+// input. `builds: |` is a YAML literal block scalar, so a sibling input indented
+// one level too deep becomes another line of the builds string, and nix is then
+// handed an installable like "upstream-cache: https://cache.nixos.org". Catching
+// it here beats a confusing `nix build` failure.
+func validateBuilds(builds []string) error {
+	for _, b := range builds {
+		entry := strings.TrimSpace(b)
+		for _, name := range actionInputNames {
+			if !strings.HasPrefix(entry, name) {
+				continue
+			}
+			if rest := entry[len(name):]; strings.HasPrefix(rest, ":") {
+				return fmt.Errorf(
+					"builds contains %q, which is the %q action input, not a flake installable: "+
+						"check your indentation — a line under `builds: |` is part of the builds "+
+						"value, not a sibling input", entry, name)
+			}
+		}
+	}
+	return nil
+}
+
 // Resolve merges a file config with inline inputs (inputs override; list fields
 // replace rather than append), applies defaults, validates, and parses caches.
 func Resolve(fc FileConfig, in Inputs) (RunSpec, error) {
@@ -157,6 +188,9 @@ func Resolve(fc FileConfig, in Inputs) (RunSpec, error) {
 
 	if len(spec.Builds) == 0 {
 		return RunSpec{}, fmt.Errorf("no builds configured: set 'builds' in the config file or pass --build")
+	}
+	if err := validateBuilds(spec.Builds); err != nil {
+		return RunSpec{}, err
 	}
 	if len(rawCaches) == 0 {
 		return RunSpec{}, fmt.Errorf("no caches configured: set 'caches' in the config file or pass --cache")

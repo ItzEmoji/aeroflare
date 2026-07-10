@@ -172,3 +172,71 @@ func TestResolve_InputsOverrideFileUpstreams(t *testing.T) {
 		t.Errorf("inline none must override the file, got %v", spec.UpstreamCaches)
 	}
 }
+
+func TestValidateBuilds_AcceptsRealInstallables(t *testing.T) {
+	ok := []string{
+		".#default",
+		"github:ItzEmoji/nvim#default",
+		".#packages.x86_64-linux.foo",
+		"git+https://example.com/repo#pkg",
+		"nixpkgs#hello",
+	}
+	for _, b := range ok {
+		if err := validateBuilds([]string{b}); err != nil {
+			t.Errorf("validateBuilds(%q) = %v, want nil", b, err)
+		}
+	}
+}
+
+func TestValidateBuilds_RejectsMisindentedActionInputs(t *testing.T) {
+	bad := []string{
+		"upstream-cache: https://cache.nixos.org",
+		"upstream-cache:",
+		"cache: ghcr.io;me/c",
+		"compression: zstd",
+		"workers: 50",
+		"signing-key: KEY",
+		"config: .aeroflare-ci.yaml",
+		"token: abc",
+		"cache-token: abc",
+		"builds: .#default",
+	}
+	for _, b := range bad {
+		err := validateBuilds([]string{b})
+		if err == nil {
+			t.Errorf("validateBuilds(%q) = nil, want an error", b)
+			continue
+		}
+		if !strings.Contains(err.Error(), b) {
+			t.Errorf("error for %q should quote the offending entry, got %v", b, err)
+		}
+		if !strings.Contains(err.Error(), "indent") {
+			t.Errorf("error for %q should explain the indentation cause, got %v", b, err)
+		}
+	}
+}
+
+// A name that merely starts with a known input name is a valid installable.
+func TestValidateBuilds_DoesNotRejectPrefixLookalikes(t *testing.T) {
+	ok := []string{"cache-token-thing#pkg", "workers#default", "tokenizer:x"}
+	for _, b := range ok {
+		if err := validateBuilds([]string{b}); err != nil {
+			t.Errorf("validateBuilds(%q) = %v, want nil", b, err)
+		}
+	}
+}
+
+func TestValidateBuilds_ChecksEveryEntry(t *testing.T) {
+	err := validateBuilds([]string{".#default", "upstream-cache: https://x"})
+	if err == nil {
+		t.Fatal("expected the second entry to be rejected")
+	}
+}
+
+func TestResolve_RejectsMisindentedBuild(t *testing.T) {
+	fc := FileConfig{Caches: []string{"ghcr.io;me/cache"}}
+	in := Inputs{Builds: []string{"github:ItzEmoji/nvim#default", "upstream-cache: https://cache.nixos.org"}}
+	if _, err := Resolve(fc, in); err == nil {
+		t.Fatal("Resolve should reject a build entry that is a mis-indented action input")
+	}
+}
