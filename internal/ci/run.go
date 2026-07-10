@@ -26,9 +26,20 @@ func nothingToPushLine(paths int) string {
 	return fmt.Sprintf("all %d build outputs are already upstream, nothing to push", paths)
 }
 
+// prepareScope names what the prepared set actually contains. With no upstreams
+// the whole closure is prepared; otherwise it is the closure minus whatever an
+// upstream already serves.
+func prepareScope(upstreams []string) string {
+	if len(upstreams) == 0 {
+		return "full closure"
+	}
+	return "closure minus upstream"
+}
+
 // Run executes the smart pipeline: start a proxy substituter at the primary cache,
-// build every installable through it, prepare the full closure once, and upload it
-// to every cache. Returns true iff every build and push succeeded.
+// build every installable through it, drop the outputs and references an upstream
+// cache already serves, prepare what remains once, and upload it to every cache.
+// Returns true iff every build and push succeeded.
 func Run(spec RunSpec, w io.Writer) bool {
 	fmt.Fprintf(w, "aeroflare-ci: %d builds, %d caches\n", len(spec.Builds), len(spec.Caches))
 
@@ -128,7 +139,7 @@ func Run(spec RunSpec, w io.Writer) bool {
 	}
 	defer prepared.Cleanup()
 	pathCount := prepared.PathCount()
-	fmt.Fprintf(w, "prepare  %d store paths (full closure)\n", pathCount)
+	fmt.Fprintf(w, "prepare  %d store paths (%s)\n", pathCount, prepareScope(upstreams))
 
 	pushesTotal := len(spec.Caches)
 	pushesOK := 0

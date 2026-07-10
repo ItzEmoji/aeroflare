@@ -43,3 +43,20 @@ func TestSummaryLine_NoPushesIsStillOK(t *testing.T) {
 		t.Errorf("expected OK, got %q", got)
 	}
 }
+
+func TestPrepareScope_NoUpstreamsIsFullClosure(t *testing.T) {
+	got := prepareScope(nil)
+	if got != "full closure" {
+		t.Errorf("prepareScope(nil) = %q, want %q", got, "full closure")
+	}
+}
+
+func TestPrepareScope_WithUpstreamsIsFiltered(t *testing.T) {
+	got := prepareScope([]string{"https://cache.nixos.org"})
+	if got == "full closure" {
+		t.Fatalf("with an upstream configured the set is not the full closure, got %q", got)
+	}
+	if !strings.Contains(got, "upstream") {
+		t.Errorf("expected the scope to mention upstream, got %q", got)
+	}
+}
