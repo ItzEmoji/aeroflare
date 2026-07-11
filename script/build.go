@@ -156,7 +156,7 @@ func distAll() error {
 // (at <tmp>/bin/<name>) and archives it into archive with the member path
 // bin/<name>, so the release asset follows a small FHS-style convention.
 func packageTarball(archive string, bin distBinary, target archTarget) error {
-	tmp, err := os.MkdirTemp("", "aeroflare-dist-")
+	tmp, err := os.MkdirTemp("out", ".aeroflare-dist-")
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,11 @@ func packageTarball(archive string, bin distBinary, target archTarget) error {
 		return err
 	}
 
-	return run("tar", "--zstd", "-cf", archive, "-C", tmp, "bin/"+bin.name)
+	tmpArchive := filepath.Join(tmp, filepath.Base(archive))
+	if err := run("tar", "--zstd", "-cf", tmpArchive, "-C", tmp, "bin/"+bin.name); err != nil {
+		return err
+	}
+	return os.Rename(tmpArchive, archive)
 }
 
 func clean() error {
@@ -206,14 +210,15 @@ func sourceFilesLaterThan(t time.Time) bool {
 		if foundLater {
 			return filepath.SkipDir
 		}
-		if len(path) > 1 && (path[0] == '.' || path[0] == '_') {
+		name := filepath.Base(path)
+		if len(name) > 1 && (name[0] == '.' || name[0] == '_') {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if info.IsDir() {
-			if name := filepath.Base(path); name == "vendor" || name == "node_modules" || name == "out" {
+			if name == "vendor" || name == "node_modules" || name == "out" {
 				return filepath.SkipDir
 			}
 			return nil
