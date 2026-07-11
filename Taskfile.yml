@@ -1,0 +1,38 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - go run script/build.go build
+
+  build-ci:
+    cmds:
+      - go run script/build.go build-ci
+
+  build-all:
+    cmds:
+      - go run script/build.go build-all
+
+  dist:
+    cmds:
+      - go run script/build.go dist
+
+  dist-ci:
+    cmds:
+      - go run script/build.go dist-ci
+
+  dist-all:
+    cmds:
+      - go run script/build.go dist-all
+
+  clean:
+    cmds:
+      - go run script/build.go clean
+
+  lint:
+    cmds:
+      - golangci-lint run ./...
+
+  test:
+    cmds:
+      - go test ./...
