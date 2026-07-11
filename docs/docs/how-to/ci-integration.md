@@ -136,9 +136,6 @@ force the token exchange.
 The Nix daemon is ignoring `extra-substituters` because the build user is not
 trusted. Add the user to `trusted-users` in `nix.conf`, or run as root.
 
-**`builds contains "…", which is the "…" action input`**
-A YAML indentation mistake under `builds: |`. Dedent the input.
-
 **Only one installable is built despite a config file listing several.**
 An inline `--build` or `builds:` input replaced the file's list. Lists replace;
 they never merge.
