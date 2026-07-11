@@ -1,38 +1,57 @@
 version: '3'
 
 tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task: help
+
   build:
+    desc: Build the aeroflare binary for the host OS/arch into ./out/aeroflare
     cmds:
       - go run script/build.go build
 
   build-ci:
+    desc: Build the aeroflare-ci binary for the host OS/arch into ./out/aeroflare-ci
     cmds:
       - go run script/build.go build-ci
 
   build-all:
+    desc: Build both aeroflare and aeroflare-ci for the host OS/arch
     cmds:
       - go run script/build.go build-all
 
   dist:
+    desc: Cross-compile aeroflare release tarballs (linux/amd64, linux/arm64) into ./out/
     cmds:
       - go run script/build.go dist
 
   dist-ci:
+    desc: Cross-compile aeroflare-ci release tarballs into ./out/
     cmds:
       - go run script/build.go dist-ci
 
   dist-all:
+    desc: Cross-compile release tarballs for both binaries
     cmds:
       - go run script/build.go dist-all
 
   clean:
+    desc: Remove ./out/
     cmds:
       - go run script/build.go clean
 
   lint:
+    desc: Run golangci-lint
     cmds:
       - golangci-lint run ./...
 
   test:
+    desc: Run go test ./...
     cmds:
       - go test ./...
+
+  help:
+    desc: Show available tasks
+    cmds:
+      - task --list
