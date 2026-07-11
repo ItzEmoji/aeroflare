@@ -5,6 +5,4 @@ result
 docs/superpowers/
 .superpowers/
 .wrangler
-bin/
-dist/
-stage/
+out/
