@@ -6,7 +6,7 @@ title: CI Configuration Schema
 # CI Configuration Schema
 
 The `.aeroflare-ci.yaml` file configures [`aeroflare-ci`](../explanation/aeroflare-ci.md)
-and the [GitHub Action](../how-to/ci-integration.md) in `config` mode. It is
+and the [GitHub Action](../how-to/github-action.md) in `config` mode. It is
 validated by a JSON Schema published alongside the source:
 
 ```
@@ -134,5 +134,6 @@ for the full table.
 
 ## Related
 
-- [CI Integration](../how-to/ci-integration.md) — using this file from GitHub Actions, GitLab CI, and elsewhere
+- [GitHub Action](../how-to/github-action.md) — using this file in `config:` mode
+- [CI Integration](../how-to/ci-integration.md) — GitLab CI and generic runners
 - [The `aeroflare-ci` Runner](../explanation/aeroflare-ci.md) — resolution, tokens, exit codes

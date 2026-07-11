@@ -12,7 +12,9 @@ of Nix flake installables and push the results to one or more OCI caches.
 It knows nothing about GitHub. The GitHub Action is a thin wrapper that
 downloads this binary and translates action inputs into flags. Every capability
 the Action exposes is therefore reachable from any CI system, or from your
-laptop — see [CI Integration](../how-to/ci-integration.md) for recipes.
+laptop — see [GitHub Action](../how-to/github-action.md) for the Action itself,
+or [CI Integration](../how-to/ci-integration.md) for GitLab CI and generic
+runners.
 
 ## The pipeline
 
@@ -207,6 +209,7 @@ one of the binaries in the default package's `bin/`.
 
 ## Related
 
-- [CI Integration](../how-to/ci-integration.md) — GitHub Actions, GitLab CI, and generic runners
+- [GitHub Action](../how-to/github-action.md) — the Action itself
+- [CI Integration](../how-to/ci-integration.md) — GitLab CI and generic runners
 - [Incremental Caching](./incremental-caching.md) — what gets skipped, and why
 - [Architecture & Design](./architecture.md) — the wider system
