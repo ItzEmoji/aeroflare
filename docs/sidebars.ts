@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
         'how-to/running-proxy',
         'how-to/cache-population',
         'how-to/authentication',
+        'how-to/github-action',
         'how-to/ci-integration',
       ],
     },
