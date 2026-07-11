@@ -24,6 +24,30 @@ dist-ci: ## Cross-compile aeroflare-ci release tarballs into ./out/
 dist-all: ## Cross-compile release tarballs for both binaries
 	go run script/build.go dist-all
 
+.PHONY: install
+install: ## Build aeroflare and install it to PREFIX/bin (default /usr/local)
+	go run script/build.go install
+
+.PHONY: install-ci
+install-ci: ## Build aeroflare-ci and install it to PREFIX/bin (default /usr/local)
+	go run script/build.go install-ci
+
+.PHONY: install-all
+install-all: ## Build both and install them to PREFIX/bin (default /usr/local)
+	go run script/build.go install-all
+
+.PHONY: install-release
+install-release: ## Fetch the aeroflare release from GitHub and install it to PREFIX/bin
+	go run script/build.go install-release
+
+.PHONY: install-release-ci
+install-release-ci: ## Fetch the aeroflare-ci release from GitHub and install it to PREFIX/bin
+	go run script/build.go install-release-ci
+
+.PHONY: install-release-all
+install-release-all: ## Fetch both releases from GitHub and install them to PREFIX/bin
+	go run script/build.go install-release-all
+
 .PHONY: clean
 clean: ## Remove ./out/
 	go run script/build.go clean

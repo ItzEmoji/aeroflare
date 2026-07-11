@@ -28,6 +28,30 @@ dist-ci:
 dist-all:
     go run script/build.go dist-all
 
+# Build aeroflare and install it to PREFIX/bin (default /usr/local)
+install *args:
+    go run script/build.go install {{args}}
+
+# Build aeroflare-ci and install it to PREFIX/bin (default /usr/local)
+install-ci *args:
+    go run script/build.go install-ci {{args}}
+
+# Build both and install them to PREFIX/bin (default /usr/local)
+install-all *args:
+    go run script/build.go install-all {{args}}
+
+# Fetch the aeroflare release from GitHub and install it to PREFIX/bin
+install-release *args:
+    go run script/build.go install-release {{args}}
+
+# Fetch the aeroflare-ci release from GitHub and install it to PREFIX/bin
+install-release-ci *args:
+    go run script/build.go install-release-ci {{args}}
+
+# Fetch both releases from GitHub and install them to PREFIX/bin
+install-release-all *args:
+    go run script/build.go install-release-all {{args}}
+
 # Remove ./out/
 clean:
     go run script/build.go clean
