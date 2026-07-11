@@ -45,18 +45,18 @@ jobs:
       - name: Build release binaries
         env:
           AEROFLARE_VERSION: ${{ needs.release.outputs.tag_name }}
-        run: make dist
+        run: make dist-all
       - name: Attest artifacts
         id: attest
         uses: actions/attest@v4
         with:
-          subject-path: dist/*.tar.zst
+          subject-path: out/*.tar.zst
 
       - name: Upload assets and publish release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.release.outputs.tag_name }}
-          files: dist/*
+          files: out/*
           fail_on_unmatched_files: true
 
       - name: Move the major version tag
