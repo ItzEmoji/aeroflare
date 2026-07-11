@@ -63,25 +63,9 @@ other registry takes a `cache-token`. By default only store paths missing from
 `https://cache.nixos.org` are uploaded, so your cache holds your artifacts
 rather than a copy of nixpkgs.
 
-Linux runners only (`x86_64` or `aarch64`). Pin to `v1.8.0` or later — earlier
-releases ship no binaries, and the action will tell you so.
-
-For several caches, a `.aeroflare-ci.yaml` config file, GitLab CI, or any other
-runner, see the documentation:
-
-- [CI Integration](https://aeroflare.pages.dev/docs/how-to/ci-integration) — `config` mode, multiple caches, GitLab CI, generic runners
-- [CI Configuration Schema](https://aeroflare.pages.dev/docs/reference/ci-configuration) — every `.aeroflare-ci.yaml` key, type, and default
-- [The `aeroflare-ci` Runner](https://aeroflare.pages.dev/docs/explanation/aeroflare-ci) — precedence, token resolution, exit codes
-- [Incremental Caching](https://aeroflare.pages.dev/docs/explanation/incremental-caching) — what is skipped on a re-run, and why
-
-### Verifying the binaries yourself
-
-Every release archive carries SLSA build provenance, which the action checks on
-every run. To check by hand:
-
-```bash
-gh attestation verify aeroflare-ci-x86_64.tar.zst --repo ItzEmoji/aeroflare
-```
+Full guide, including advanced `config:` mode, multiple caches, GitLab CI,
+generic runners, and binary verification:
+[GitHub Action](https://aeroflare.pages.dev/docs/how-to/github-action).
 
 ---
 
