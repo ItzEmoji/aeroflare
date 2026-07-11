@@ -21,6 +21,7 @@ buildGoModule (finalAttrs: {
   ldflags = [
     "-s"
     "-w"
+    "-X github.com/itzemoji/aeroflare/internal/build.Version=${finalAttrs.version}"
   ];
 
   meta = {
