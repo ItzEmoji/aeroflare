@@ -3,7 +3,7 @@
 // version/date metadata and invokes `go build` with the right ldflags, so
 // the same logic runs locally and in CI.
 //
-// Usage: go run script/build.go <task>
+// Usage: go run script/build.go <task> [--prefix=VALUE]
 //
 // Known tasks:
 //
@@ -30,6 +30,26 @@
 //	dist-all:
 //	  Runs dist then dist-ci.
 //
+//	install:
+//	  Builds aeroflare (like build) and copies it to <prefix>/bin/aeroflare.
+//
+//	install-ci:
+//	  Builds aeroflare-ci (like build-ci) and copies it to
+//	  <prefix>/bin/aeroflare-ci.
+//
+//	install-all:
+//	  Runs install then install-ci.
+//
+//	install-release:
+//	  Fetches the aeroflare release tarball from GitHub (no local build)
+//	  and copies the extracted binary to <prefix>/bin/aeroflare.
+//
+//	install-release-ci:
+//	  Same as install-release, for aeroflare-ci.
+//
+//	install-release-all:
+//	  Runs install-release then install-release-ci.
+//
 //	clean:
 //	  Removes out/.
 //
@@ -37,17 +57,29 @@
 // tracked Go source files, printing "<path>: up to date" instead of
 // rebuilding it.
 //
+// The install* tasks resolve <prefix> as: --prefix=VALUE (or --prefix
+// VALUE) if given, else the PREFIX environment variable, else
+// /usr/local.
+//
 // Supported environment variables:
 //   - AEROFLARE_VERSION: overrides the version baked into the binary
+//     (build/dist tasks), or pins the release tag to fetch
+//     (install-release tasks)
+//   - AEROFLARE_REPO: GitHub repo to fetch releases from for
+//     install-release tasks (default ItzEmoji/aeroflare)
+//   - PREFIX: install prefix for install* tasks (default /usr/local)
 //   - SOURCE_DATE_EPOCH: enables reproducible build dates
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -67,7 +99,8 @@ var distTargets = []archTarget{
 	{label: "aarch64", goarch: "arm64"},
 }
 
-// distBinary is one binary that build/dist tasks build and package.
+// distBinary is one binary that build/dist/install tasks build, package,
+// or install.
 type distBinary struct {
 	name string // output binary name, and out/<name>-<label>.tar.zst
 	pkg  string // package path passed to `go build`
@@ -77,13 +110,14 @@ var aeroflareBin = distBinary{name: "aeroflare", pkg: "."}
 var aeroflareCIBin = distBinary{name: "aeroflare-ci", pkg: "./cmd/aeroflare-ci"}
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: go run script/build.go <task>")
+	task, prefixFlag, err := parseArgs(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "usage: go run script/build.go <task> [--prefix=VALUE]")
 		os.Exit(1)
 	}
 
-	var err error
-	switch task := os.Args[1]; task {
+	switch task {
 	case "build":
 		err = buildOne(aeroflareBin)
 	case "build-ci":
@@ -96,6 +130,18 @@ func main() {
 		err = distOne(aeroflareCIBin)
 	case "dist-all":
 		err = distAll()
+	case "install":
+		err = installOne(aeroflareBin, prefixFlag)
+	case "install-ci":
+		err = installOne(aeroflareCIBin, prefixFlag)
+	case "install-all":
+		err = installAll(prefixFlag)
+	case "install-release":
+		err = installReleaseOne(aeroflareBin, prefixFlag)
+	case "install-release-ci":
+		err = installReleaseOne(aeroflareCIBin, prefixFlag)
+	case "install-release-all":
+		err = installReleaseAll(prefixFlag)
 	case "clean":
 		err = clean()
 	default:
@@ -107,6 +153,44 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// parseArgs splits args into a task name and an optional --prefix value,
+// accepting both `--prefix VALUE` and `--prefix=VALUE`.
+func parseArgs(args []string) (task string, prefixFlag string, err error) {
+	if len(args) < 1 {
+		return "", "", fmt.Errorf("no task given")
+	}
+	task = args[0]
+	rest := args[1:]
+	for i := 0; i < len(rest); i++ {
+		a := rest[i]
+		switch {
+		case a == "--prefix":
+			if i+1 >= len(rest) {
+				return "", "", fmt.Errorf("--prefix requires a value")
+			}
+			prefixFlag = rest[i+1]
+			i++
+		case strings.HasPrefix(a, "--prefix="):
+			prefixFlag = strings.TrimPrefix(a, "--prefix=")
+		default:
+			return "", "", fmt.Errorf("unknown argument %q", a)
+		}
+	}
+	return task, prefixFlag, nil
+}
+
+// prefix resolves the install prefix: flagValue (if non-empty), else the
+// PREFIX environment variable, else /usr/local.
+func prefix(flagValue string) string {
+	if flagValue != "" {
+		return flagValue
+	}
+	if v := os.Getenv("PREFIX"); v != "" {
+		return v
+	}
+	return "/usr/local"
 }
 
 func buildOne(bin distBinary) error {
@@ -182,6 +266,154 @@ func packageTarball(archive string, bin distBinary, target archTarget) error {
 		return err
 	}
 	return os.Rename(tmpArchive, archive)
+}
+
+// installOne builds bin (reusing buildOne, so the skip-if-fresh check
+// still applies) and copies the result to <prefix>/bin/<name>.
+func installOne(bin distBinary, prefixFlag string) error {
+	if err := buildOne(bin); err != nil {
+		return err
+	}
+	return installBinary("out/"+bin.name, bin.name, prefixFlag)
+}
+
+func installAll(prefixFlag string) error {
+	if err := installOne(aeroflareBin, prefixFlag); err != nil {
+		return err
+	}
+	return installOne(aeroflareCIBin, prefixFlag)
+}
+
+// installBinary copies src to <prefix>/bin/<name> with executable
+// permissions, creating <prefix>/bin if needed.
+func installBinary(src, name, prefixFlag string) error {
+	binDir := filepath.Join(prefix(prefixFlag), "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		return err
+	}
+	dest := filepath.Join(binDir, name)
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(dest, data, 0o755); err != nil {
+		return err
+	}
+	fmt.Printf("installed %s\n", dest)
+	return nil
+}
+
+// installReleaseOne fetches bin's release tarball from GitHub (no local
+// build) and installs the extracted binary to <prefix>/bin/<name>.
+func installReleaseOne(bin distBinary, prefixFlag string) error {
+	repoSlug := repo()
+	tag, err := releaseVersion(repoSlug)
+	if err != nil {
+		return err
+	}
+	label, err := hostArchLabel()
+	if err != nil {
+		return err
+	}
+
+	archiveName := fmt.Sprintf("%s-%s.tar.zst", bin.name, label)
+	url := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", repoSlug, tag, archiveName)
+
+	tmp, err := os.MkdirTemp("", "aeroflare-install-release-")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+
+	archivePath := filepath.Join(tmp, archiveName)
+	fmt.Printf("downloading %s\n", url)
+	if err := downloadFile(url, archivePath); err != nil {
+		return err
+	}
+
+	if err := run("tar", "--zstd", "-xf", archivePath, "-C", tmp, "bin/"+bin.name); err != nil {
+		return err
+	}
+
+	return installBinary(filepath.Join(tmp, "bin", bin.name), bin.name, prefixFlag)
+}
+
+func installReleaseAll(prefixFlag string) error {
+	if err := installReleaseOne(aeroflareBin, prefixFlag); err != nil {
+		return err
+	}
+	return installReleaseOne(aeroflareCIBin, prefixFlag)
+}
+
+// repo resolves the GitHub repo install-release fetches from: the
+// AEROFLARE_REPO environment variable, or ItzEmoji/aeroflare by default.
+func repo() string {
+	if v := os.Getenv("AEROFLARE_REPO"); v != "" {
+		return v
+	}
+	return "ItzEmoji/aeroflare"
+}
+
+// releaseVersion resolves the release tag install-release fetches: the
+// AEROFLARE_VERSION environment variable, or repoSlug's latest GitHub
+// release tag_name if unset.
+func releaseVersion(repoSlug string) (string, error) {
+	if v := os.Getenv("AEROFLARE_VERSION"); v != "" {
+		return v, nil
+	}
+	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repoSlug)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("fetching latest release for %s: unexpected status %s", repoSlug, resp.Status)
+	}
+	var payload struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", err
+	}
+	if payload.TagName == "" {
+		return "", fmt.Errorf("no tag_name in latest release response for %s", repoSlug)
+	}
+	return payload.TagName, nil
+}
+
+// hostArchLabel maps the host's GOOS/GOARCH to the release asset label
+// (x86_64/aarch64), matching distTargets. Only linux/amd64 and
+// linux/arm64 releases are published.
+func hostArchLabel() (string, error) {
+	if runtime.GOOS != "linux" {
+		return "", fmt.Errorf("install-release only supports linux (GOOS=%s)", runtime.GOOS)
+	}
+	for _, target := range distTargets {
+		if target.goarch == runtime.GOARCH {
+			return target.label, nil
+		}
+	}
+	return "", fmt.Errorf("install-release doesn't support GOARCH=%s", runtime.GOARCH)
+}
+
+// downloadFile GETs url and writes the response body to dest.
+func downloadFile(url, dest string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("downloading %s: unexpected status %s", url, resp.Status)
+	}
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	_, err = io.Copy(f, resp.Body)
+	return err
 }
 
 func clean() error {
