@@ -37,8 +37,8 @@ compressed archive per binary and architecture:
 
 | Asset | Contents |
 |---|---|
-| `aeroflare-x86_64.tar.zst` | `aeroflare`, Linux x86_64 |
-| `aeroflare-aarch64.tar.zst` | `aeroflare`, Linux aarch64 |
+| [`aeroflare-x86_64.tar.zst`](https://github.com/ItzEmoji/aeroflare/releases/latest/download/aeroflare-x86_64.tar.zst) | `aeroflare`, Linux x86_64 |
+| [`aeroflare-aarch64.tar.zst`](https://github.com/ItzEmoji/aeroflare/releases/latest/download/aeroflare-aarch64.tar.zst) | `aeroflare`, Linux aarch64 |
 | `aeroflare-ci-x86_64.tar.zst` | `aeroflare-ci`, Linux x86_64 |
 | `aeroflare-ci-aarch64.tar.zst` | `aeroflare-ci`, Linux aarch64 |
 
