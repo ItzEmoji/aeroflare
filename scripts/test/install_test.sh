@@ -28,10 +28,11 @@ setup() {
   done
 
   # A stub "aeroflare-ci" binary, packaged exactly like the release asset:
-  # bare binary at the archive root.
-  printf '#!/bin/sh\necho stub-ci "$@"\n' > "$WORK/assets/aeroflare-ci"
-  chmod +x "$WORK/assets/aeroflare-ci"
-  tar --zstd -cf "$WORK/assets/aeroflare-ci-x86_64.tar.zst" -C "$WORK/assets" aeroflare-ci
+  # binary at bin/aeroflare-ci inside the archive.
+  mkdir -p "$WORK/assets/bin"
+  printf '#!/bin/sh\necho stub-ci "$@"\n' > "$WORK/assets/bin/aeroflare-ci"
+  chmod +x "$WORK/assets/bin/aeroflare-ci"
+  tar --zstd -cf "$WORK/assets/aeroflare-ci-x86_64.tar.zst" -C "$WORK/assets" bin/aeroflare-ci
 
   cat > "$WORK/bin/nix" <<'EOF'
 #!/bin/sh
@@ -83,9 +84,9 @@ run_install() { bash "$REPO_ROOT/scripts/install.sh" 2>&1; }
 setup
 out=$(run_install); rc=$?
 assert_eq "install.sh succeeds" "0" "$rc"
-assert_contains "emits bin= output" "bin=$RUNNER_TEMP/aeroflare/aeroflare-ci" "$(cat "$GITHUB_OUTPUT")"
+assert_contains "emits bin= output" "bin=$RUNNER_TEMP/aeroflare/bin/aeroflare-ci" "$(cat "$GITHUB_OUTPUT")"
 assert_eq "extracted binary is executable" "yes" \
-  "$([ -x "$RUNNER_TEMP/aeroflare/aeroflare-ci" ] && echo yes || echo no)"
+  "$([ -x "$RUNNER_TEMP/aeroflare/bin/aeroflare-ci" ] && echo yes || echo no)"
 teardown
 
 # --- preflight --------------------------------------------------------------

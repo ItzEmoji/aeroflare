@@ -34,7 +34,7 @@ gh attestation verify "$dest/$archive" --repo "$repo" \
 
 # --- extract ----------------------------------------------------------------
 tar --zstd -xf "$dest/$archive" -C "$dest"
-chmod +x "$dest/aeroflare-ci"
+chmod +x "$dest/bin/aeroflare-ci"
 
-printf 'bin=%s\n' "$dest/aeroflare-ci" >> "$GITHUB_OUTPUT"
+printf 'bin=%s\n' "$dest/bin/aeroflare-ci" >> "$GITHUB_OUTPUT"
 printf 'aeroflare-ci %s (%s) verified and installed\n' "$version" "$arch"
