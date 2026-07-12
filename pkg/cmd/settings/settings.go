@@ -185,13 +185,18 @@ func settingsRun(f *cmdutil.Factory, opts *Options) error {
 	if err := v.WriteConfig(); err != nil {
 		opts.IO.Error(fmt.Sprintf("Failed to save settings: %v", err))
 	} else {
-		// Provide context-aware success messages.
-		if f.IsNewConfig() {
-			opts.IO.Success(fmt.Sprintf("Initial config has been saved to %s", v.ConfigFileUsed()))
-		} else {
-			opts.IO.Success(fmt.Sprintf("Config has been updated in %s", v.ConfigFileUsed()))
-		}
+		opts.reportSaved(f.IsNewConfig(), v.ConfigFileUsed())
 	}
 
 	return nil
+}
+
+// reportSaved announces where the config landed, distinguishing a config file
+// created fresh on this run from one that already existed and was updated.
+func (opts *Options) reportSaved(isNewConfig bool, configFile string) {
+	if isNewConfig {
+		opts.IO.Success(fmt.Sprintf("Initial config has been saved to %s", configFile))
+		return
+	}
+	opts.IO.Success(fmt.Sprintf("Config has been updated in %s", configFile))
 }

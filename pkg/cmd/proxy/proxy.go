@@ -42,33 +42,39 @@ func NewCmdProxy(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func proxyRun(f *cmdutil.Factory, opts *Options) error {
-	registry, repository, err := oci.GetRegistryAndRepository()
-	if err != nil {
-		return err
-	}
-
-	// Settings below are read from NIXCACHE_* env vars rather than flags so
-	// the proxy can be configured the same way whether it's run directly
-	// or deployed as a systemd service / container.
-	port := 37515
+// proxySettingsFromEnv reads the proxy's listen settings from NIXCACHE_* env
+// vars rather than flags, so the proxy can be configured the same way whether
+// it's run directly or deployed as a systemd service / container. An
+// unparseable NIXCACHE_PORT falls back to the default rather than failing.
+func proxySettingsFromEnv() (port int, listenAddr string, upstreams []string) {
+	port = 37515
 	if pStr := os.Getenv("NIXCACHE_PORT"); pStr != "" {
 		if p, err := strconv.Atoi(pStr); err == nil {
 			port = p
 		}
 	}
 
-	listenAddr := os.Getenv("NIXCACHE_LISTEN")
+	listenAddr = os.Getenv("NIXCACHE_LISTEN")
 	if listenAddr == "" {
 		listenAddr = "127.0.0.1"
 	}
 
-	var upstreams []string
 	if ups := os.Getenv("NIXCACHE_UPSTREAM"); ups != "" {
 		upstreams = strings.Fields(ups)
 	} else {
 		upstreams = []string{"https://cache.nixos.org"}
 	}
+
+	return port, listenAddr, upstreams
+}
+
+func proxyRun(f *cmdutil.Factory, opts *Options) error {
+	registry, repository, err := oci.GetRegistryAndRepository()
+	if err != nil {
+		return err
+	}
+
+	port, listenAddr, upstreams := proxySettingsFromEnv()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
