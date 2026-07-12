@@ -9,11 +9,11 @@ import (
 
 	"github.com/itzemoji/aeroflare/internal/backend"
 	"github.com/itzemoji/aeroflare/pkg/oci"
-	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
 	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
 	"github.com/itzemoji/aeroflare/pkg/prepare/prepare"
 	"github.com/itzemoji/aeroflare/pkg/prepare/signing"
+	"github.com/itzemoji/aeroflare/pkg/proxy"
 
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"golang.org/x/sync/errgroup"
@@ -228,6 +228,7 @@ func (ps *PreparedSet) PushTo(target Target, reporter Reporter) (*PushResult, er
 	}
 
 	tokenMgr := proxy.NewTokenManager(target.Registry, target.Repository, target.Token)
+	tokenMgr.SetOverrideToken(target.OverrideToken)
 	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, nil, target.Registry, target.Repository, tokenMgr)
 
 	reporter.Step(1, 2, fmt.Sprintf("Uploading %d packages to OCI registry", len(ps.tasks)))

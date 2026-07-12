@@ -13,14 +13,14 @@ import (
 	"time"
 
 	"github.com/itzemoji/aeroflare/internal/backend"
-	"github.com/itzemoji/aeroflare/pkg/oci"
-	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/internal/ui"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/pkg/prepare/cache"
 	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
 	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
 	"github.com/itzemoji/aeroflare/pkg/prepare/prepare"
 	"github.com/itzemoji/aeroflare/pkg/prepare/signing"
+	"github.com/itzemoji/aeroflare/pkg/proxy"
 
 	"strconv"
 
@@ -62,6 +62,11 @@ type Target struct {
 	//
 	// The CLI supplies cmdutil.RegistryToken here.
 	TokenSource func() string
+
+	// OverrideToken, when non-empty, is used verbatim as the registry bearer
+	// token when reading cache metadata, skipping token exchange. The CLI
+	// supplies cmdutil.RegistryOverrideToken here.
+	OverrideToken string
 }
 
 // token returns a fresh bearer token for the target, preferring TokenSource so
@@ -275,6 +280,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 		return &PushResult{}, nil
 	}
 	tokenMgr := proxy.NewTokenManager(registry, repository, target.Token)
+	tokenMgr.SetOverrideToken(target.OverrideToken)
 	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, nil, registry, repository, tokenMgr)
 
 	var totalReceipts []backend.PushReceipt

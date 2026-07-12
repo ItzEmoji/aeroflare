@@ -8,6 +8,7 @@ import (
 
 	"github.com/itzemoji/aeroflare/internal/auth"
 	"github.com/itzemoji/aeroflare/pkg/oci"
+	"github.com/itzemoji/aeroflare/pkg/proxy"
 
 	"github.com/spf13/viper"
 )
@@ -56,6 +57,22 @@ func RegistryAndRepository() (string, string, error) {
 	}
 
 	return registry, repository, nil
+}
+
+// RegistryOverrideToken returns a verbatim registry bearer token from the
+// environment (oci_token, then NIXCACHE_TOKEN), or "" if neither is set to a
+// usable bearer. For GHCR this is the base64-encoded PAT, which the registry
+// accepts directly, skipping token exchange.
+//
+// The proxy and push packages take this as a parameter rather than reading the
+// environment themselves; this is the CLI-side lookup that feeds them.
+func RegistryOverrideToken() string {
+	for _, key := range []string{"oci_token", "NIXCACHE_TOKEN"} {
+		if t := os.Getenv(key); proxy.IsBearerToken(t) {
+			return t
+		}
+	}
+	return ""
 }
 
 // RegistryToken resolves a usable registry credential, exchanging a GitHub or

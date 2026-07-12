@@ -1,9 +1,9 @@
 package proxy
 
 import (
-	"github.com/itzemoji/aeroflare/pkg/oci"
 	"context"
 	"fmt"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"log/slog"
 	"net"
 	"net/http"
@@ -52,7 +52,12 @@ func BootstrapConfigWithAnnotations(ctx context.Context, client *http.Client, re
 }
 
 // StartProxy starts the proxy HTTP server on the configured address.
-func StartProxy(ctx context.Context, port int, listenAddr string, registry string, repository string, upstreams []string, githubToken string) (int, error) {
+//
+// overrideToken, when non-empty, is used verbatim as the registry bearer token,
+// skipping token exchange; pass "" to always exchange. It is supplied by the
+// caller rather than read from the environment so the proxy can be embedded.
+// Values that are not usable bearer tokens are ignored (see IsBearerToken).
+func StartProxy(ctx context.Context, port int, listenAddr string, registry string, repository string, upstreams []string, githubToken string, overrideToken string) (int, error) {
 	// --- VALIDATION CHECK ---
 	for _, upstream := range upstreams {
 		if !IsValidUpstreamURL(upstream) {
@@ -61,6 +66,7 @@ func StartProxy(ctx context.Context, port int, listenAddr string, registry strin
 	}
 
 	tokenMgr := NewTokenManager(registry, repository, githubToken)
+	tokenMgr.SetOverrideToken(overrideToken)
 
 	// --- HTTP TRANSPORT & CLIENT TUNING ---
 	var transport *http.Transport

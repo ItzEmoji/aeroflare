@@ -12,8 +12,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/internal/ui"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/pkg/proxy"
 )
 
 // RunConfig holds the command line to be executed via the Nix proxy.
@@ -59,7 +60,7 @@ func ExecuteCommand(cfg *RunConfig, registry, repository, githubToken string) ([
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	slog.SetDefault(logger)
 
-	port, err := proxy.StartProxy(ctx, 0, "127.0.0.1", registry, repository, []string{"https://cache.nixos.org"}, githubToken)
+	port, err := proxy.StartProxy(ctx, 0, "127.0.0.1", registry, repository, []string{"https://cache.nixos.org"}, githubToken, cmdutil.RegistryOverrideToken())
 	if err != nil {
 		return nil, fmt.Errorf("failed to start proxy: %w", err)
 	}

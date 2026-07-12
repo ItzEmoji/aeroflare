@@ -8,6 +8,56 @@ import (
 	"github.com/spf13/viper"
 )
 
+// The proxy and push packages no longer read oci_token / NIXCACHE_TOKEN
+// themselves; this is the CLI-side lookup that feeds them.
+func TestRegistryOverrideToken(t *testing.T) {
+	tests := []struct {
+		name        string
+		ociToken    string
+		nixcacheTok string
+		want        string
+	}{
+		{
+			name:     "oci_token is used verbatim",
+			ociToken: "direct-oci-token-value",
+			want:     "direct-oci-token-value",
+		},
+		{
+			name:        "NIXCACHE_TOKEN is the fallback",
+			nixcacheTok: "nixcache-direct-token",
+			want:        "nixcache-direct-token",
+		},
+		{
+			name:        "oci_token wins over NIXCACHE_TOKEN",
+			ociToken:    "first",
+			nixcacheTok: "second",
+			want:        "first",
+		},
+		{
+			// A raw PAT is not a bearer token: fall through to exchange
+			// rather than send an invalid Authorization header.
+			name:     "a raw PAT is rejected",
+			ociToken: "ghp_mypersonalaccesstoken",
+			want:     "",
+		},
+		{
+			name: "nothing set",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("oci_token", tt.ociToken)
+			t.Setenv("NIXCACHE_TOKEN", tt.nixcacheTok)
+
+			if got := cmdutil.RegistryOverrideToken(); got != tt.want {
+				t.Errorf("RegistryOverrideToken() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRegistryAndRepository(t *testing.T) {
 	tests := []struct {
 		name     string

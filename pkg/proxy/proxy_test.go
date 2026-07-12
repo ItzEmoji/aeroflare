@@ -606,11 +606,10 @@ func TestProxyServer_ServeNar_Upstream_Interrupted(t *testing.T) {
 }
 
 // TestTokenManager_GetToken_OciTokenEnv verifies that the oci_token env var bypasses fetching.
-func TestTokenManager_GetToken_OciTokenEnv(t *testing.T) {
-	t.Setenv("oci_token", "direct-oci-token-value")
-	t.Setenv("NIXCACHE_TOKEN", "")
-
+func TestTokenManager_GetToken_OverrideUsedDirectly(t *testing.T) {
 	tokenMgr := NewTokenManager("ghcr.io", "test", "")
+	tokenMgr.SetOverrideToken("direct-oci-token-value")
+
 	token, err := tokenMgr.GetToken(context.Background())
 	if err != nil {
 		t.Fatalf("GetToken failed: %v", err)
@@ -652,19 +651,8 @@ func TestTokenManager_GetToken_OciTokenEnv_GhpPrefix(t *testing.T) {
 }
 
 // TestTokenManager_GetToken_NixcacheTokenEnv verifies that NIXCACHE_TOKEN env var bypasses fetching.
-func TestTokenManager_GetToken_NixcacheTokenEnv(t *testing.T) {
-	t.Setenv("oci_token", "")
-	t.Setenv("NIXCACHE_TOKEN", "nixcache-direct-token")
-
-	tokenMgr := NewTokenManager("ghcr.io", "test", "")
-	token, err := tokenMgr.GetToken(context.Background())
-	if err != nil {
-		t.Fatalf("GetToken failed: %v", err)
-	}
-	if token != "nixcache-direct-token" {
-		t.Errorf("Expected nixcache-direct-token, got %s", token)
-	}
-}
+// The env-var lookup that used to live here (oci_token / NIXCACHE_TOKEN) now
+// belongs to the CLI layer; see TestRegistryOverrideToken in pkg/cmdutil.
 
 // TestTokenManager_GetToken_Cached verifies that subsequent calls return the cached token.
 func TestTokenManager_GetToken_Cached(t *testing.T) {

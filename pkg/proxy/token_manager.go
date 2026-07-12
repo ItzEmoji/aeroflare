@@ -1,13 +1,12 @@
 package proxy
 
 import (
-	"github.com/itzemoji/aeroflare/pkg/oci"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +19,7 @@ type TokenManager struct {
 	registry      string
 	repository    string
 	githubToken   string
-	overrideToken string // Cached environment token
+	overrideToken string // verbatim bearer supplied by the caller
 
 	mu     sync.Mutex
 	token  string
@@ -29,38 +28,55 @@ type TokenManager struct {
 	now    func() time.Time // clock; overridable in tests
 }
 
+// patPrefixes are the personal-access-token prefixes used by GitHub and GitLab.
+// A PAT is not a valid OCI bearer token.
+var patPrefixes = []string{"ghp_", "github_pat_", "glpat-", "gho_", "ghu_", "ghs_"}
+
+// IsBearerToken reports whether token can be sent verbatim as an OCI bearer
+// credential. It rejects raw GitHub/GitLab personal-access tokens: a user who
+// pastes one where a bearer is expected should fall through to normal token
+// exchange rather than have an invalid Authorization header sent for them.
+func IsBearerToken(token string) bool {
+	if token == "" {
+		return false
+	}
+	for _, p := range patPrefixes {
+		if strings.HasPrefix(token, p) {
+			return false
+		}
+	}
+	return true
+}
+
 // NewTokenManager creates a new OCI token manager.
+//
+// It does not read the environment. A caller that wants to supply a verbatim
+// bearer token (as the CLI does from oci_token / NIXCACHE_TOKEN) passes it to
+// SetOverrideToken.
 func NewTokenManager(registry, repository, githubToken string) *TokenManager {
 	if reg, err := name.NewRegistry(registry); err == nil {
 		registry = reg.RegistryStr()
 	}
 
-	// Check for a static token override once during initialization. Reject
-	// values that look like GitHub/GitLab personal-access tokens (common
-	// prefixes below): those are not valid OCI bearer tokens, so a user who
-	// pasted one into oci_token/NIXCACHE_TOKEN by mistake falls through to
-	// normal token exchange instead of sending an invalid Authorization header.
-	var override string
-	if t := os.Getenv("oci_token"); t != "" && !strings.HasPrefix(t, "ghp_") && !strings.HasPrefix(t, "github_pat_") && !strings.HasPrefix(t, "glpat-") && !strings.HasPrefix(t, "gho_") && !strings.HasPrefix(t, "ghu_") && !strings.HasPrefix(t, "ghs_") {
-		override = t
-	} else if t := os.Getenv("NIXCACHE_TOKEN"); t != "" && !strings.HasPrefix(t, "ghp_") && !strings.HasPrefix(t, "github_pat_") && !strings.HasPrefix(t, "glpat-") && !strings.HasPrefix(t, "gho_") && !strings.HasPrefix(t, "ghu_") && !strings.HasPrefix(t, "ghs_") {
-		override = t
-	}
-
 	return &TokenManager{
-		registry:      registry,
-		repository:    repository,
-		githubToken:   githubToken,
-		overrideToken: override,
-		client:        &http.Client{Timeout: 10 * time.Second},
-		now:           time.Now,
+		registry:    registry,
+		repository:  repository,
+		githubToken: githubToken,
+		client:      &http.Client{Timeout: 10 * time.Second},
+		now:         time.Now,
 	}
 }
 
 // SetOverrideToken sets a static bearer token, bypassing token exchange.
+// Values that are not usable bearer tokens (see IsBearerToken) are ignored, so
+// a mistakenly-supplied PAT falls through to normal exchange.
 func (tm *TokenManager) SetOverrideToken(token string) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
+	if !IsBearerToken(token) {
+		tm.overrideToken = ""
+		return
+	}
 	tm.overrideToken = token
 }
 
@@ -69,11 +85,11 @@ func (tm *TokenManager) GetToken(ctx context.Context) (string, error) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
-	// A verbatim bearer token (from oci_token / NIXCACHE_TOKEN) is used as-is.
-	// For GHCR this is the base64-encoded PAT, which the registry accepts
-	// directly, skipping the /token exchange. NewTokenManager already rejects
-	// raw PAT values (ghp_/github_pat_/… prefixes) for this field, so only a
-	// properly-formed bearer reaches here.
+	// A verbatim bearer token supplied via SetOverrideToken is used as-is. For
+	// GHCR this is the base64-encoded PAT, which the registry accepts directly,
+	// skipping the /token exchange. SetOverrideToken rejects raw PAT values
+	// (ghp_/github_pat_/… prefixes), so only a properly-formed bearer reaches
+	// here.
 	if tm.overrideToken != "" {
 		return tm.overrideToken, nil
 	}

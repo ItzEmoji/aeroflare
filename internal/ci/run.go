@@ -6,9 +6,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/internal/push"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/prepare/cache"
+	"github.com/itzemoji/aeroflare/pkg/proxy"
 )
 
 // summaryLine renders the final one-line roll-up.
@@ -78,7 +79,7 @@ func Run(spec RunSpec, w io.Writer) bool {
 	buildCtx, stopProxy := context.WithCancel(context.Background())
 	defer stopProxy()
 
-	port, err := proxy.StartProxy(buildCtx, 0, "127.0.0.1", primary.Registry, primary.Repository, upstreams, token0)
+	port, err := proxy.StartProxy(buildCtx, 0, "127.0.0.1", primary.Registry, primary.Repository, upstreams, token0, cmdutil.RegistryOverrideToken())
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "✗ proxy: %v\n", err)
 		return false
