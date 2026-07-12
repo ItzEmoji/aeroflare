@@ -8,7 +8,6 @@ import (
 
 	"github.com/itzemoji/aeroflare/internal/oci"
 	internalpush "github.com/itzemoji/aeroflare/internal/push"
-	"github.com/itzemoji/aeroflare/internal/secrets"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
@@ -19,21 +18,18 @@ import (
 // Options holds the flags and dependencies push and run need to build a
 // PushConfig and drive the shared push pipeline.
 type Options struct {
-	IO      *iostreams.IOStreams
-	Secrets func() secrets.Manager
+	IO *iostreams.IOStreams
 
 	StorePath string
 	InputFile string
 
-	Compression string
-	CacheURL    string
-	Workers     int
-	PrepareRefs bool
-	SigningKey  string
-	KeepFiles   bool
-	ForcePush   bool
-
-	Verbosity int
+	Compression   string
+	UpstreamCache string
+	Workers       int
+	PrepareRefs   bool
+	SigningKey    string
+	KeepFiles     bool
+	ForcePush     bool
 }
 
 // AddPushFlags registers the flags that `push` and `run` share, so the two
@@ -41,7 +37,7 @@ type Options struct {
 // vars; this makes the shared contract explicit and compiler-checked.
 func AddPushFlags(cmd *cobra.Command, opts *Options) {
 	cmd.Flags().StringVar(&opts.Compression, "compression", "zstd", "Compression type: zstd, xz, gzip, none")
-	cmd.Flags().StringVar(&opts.CacheURL, "upstream-cache", "https://cache.nixos.org", "Upstream binary cache URL (empty to skip reference checking)")
+	cmd.Flags().StringVar(&opts.UpstreamCache, "upstream-cache", "https://cache.nixos.org", "Upstream binary cache URL (empty to skip reference checking)")
 	cmd.Flags().IntVar(&opts.Workers, "workers", 50, "Number of concurrent workers")
 	cmd.Flags().BoolVar(&opts.PrepareRefs, "prepare-refs", true, "Also prepare references that are not on the upstream cache")
 	cmd.Flags().StringVar(&opts.SigningKey, "signing-key", "", "Path to Nix signing private key file")
@@ -52,8 +48,7 @@ func AddPushFlags(cmd *cobra.Command, opts *Options) {
 // NewCmdPush builds the `aeroflare push` command.
 func NewCmdPush(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
-		IO:      f.IOStreams,
-		Secrets: f.Secrets,
+		IO: f.IOStreams,
 	}
 
 	cmd := &cobra.Command{
@@ -85,7 +80,7 @@ func pushRun(f *cmdutil.Factory, opts *Options, args []string) error {
 	}
 
 	cfg.Compression = opts.Compression
-	cfg.CacheURL = opts.CacheURL
+	cfg.CacheURL = opts.UpstreamCache
 	cfg.Workers = opts.Workers
 	cfg.PrepareRefs = opts.PrepareRefs
 	cfg.SigningKey = opts.SigningKey

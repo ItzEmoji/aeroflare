@@ -131,7 +131,7 @@ func githubScopeWarning(token string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	id, err := svc.Validate(ctx, map[string]string{"token": token})
-	if err != nil || len(id.Warnings) == 0 {
+	if err != nil || id == nil || len(id.Warnings) == 0 {
 		return ""
 	}
 	return " (⚠️ Warning: " + strings.Join(id.Warnings, "; ") + ")"

@@ -23,8 +23,8 @@ func TestAddPushFlagsDefaults(t *testing.T) {
 	if opts.Compression != "zstd" {
 		t.Errorf("Compression = %q, want zstd", opts.Compression)
 	}
-	if opts.CacheURL != "https://cache.nixos.org" {
-		t.Errorf("CacheURL = %q, want https://cache.nixos.org", opts.CacheURL)
+	if opts.UpstreamCache != "https://cache.nixos.org" {
+		t.Errorf("UpstreamCache = %q, want https://cache.nixos.org", opts.UpstreamCache)
 	}
 	if opts.Workers != 50 {
 		t.Errorf("Workers = %d, want 50", opts.Workers)

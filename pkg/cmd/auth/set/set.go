@@ -58,7 +58,7 @@ func setRun(opts *Options) error {
 		if !f.IOStreams.IsStdinTTY() {
 			return fmt.Errorf("no values provided and not running interactively; pass values as arguments")
 		}
-		prompted := shared.PromptServiceFields(f, svc)
+		prompted := shared.PromptServiceFields(svc)
 		for _, fld := range svc.Fields {
 			if v, ok := prompted[fld.Name]; ok && v != "" {
 				if err := manager.Set(fld.SecretKey, v); err != nil {

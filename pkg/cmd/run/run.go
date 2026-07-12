@@ -26,8 +26,7 @@ type Options struct {
 func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		Push: push.Options{
-			IO:      f.IOStreams,
-			Secrets: f.Secrets,
+			IO: f.IOStreams,
 		},
 	}
 
@@ -78,7 +77,7 @@ func runRun(f *cmdutil.Factory, opts *Options, args []string) error {
 	pushCfg := &internalpush.PushConfig{
 		TargetPaths: targetPaths,
 		Compression: opts.Push.Compression,
-		CacheURL:    opts.Push.CacheURL,
+		CacheURL:    opts.Push.UpstreamCache,
 		Workers:     opts.Push.Workers,
 		PrepareRefs: opts.Push.PrepareRefs,
 		SigningKey:  opts.Push.SigningKey,

@@ -150,7 +150,7 @@ func RunInteractiveOCIAuth(f *cmdutil.Factory, registry string) (string, string,
 // masking input for secret fields, and returns the entered values keyed by
 // field Name. It is the catalog-driven prompt used by `auth set <service>`
 // when no values are given on the command line.
-func PromptServiceFields(f *cmdutil.Factory, svc auth.Service) map[string]string {
+func PromptServiceFields(svc auth.Service) map[string]string {
 	vals := make(map[string]string)
 	for _, field := range svc.Fields {
 		var val string
