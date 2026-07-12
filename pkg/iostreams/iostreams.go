@@ -67,6 +67,14 @@ func (s *IOStreams) SetStdinTTY(isTTY bool) {
 	s.stdinTTY = &isTTY
 }
 
+// SetStdinFile overrides the file consulted by IsStdinTTY's device check, and
+// clears any override set by SetStdinTTY so the stat path is genuinely taken.
+// Tests use it to exercise that path against a known file.
+func (s *IOStreams) SetStdinFile(f *os.File) {
+	s.stdinIsFile = f
+	s.stdinTTY = nil
+}
+
 // IsStdinTTY reports whether stdin is an interactive character device, used to
 // decide whether it's safe to launch an interactive prompt or whether we should
 // fail with an actionable error message instead.
