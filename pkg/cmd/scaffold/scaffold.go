@@ -5,6 +5,7 @@ package scaffold
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -58,7 +59,7 @@ func scaffoldRun(opts *Options) error {
 	opts.IO.Info("Fetching available releases...")
 	resp, err := http.Get("https://api.github.com/repos/ItzEmoji/aeroflare/releases")
 	if err != nil {
-		return fmt.Errorf("Failed to fetch releases: %w", err)
+		return fmt.Errorf("failed to fetch releases: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -66,10 +67,10 @@ func scaffoldRun(opts *Options) error {
 		TagName string `json:"tag_name"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		return fmt.Errorf("Failed to decode releases: %w", err)
+		return fmt.Errorf("failed to decode releases: %w", err)
 	}
 	if len(releases) == 0 {
-		return fmt.Errorf("No releases found.")
+		return errors.New("no releases found")
 	}
 
 	releaseTag := opts.Release
@@ -121,11 +122,11 @@ func scaffoldRun(opts *Options) error {
 
 	tarResp, err := http.Get(tarURL)
 	if err != nil {
-		return fmt.Errorf("Failed to download source: %w", err)
+		return fmt.Errorf("failed to download source: %w", err)
 	}
 	defer func() { _ = tarResp.Body.Close() }()
 	if tarResp.StatusCode < 200 || tarResp.StatusCode >= 300 {
-		return fmt.Errorf("Failed to download source: GitHub returned %s", tarResp.Status)
+		return fmt.Errorf("failed to download source: GitHub returned %s", tarResp.Status)
 	}
 
 	downloadCmd := exec.Command("tar", "-xz", "-C", targetDir, "--strip-components=1")
@@ -133,12 +134,12 @@ func scaffoldRun(opts *Options) error {
 	downloadCmd.Stdout = os.Stdout
 	downloadCmd.Stderr = os.Stderr
 	if err := downloadCmd.Run(); err != nil {
-		return fmt.Errorf("Failed to download or extract source: %w", err)
+		return fmt.Errorf("failed to download or extract source: %w", err)
 	}
 
 	proxyDir := fmt.Sprintf("%s/proxy/no-webui-native", targetDir)
 	if _, err := os.Stat(proxyDir); os.IsNotExist(err) {
-		return fmt.Errorf("Proxy directory %s not found in the release", proxyDir)
+		return fmt.Errorf("proxy directory %s not found in the release", proxyDir)
 	}
 
 	// Patch wrangler.toml with environment values if available.

@@ -59,9 +59,9 @@ func removeRun(opts *Options) error {
 	}
 
 	if removed == 0 {
-		fmt.Fprintf(f.IOStreams.Out, "No stored credentials for %s.\n", svc.DisplayName)
+		_, _ = fmt.Fprintf(f.IOStreams.Out, "No stored credentials for %s.\n", svc.DisplayName)
 	} else {
-		fmt.Fprintf(f.IOStreams.Out, "Removed %s credentials.\n", svc.DisplayName)
+		_, _ = fmt.Fprintf(f.IOStreams.Out, "Removed %s credentials.\n", svc.DisplayName)
 	}
 	return nil
 }

@@ -19,19 +19,19 @@ func NewPlainReporter(w io.Writer, prefix string) *PlainReporter {
 }
 
 func (r *PlainReporter) Step(step, total int, msg string) {
-	fmt.Fprintf(r.w, "%s[%d/%d] %s\n", r.prefix, step, total, msg)
+	_, _ = fmt.Fprintf(r.w, "%s[%d/%d] %s\n", r.prefix, step, total, msg)
 }
 
 func (r *PlainReporter) Uploaded(storePath string) {
-	fmt.Fprintf(r.w, "%s  ✓ uploaded  %s\n", r.prefix, storePath)
+	_, _ = fmt.Fprintf(r.w, "%s  ✓ uploaded  %s\n", r.prefix, storePath)
 }
 
 func (r *PlainReporter) SkippedUpstream(storePath string) {
-	fmt.Fprintf(r.w, "%s  - skipped   %s  (already upstream)\n", r.prefix, storePath)
+	_, _ = fmt.Fprintf(r.w, "%s  - skipped   %s  (already upstream)\n", r.prefix, storePath)
 }
 
 func (r *PlainReporter) Success(msg string) {
-	fmt.Fprintf(r.w, "%s  %s\n", r.prefix, msg)
+	_, _ = fmt.Fprintf(r.w, "%s  %s\n", r.prefix, msg)
 }
 
 func (r *PlainReporter) Summary(title string, fields [][2]string) {
@@ -39,5 +39,5 @@ func (r *PlainReporter) Summary(title string, fields [][2]string) {
 	for _, f := range fields {
 		parts = append(parts, fmt.Sprintf("%s %s", f[0], f[1]))
 	}
-	fmt.Fprintf(r.w, "%s  (%s)\n", r.prefix, strings.Join(parts, ", "))
+	_, _ = fmt.Fprintf(r.w, "%s  (%s)\n", r.prefix, strings.Join(parts, ", "))
 }

@@ -237,14 +237,3 @@ func statusCell(e statusEntryJSON, noVerify bool) string {
 	}
 	return status
 }
-
-// printIdentity renders a validated identity for a service to stdout, used
-// after an interactive `auth set` to confirm the credential works.
-func printIdentity(f *cmdutil.Factory, svc auth.Service, id *auth.Identity) {
-	if id.User != "" {
-		fmt.Fprintf(f.IOStreams.Out, "✓ %s authenticated as %s\n", svc.DisplayName, id.User)
-	}
-	for _, w := range id.Warnings {
-		fmt.Fprintf(f.IOStreams.Out, "⚠️  %s\n", w)
-	}
-}

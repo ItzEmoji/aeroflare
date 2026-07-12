@@ -73,7 +73,7 @@ func prepareRun(cmd *cobra.Command, opts *Options) error {
 	if opts.SigningKey != "" {
 		signKey, err = signing.LoadPrivateKey(opts.SigningKey)
 		if err != nil {
-			return fmt.Errorf("Error loading signing key: %w", err)
+			return fmt.Errorf("error loading signing key: %w", err)
 		}
 	}
 
@@ -138,24 +138,24 @@ func prepareRun(cmd *cobra.Command, opts *Options) error {
 // its NAR/narinfo output locations, signing status, and any references
 // that were missing from (or newly prepared for) the upstream cache.
 func (opts *Options) printResult(r *prepare.Result) {
-	fmt.Fprintln(opts.IO.Out, "Prepared: "+r.StorePath)
-	fmt.Fprintln(opts.IO.Out, "  NAR:     "+r.NarPath)
-	fmt.Fprintln(opts.IO.Out, "  Narinfo: "+r.NarinfoPath)
+	_, _ = fmt.Fprintln(opts.IO.Out, "Prepared: "+r.StorePath)
+	_, _ = fmt.Fprintln(opts.IO.Out, "  NAR:     "+r.NarPath)
+	_, _ = fmt.Fprintln(opts.IO.Out, "  Narinfo: "+r.NarinfoPath)
 	if r.Signed {
-		fmt.Fprintln(opts.IO.Out, "  Signed:  yes")
+		_, _ = fmt.Fprintln(opts.IO.Out, "  Signed:  yes")
 	}
 	if len(r.MissingRefs) > 0 {
-		fmt.Fprintf(opts.IO.Out, "  Missing references (%d, not on upstream cache):\n", len(r.MissingRefs))
+		_, _ = fmt.Fprintf(opts.IO.Out, "  Missing references (%d, not on upstream cache):\n", len(r.MissingRefs))
 		for _, ref := range r.MissingRefs {
-			fmt.Fprintln(opts.IO.Out, "    "+filepath.Base(ref))
+			_, _ = fmt.Fprintln(opts.IO.Out, "    "+filepath.Base(ref))
 		}
 		if len(r.MissingRefResults) > 0 {
-			fmt.Fprintf(opts.IO.Out, "  Prepared missing refs (%d):\n", len(r.MissingRefResults))
+			_, _ = fmt.Fprintf(opts.IO.Out, "  Prepared missing refs (%d):\n", len(r.MissingRefResults))
 			for _, rr := range r.MissingRefResults {
-				fmt.Fprintf(opts.IO.Out, "    %s -> %s, %s\n", filepath.Base(rr.StorePath), filepath.Base(rr.NarPath), filepath.Base(rr.NarinfoPath))
+				_, _ = fmt.Fprintf(opts.IO.Out, "    %s -> %s, %s\n", filepath.Base(rr.StorePath), filepath.Base(rr.NarPath), filepath.Base(rr.NarinfoPath))
 			}
 		}
 	} else if len(r.References) > 0 {
-		fmt.Fprintf(opts.IO.Out, "  All %d references found on upstream cache\n", len(r.References))
+		_, _ = fmt.Fprintf(opts.IO.Out, "  All %d references found on upstream cache\n", len(r.References))
 	}
 }

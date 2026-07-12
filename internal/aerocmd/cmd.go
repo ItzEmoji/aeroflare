@@ -51,12 +51,12 @@ func handleError(f *cmdutil.Factory, cmd *cobra.Command, err error) exitCode {
 		// Already reported by the command.
 		return exitError
 	}
-	fmt.Fprintf(f.IOStreams.ErrOut, "Error: %s\n", err.Error())
+	_, _ = fmt.Fprintf(f.IOStreams.ErrOut, "Error: %s\n", err.Error())
 
 	var flagErr *cmdutil.FlagError
 	if errors.As(err, &flagErr) && cmd != nil {
-		fmt.Fprintln(f.IOStreams.ErrOut)
-		fmt.Fprint(f.IOStreams.ErrOut, cmd.UsageString())
+		_, _ = fmt.Fprintln(f.IOStreams.ErrOut)
+		_, _ = fmt.Fprint(f.IOStreams.ErrOut, cmd.UsageString())
 	}
 
 	return exitError

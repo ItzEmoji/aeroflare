@@ -33,17 +33,17 @@ func RunInteractiveGithubAuth(f *cmdutil.Factory) (string, error) {
 
 	var token string
 	if ghMethod == "device" {
-		fmt.Fprintln(f.IOStreams.Out, "Requesting device code...")
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "Requesting device code...")
 		res, err := auth.RequestDeviceCode(githubClientID)
 		if err != nil {
-			return "", fmt.Errorf("Failed to request code: %v", err)
+			return "", fmt.Errorf("failed to request code: %v", err)
 		}
-		fmt.Fprintf(f.IOStreams.Out, "Please go to %s and enter the code: %s\n", res.VerificationURI, res.UserCode)
-		fmt.Fprintln(f.IOStreams.Out, "Waiting for authorization...")
+		_, _ = fmt.Fprintf(f.IOStreams.Out, "Please go to %s and enter the code: %s\n", res.VerificationURI, res.UserCode)
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "Waiting for authorization...")
 
 		token, err = auth.PollAccessToken(githubClientID, res.DeviceCode, res.Interval)
 		if err != nil {
-			return "", fmt.Errorf("Authorization failed: %v", err)
+			return "", fmt.Errorf("authorization failed: %v", err)
 		}
 	} else {
 		err = huh.NewInput().Title("GitHub Token").EchoMode(huh.EchoModePassword).Value(&token).Run()
@@ -54,9 +54,9 @@ func RunInteractiveGithubAuth(f *cmdutil.Factory) (string, error) {
 
 	if token != "" {
 		if err := manager.Set("github-token", token); err != nil {
-			return "", fmt.Errorf("Failed to save token: %v", err)
+			return "", fmt.Errorf("failed to save token: %v", err)
 		}
-		fmt.Fprintln(f.IOStreams.Out, "Success! GitHub token saved. This will automatically be used for GitHub APIs and the ghcr.io container registry.")
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "Success! GitHub token saved. This will automatically be used for GitHub APIs and the ghcr.io container registry.")
 	}
 	return token, nil
 }
@@ -72,9 +72,9 @@ func RunInteractiveGitlabAuth(f *cmdutil.Factory) (string, error) {
 	}
 	if token != "" {
 		if err := manager.Set("gitlab-token", token); err != nil {
-			return "", fmt.Errorf("Failed to save token: %v", err)
+			return "", fmt.Errorf("failed to save token: %v", err)
 		}
-		fmt.Fprintln(f.IOStreams.Out, "Success! GitLab token saved.")
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "Success! GitLab token saved.")
 	}
 	return token, nil
 }
@@ -96,16 +96,16 @@ func RunInteractiveCloudflareAuth(f *cmdutil.Factory) (string, string, error) {
 
 	if apiToken != "" {
 		if err := manager.Set("cf-token", apiToken); err != nil {
-			return "", "", fmt.Errorf("Failed to save Cloudflare API token: %v", err)
+			return "", "", fmt.Errorf("failed to save Cloudflare API token: %v", err)
 		}
 	}
 	if userID != "" {
 		if err := manager.Set("cf-user-id", userID); err != nil {
-			return "", "", fmt.Errorf("Failed to save Cloudflare user ID: %v", err)
+			return "", "", fmt.Errorf("failed to save Cloudflare user ID: %v", err)
 		}
 	}
 	if apiToken != "" || userID != "" {
-		fmt.Fprintln(f.IOStreams.Out, "Cloudflare credentials saved.")
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "Cloudflare credentials saved.")
 	}
 	return apiToken, userID, nil
 }
@@ -136,12 +136,12 @@ func RunInteractiveOCIAuth(f *cmdutil.Factory, registry string) (string, string,
 
 	if registry != "" {
 		if err := manager.Set(fmt.Sprintf("oci-%s-username", registry), user); err != nil {
-			return "", "", fmt.Errorf("Failed to save OCI username: %v", err)
+			return "", "", fmt.Errorf("failed to save OCI username: %v", err)
 		}
 		if err := manager.Set(fmt.Sprintf("oci-%s-token", registry), pass); err != nil {
-			return "", "", fmt.Errorf("Failed to save OCI token: %v", err)
+			return "", "", fmt.Errorf("failed to save OCI token: %v", err)
 		}
-		fmt.Fprintln(f.IOStreams.Out, "OCI credentials saved.")
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "OCI credentials saved.")
 	}
 	return user, pass, nil
 }

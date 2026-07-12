@@ -59,7 +59,7 @@ func (g *Group) ExistsBatch(ctx context.Context, hashes []string, workers int) (
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
-				fmt.Fprintf(g.warn, "warning: upstream %s unavailable; its paths will be re-uploaded: %v\n", g.urls[i], err)
+				_, _ = fmt.Fprintf(g.warn, "warning: upstream %s unavailable; its paths will be re-uploaded: %v\n", g.urls[i], err)
 				return
 			}
 			for h, ok := range m {

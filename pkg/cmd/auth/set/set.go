@@ -64,7 +64,7 @@ func setRun(opts *Options) error {
 				if err := manager.Set(fld.SecretKey, v); err != nil {
 					return err
 				}
-				fmt.Fprintf(f.IOStreams.Out, "Saved %s %s\n", svc.DisplayName, fld.Name)
+				_, _ = fmt.Fprintf(f.IOStreams.Out, "Saved %s %s\n", svc.DisplayName, fld.Name)
 			}
 		}
 		return nil
@@ -76,7 +76,7 @@ func setRun(opts *Options) error {
 		if err := manager.Set(fld.SecretKey, v); err != nil {
 			return err
 		}
-		fmt.Fprintf(f.IOStreams.Out, "Saved %s %s\n", svc.DisplayName, fld.Name)
+		_, _ = fmt.Fprintf(f.IOStreams.Out, "Saved %s %s\n", svc.DisplayName, fld.Name)
 	}
 
 	// Live-validate on save only when interactive, so scripted/test runs
@@ -93,9 +93,9 @@ func setRun(opts *Options) error {
 // credential just saved actually works.
 func printIdentity(f *cmdutil.Factory, svc auth.Service, id *auth.Identity) {
 	if id.User != "" {
-		fmt.Fprintf(f.IOStreams.Out, "✓ %s authenticated as %s\n", svc.DisplayName, id.User)
+		_, _ = fmt.Fprintf(f.IOStreams.Out, "✓ %s authenticated as %s\n", svc.DisplayName, id.User)
 	}
 	for _, w := range id.Warnings {
-		fmt.Fprintf(f.IOStreams.Out, "⚠️  %s\n", w)
+		_, _ = fmt.Fprintf(f.IOStreams.Out, "⚠️  %s\n", w)
 	}
 }

@@ -47,7 +47,7 @@ func InitConfig() (*viper.Viper, bool, error) {
 			homeDir = os.Getenv("HOME")
 		}
 		if homeDir == "" {
-			return nil, false, fmt.Errorf("Could not determine home directory")
+			return nil, false, fmt.Errorf("could not determine home directory")
 		}
 		configDir = filepath.Join(homeDir, ".config")
 	}
@@ -55,14 +55,14 @@ func InitConfig() (*viper.Viper, bool, error) {
 
 	isNew := false
 	if err := os.MkdirAll(aeroDir, 0755); err != nil {
-		return nil, false, fmt.Errorf("Could not create config directory: %w", err)
+		return nil, false, fmt.Errorf("could not create config directory: %w", err)
 	}
 
 	configFile := filepath.Join(aeroDir, "aeroflare.yaml")
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		isNew = true
 		if err := os.WriteFile(configFile, []byte(defaultConfig), 0644); err != nil {
-			return nil, false, fmt.Errorf("Could not write default config file: %w", err)
+			return nil, false, fmt.Errorf("could not write default config file: %w", err)
 		}
 	}
 	v.SetConfigFile(configFile)
@@ -74,7 +74,7 @@ func InitConfig() (*viper.Viper, bool, error) {
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, isNew, fmt.Errorf("Error reading config file: %w", err)
+			return nil, isNew, fmt.Errorf("error reading config file: %w", err)
 		}
 	}
 

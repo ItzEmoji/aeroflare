@@ -91,7 +91,7 @@ func proxyRun(f *cmdutil.Factory, opts *Options) error {
 	token := shared.OptionalTokenForRegistry(f, registry)
 	actualPort, err := proxysrv.StartProxy(ctx, port, listenAddr, registry, repository, upstreams, token)
 	if err != nil {
-		return fmt.Errorf("Proxy server failed: %w", err)
+		return fmt.Errorf("proxy server failed: %w", err)
 	}
 	opts.IO.Info(fmt.Sprintf("Started proxy on %s:%d...", listenAddr, actualPort))
 

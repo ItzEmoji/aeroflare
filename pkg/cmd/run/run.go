@@ -73,7 +73,7 @@ func runRun(f *cmdutil.Factory, opts *Options, args []string) error {
 		return nil
 	}
 
-	fmt.Fprintf(f.IOStreams.Out, "\nFound %d store paths to push from run command output.\n", len(targetPaths))
+	_, _ = fmt.Fprintf(f.IOStreams.Out, "\nFound %d store paths to push from run command output.\n", len(targetPaths))
 
 	// Feed the discovered store paths straight into the push pipeline,
 	// reusing push's own flags (registered above) for compression, workers, etc.

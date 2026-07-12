@@ -45,7 +45,7 @@ func configureRun(f *cmdutil.Factory, opts *Options) error {
 	}
 	ociToken := oci.GetToken(registry, repository, "")
 	if ociToken == "" {
-		return fmt.Errorf("Authentication token missing (oci_token, GITHUB_TOKEN or GH_TOKEN)")
+		return fmt.Errorf("authentication token missing (oci_token, GITHUB_TOKEN or GH_TOKEN)")
 	}
 
 	// Fetch existing config manifest so we can prefill the public key.
@@ -80,7 +80,7 @@ func configureRun(f *cmdutil.Factory, opts *Options) error {
 
 	if err := form.Run(); err != nil {
 		if err.Error() != "user aborted" {
-			return fmt.Errorf("Form error: %v", err)
+			return fmt.Errorf("form error: %v", err)
 		}
 		return cmdutil.ErrCancel
 	}
@@ -92,7 +92,7 @@ func configureRun(f *cmdutil.Factory, opts *Options) error {
 	opts.IO.Info("Saving configuration to OCI manifest annotations...")
 
 	if err := oci.PushConfigManifest(registry, repository, ociToken, annotations); err != nil {
-		return fmt.Errorf("Failed to save config: %w", err)
+		return fmt.Errorf("failed to save config: %w", err)
 	}
 
 	opts.IO.Success("Configuration successfully saved to cache-config manifest!")

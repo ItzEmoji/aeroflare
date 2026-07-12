@@ -74,18 +74,18 @@ func RequireGithubToken(f *cmdutil.Factory) (string, error) {
 
 	token, err := auth.ResolveGithubToken(f.Secrets())
 	if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
-		fmt.Fprintf(f.IOStreams.ErrOut, "Warning: failed to read token from keychain: %v\n", err)
+		_, _ = fmt.Fprintf(f.IOStreams.ErrOut, "Warning: failed to read token from keychain: %v\n", err)
 	}
 	if token != "" {
 		return token, nil
 	}
 
 	if f.IOStreams.IsStdinTTY() {
-		fmt.Fprintln(f.IOStreams.Out, "GitHub token is required but not found. Launching authentication...")
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "GitHub token is required but not found. Launching authentication...")
 		return RunInteractiveGithubAuth(f)
 	}
 
-	return "", errors.New("GitHub token required. Please set GITHUB_TOKEN or run 'aeroflare auth login'.")
+	return "", errors.New("GitHub token required, please set GITHUB_TOKEN or run 'aeroflare auth login'")
 }
 
 // RequireGitlabToken resolves a GitLab token the same way RequireGithubToken
@@ -98,18 +98,18 @@ func RequireGitlabToken(f *cmdutil.Factory) (string, error) {
 
 	token, err := auth.ResolveGitlabToken(f.Secrets())
 	if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
-		fmt.Fprintf(f.IOStreams.ErrOut, "Warning: failed to read token from keychain: %v\n", err)
+		_, _ = fmt.Fprintf(f.IOStreams.ErrOut, "Warning: failed to read token from keychain: %v\n", err)
 	}
 	if token != "" {
 		return token, nil
 	}
 
 	if f.IOStreams.IsStdinTTY() {
-		fmt.Fprintln(f.IOStreams.Out, "GitLab token is required but not found. Launching authentication...")
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "GitLab token is required but not found. Launching authentication...")
 		return RunInteractiveGitlabAuth(f)
 	}
 
-	return "", errors.New("GitLab token required. Please set GITLAB_TOKEN or run 'aeroflare auth login'.")
+	return "", errors.New("GitLab token required, please set GITLAB_TOKEN or run 'aeroflare auth login'")
 }
 
 // RequireCloudflareToken resolves the Cloudflare API token and account ID,
@@ -134,11 +134,11 @@ func RequireCloudflareToken(f *cmdutil.Factory) (string, string, error) {
 	}
 
 	if f.IOStreams.IsStdinTTY() {
-		fmt.Fprintln(f.IOStreams.Out, "Cloudflare credentials required but incomplete. Launching authentication...")
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "Cloudflare credentials required but incomplete. Launching authentication...")
 		return RunInteractiveCloudflareAuth(f)
 	}
 
-	return "", "", errors.New("Cloudflare credentials required. Please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, or run 'aeroflare auth login'.")
+	return "", "", errors.New("cloudflare credentials required, please set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, or run 'aeroflare auth login'")
 }
 
 // GetOCIToken looks up a saved username/token pair for an arbitrary OCI
@@ -160,7 +160,7 @@ func ResolveField(f *cmdutil.Factory, svc auth.Service, name string) string {
 	}
 	val, err := field.Resolve(f.Secrets())
 	if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
-		fmt.Fprintf(f.IOStreams.ErrOut, "Warning: failed to read credential from keychain: %v\n", err)
+		_, _ = fmt.Fprintf(f.IOStreams.ErrOut, "Warning: failed to read credential from keychain: %v\n", err)
 	}
 	return val
 }
@@ -175,11 +175,11 @@ func RequireOCIToken(f *cmdutil.Factory, registry string) (string, string, error
 	}
 
 	if f.IOStreams.IsStdinTTY() {
-		fmt.Fprintf(f.IOStreams.Out, "Credentials for registry %s are required. Launching authentication...\n", registry)
+		_, _ = fmt.Fprintf(f.IOStreams.Out, "Credentials for registry %s are required. Launching authentication...\n", registry)
 		return RunInteractiveOCIAuth(f, registry)
 	}
 
-	return "", "", fmt.Errorf("Credentials required for registry %s. Run 'aeroflare auth login' to set them.", registry)
+	return "", "", fmt.Errorf("credentials required for registry %s, run 'aeroflare auth login' to set them", registry)
 }
 
 // TokenForRegistry resolves (prompting interactively if needed) and exports

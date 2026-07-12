@@ -55,10 +55,10 @@ func pushBlobRun(opts *PushOptions) error {
 
 	digest, err := oci.PushBlob(opts.FilePath, registry, repository, ociToken)
 	if err != nil {
-		return fmt.Errorf("Failed to push blob: %w", err)
+		return fmt.Errorf("failed to push blob: %w", err)
 	}
 
-	fmt.Fprintf(opts.IO.Out, "✔ Blob Digest: %s\n", digest)
+	_, _ = fmt.Fprintf(opts.IO.Out, "✔ Blob Digest: %s\n", digest)
 
 	return nil
 }
@@ -105,7 +105,7 @@ func pullBlobRun(opts *PullOptions) error {
 	opts.IO.Info(fmt.Sprintf("Pulling blob %s to %s", opts.Digest, opts.OutFile))
 
 	if err := oci.PullBlob(opts.Digest, opts.OutFile, registry, repository, ociToken); err != nil {
-		return fmt.Errorf("Failed to pull blob: %w", err)
+		return fmt.Errorf("failed to pull blob: %w", err)
 	}
 
 	opts.IO.Success(fmt.Sprintf("Successfully pulled blob to %s", opts.OutFile))

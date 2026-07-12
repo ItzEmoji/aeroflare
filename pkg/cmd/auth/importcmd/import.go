@@ -50,7 +50,7 @@ func importRun(opts *Options) error {
 			if token != "" {
 				if err := manager.Set("github-token", token); err == nil {
 					msg := "✅ Imported GitHub token from gh CLI" + githubScopeWarning(token)
-					fmt.Fprintln(f.IOStreams.Out, msg)
+					_, _ = fmt.Fprintln(f.IOStreams.Out, msg)
 					imported++
 				}
 			}
@@ -64,7 +64,7 @@ func importRun(opts *Options) error {
 			token := strings.TrimSpace(string(out))
 			if token != "" {
 				if err := manager.Set("gitlab-token", token); err == nil {
-					fmt.Fprintln(f.IOStreams.Out, "✅ Imported GitLab token from glab CLI")
+					_, _ = fmt.Fprintln(f.IOStreams.Out, "✅ Imported GitLab token from glab CLI")
 					imported++
 				}
 			}
@@ -101,7 +101,7 @@ func importRun(opts *Options) error {
 						err2 := manager.Set(fmt.Sprintf("oci-%s-token", registry), token)
 
 						if err1 == nil && err2 == nil {
-							fmt.Fprintf(f.IOStreams.Out, "✅ Imported OCI credentials for %s from Docker config\n", registry)
+							_, _ = fmt.Fprintf(f.IOStreams.Out, "✅ Imported OCI credentials for %s from Docker config\n", registry)
 							imported++
 						}
 					}
@@ -111,9 +111,9 @@ func importRun(opts *Options) error {
 	}
 
 	if imported == 0 {
-		fmt.Fprintln(f.IOStreams.Out, "No credentials found to import.")
+		_, _ = fmt.Fprintln(f.IOStreams.Out, "No credentials found to import.")
 	} else {
-		fmt.Fprintf(f.IOStreams.Out, "Successfully imported %d credential(s).\n", imported)
+		_, _ = fmt.Fprintf(f.IOStreams.Out, "Successfully imported %d credential(s).\n", imported)
 	}
 
 	return nil

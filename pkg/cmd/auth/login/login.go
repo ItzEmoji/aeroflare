@@ -48,7 +48,7 @@ func loginRun(opts *Options) error {
 			if err := manager.Set(t.key, t.val); err != nil {
 				return err
 			}
-			fmt.Fprintf(f.IOStreams.Out, "Saved %s\n", t.key)
+			_, _ = fmt.Fprintf(f.IOStreams.Out, "Saved %s\n", t.key)
 			savedAny = true
 		}
 	}

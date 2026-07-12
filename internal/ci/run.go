@@ -41,11 +41,11 @@ func prepareScope(upstreams []string) string {
 // cache already serves, prepare what remains once, and upload it to every cache.
 // Returns true iff every build and push succeeded.
 func Run(spec RunSpec, w io.Writer) bool {
-	fmt.Fprintf(w, "aeroflare-ci: %d builds, %d caches\n", len(spec.Builds), len(spec.Caches))
+	_, _ = fmt.Fprintf(w, "aeroflare-ci: %d builds, %d caches\n", len(spec.Builds), len(spec.Caches))
 
 	keyPath, cleanup, err := ResolveSigningKey(spec.SigningKey)
 	if err != nil {
-		fmt.Fprintf(w, "✗ signing-key: %v\n", err)
+		_, _ = fmt.Fprintf(w, "✗ signing-key: %v\n", err)
 		return false
 	}
 	defer cleanup()
@@ -53,7 +53,7 @@ func Run(spec RunSpec, w io.Writer) bool {
 	primary := spec.Caches[0]
 	token0 := ResolveToken(primary.Registry)
 	if token0 == "" {
-		fmt.Fprintf(w, "✗ no token for primary cache %s (set %s)\n", primary.Raw, TokenEnvVar(primary.Registry))
+		_, _ = fmt.Fprintf(w, "✗ no token for primary cache %s (set %s)\n", primary.Raw, TokenEnvVar(primary.Registry))
 		return false
 	}
 
@@ -80,14 +80,14 @@ func Run(spec RunSpec, w io.Writer) bool {
 
 	port, err := proxy.StartProxy(buildCtx, 0, "127.0.0.1", primary.Registry, primary.Repository, upstreams, token0)
 	if err != nil {
-		fmt.Fprintf(w, "✗ proxy: %v\n", err)
+		_, _ = fmt.Fprintf(w, "✗ proxy: %v\n", err)
 		return false
 	}
 	up := "none"
 	if len(upstreams) > 0 {
 		up = strings.Join(upstreams, ", ")
 	}
-	fmt.Fprintf(w, "proxy 127.0.0.1:%d → %s  (upstream: %s)\n\n", port, primary.Raw, up)
+	_, _ = fmt.Fprintf(w, "proxy 127.0.0.1:%d → %s  (upstream: %s)\n\n", port, primary.Raw, up)
 
 	buildsTotal := len(spec.Builds)
 	buildsOK := 0
@@ -95,11 +95,11 @@ func Run(spec RunSpec, w io.Writer) bool {
 	for _, installable := range spec.Builds {
 		paths, err := BuildInstallable(installable, port)
 		if err != nil {
-			fmt.Fprintf(w, "✗ build   %s   %v\n", installable, err)
+			_, _ = fmt.Fprintf(w, "✗ build   %s   %v\n", installable, err)
 			continue
 		}
 		buildsOK++
-		fmt.Fprintf(w, "✓ build   %s   (%d paths)\n", installable, len(paths))
+		_, _ = fmt.Fprintf(w, "✓ build   %s   (%d paths)\n", installable, len(paths))
 		union = append(union, paths...)
 	}
 	// Builds are done — tear down the proxy so it isn't serving during
@@ -107,22 +107,22 @@ func Run(spec RunSpec, w io.Writer) bool {
 	stopProxy()
 	union = dedupPaths(union)
 	if len(union) == 0 {
-		fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, 0, 0, 0))
+		_, _ = fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, 0, 0, 0))
 		return false
 	}
 
 	roots, skipped, err := filterRoots(context.Background(), union, checker, spec.Workers)
 	if err != nil {
-		fmt.Fprintf(w, "✗ upstream check: %v\n", err)
-		fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, len(spec.Caches), 0, 0))
+		_, _ = fmt.Fprintf(w, "✗ upstream check: %v\n", err)
+		_, _ = fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, len(spec.Caches), 0, 0))
 		return false
 	}
 	if skipped > 0 && len(roots) > 0 {
-		fmt.Fprintf(w, "skip     %d build outputs already upstream\n", skipped)
+		_, _ = fmt.Fprintf(w, "skip     %d build outputs already upstream\n", skipped)
 	}
 	if len(roots) == 0 {
-		fmt.Fprintf(w, "%s\n", nothingToPushLine(len(union)))
-		fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, 0, 0, 0))
+		_, _ = fmt.Fprintf(w, "%s\n", nothingToPushLine(len(union)))
+		_, _ = fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, 0, 0, 0))
 		return buildsOK == buildsTotal
 	}
 
@@ -133,33 +133,33 @@ func Run(spec RunSpec, w io.Writer) bool {
 		CacheURLs:   upstreams,
 	})
 	if err != nil {
-		fmt.Fprintf(w, "✗ prepare: %v\n", err)
-		fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, len(spec.Caches), 0, 0))
+		_, _ = fmt.Fprintf(w, "✗ prepare: %v\n", err)
+		_, _ = fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, len(spec.Caches), 0, 0))
 		return false
 	}
 	defer prepared.Cleanup()
 	pathCount := prepared.PathCount()
-	fmt.Fprintf(w, "prepare  %d store paths (%s)\n", pathCount, prepareScope(upstreams))
+	_, _ = fmt.Fprintf(w, "prepare  %d store paths (%s)\n", pathCount, prepareScope(upstreams))
 
 	pushesTotal := len(spec.Caches)
 	pushesOK := 0
 	for _, c := range spec.Caches {
 		token := ResolveToken(c.Registry)
 		if token == "" {
-			fmt.Fprintf(w, "✗ push    → %s   auth: no token (set %s)\n", c.Raw, TokenEnvVar(c.Registry))
+			_, _ = fmt.Fprintf(w, "✗ push    → %s   auth: no token (set %s)\n", c.Raw, TokenEnvVar(c.Registry))
 			continue
 		}
 		reporter := NewPlainReporter(w, "  ")
 		target := push.Target{Registry: c.Registry, Repository: c.Repository, Token: token}
 		res, err := prepared.PushTo(target, reporter)
 		if err != nil {
-			fmt.Fprintf(w, "✗ push    → %s   %v\n", c.Raw, err)
+			_, _ = fmt.Fprintf(w, "✗ push    → %s   %v\n", c.Raw, err)
 			continue
 		}
 		pushesOK++
-		fmt.Fprintf(w, "✓ push    → %s   (%d pushed)\n", c.Raw, res.Uploaded)
+		_, _ = fmt.Fprintf(w, "✓ push    → %s   (%d pushed)\n", c.Raw, res.Uploaded)
 	}
 
-	fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, pushesTotal, pushesOK, pathCount))
+	_, _ = fmt.Fprintf(w, "\n%s\n", summaryLine(buildsTotal, buildsOK, pushesTotal, pushesOK, pathCount))
 	return buildsOK == buildsTotal && pushesOK == pushesTotal
 }

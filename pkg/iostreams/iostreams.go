@@ -41,24 +41,24 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 
 // Error prints msg to stderr, prefixed with "Error: ".
 func (s *IOStreams) Error(msg string) {
-	fmt.Fprintf(s.ErrOut, "Error: %s\n", msg)
+	_, _ = fmt.Fprintf(s.ErrOut, "Error: %s\n", msg)
 }
 
 // Success prints msg to stdout as-is. It's a distinct method from Info mainly
 // so call sites read as intent ("this succeeded" vs. "just letting you know"),
 // even though the formatting is currently identical.
 func (s *IOStreams) Success(msg string) {
-	fmt.Fprintln(s.Out, msg)
+	_, _ = fmt.Fprintln(s.Out, msg)
 }
 
 // Info prints msg to stdout as-is.
 func (s *IOStreams) Info(msg string) {
-	fmt.Fprintln(s.Out, msg)
+	_, _ = fmt.Fprintln(s.Out, msg)
 }
 
 // Warning prints msg to stdout, prefixed with "Warning: ".
 func (s *IOStreams) Warning(msg string) {
-	fmt.Fprintln(s.Out, "Warning: "+msg)
+	_, _ = fmt.Fprintln(s.Out, "Warning: "+msg)
 }
 
 // SetStdinTTY overrides TTY detection. Tests use it to exercise the
