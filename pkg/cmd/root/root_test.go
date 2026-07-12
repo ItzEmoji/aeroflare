@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/itzemoji/aeroflare/internal/oci"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 	"github.com/spf13/viper"
 )
@@ -73,4 +74,63 @@ func TestCacheURLFlagOverridesConfigOnSubcommand(t *testing.T) {
 	if got := ResolveCacheURL(v); got != "oci://from-flag" {
 		t.Errorf("ResolveCacheURL() after Execute = %q, want %q (--cache-url flag should override config file)", got, "oci://from-flag")
 	}
+}
+
+// TestInitConfigUsesGlobalViper is a regression test for a bug where
+// InitConfig() created a private viper.New() instance instead of binding
+// the global viper.GetViper() singleton. internal/oci and internal/init read
+// config via package-level viper.GetString calls (i.e. the global
+// singleton), so a private instance meant --cache-url, AEROFLARE_CACHE, and
+// the config file were silently ignored everywhere except NIXCACHE_REGISTRY
+// /NIXCACHE_REPO. This must be exercised through an executed command (not a
+// direct InitConfig() call) and through internal/oci.GetRegistryAndRepository,
+// the same path production code takes, to actually catch the regression.
+func TestInitConfigUsesGlobalViper(t *testing.T) {
+	t.Run("cache-url flag", func(t *testing.T) {
+		viper.Reset()
+		t.Cleanup(viper.Reset)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+		f, _, _ := cmdutiltest.NewTestFactory(t, nil)
+		f.Config = initConfigAdapter
+
+		cmd := NewCmdRoot(f, "test", "")
+		cmd.SetArgs([]string{"version", "--cache-url", "oci://ghcr.io/foo/bar"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("Execute() = %v, want nil", err)
+		}
+
+		registry, repository := oci.GetRegistryAndRepository()
+		if registry != "ghcr.io" || repository != "foo/bar" {
+			t.Errorf("GetRegistryAndRepository() = (%q, %q), want (%q, %q)", registry, repository, "ghcr.io", "foo/bar")
+		}
+	})
+
+	t.Run("AEROFLARE_CACHE env var", func(t *testing.T) {
+		viper.Reset()
+		t.Cleanup(viper.Reset)
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		t.Setenv("AEROFLARE_CACHE", "foo/bar")
+
+		f, _, _ := cmdutiltest.NewTestFactory(t, nil)
+		f.Config = initConfigAdapter
+
+		cmd := NewCmdRoot(f, "test", "")
+		cmd.SetArgs([]string{"version"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("Execute() = %v, want nil", err)
+		}
+
+		registry, repository := oci.GetRegistryAndRepository()
+		if registry != "ghcr.io" || repository != "foo/bar" {
+			t.Errorf("GetRegistryAndRepository() = (%q, %q), want (%q, %q)", registry, repository, "ghcr.io", "foo/bar")
+		}
+	})
+}
+
+// initConfigAdapter adapts InitConfig's (v, isNew, err) return to the
+// cmdutil.Factory.Config shape of (v, err), for use as f.Config in tests.
+func initConfigAdapter() (*viper.Viper, error) {
+	v, _, err := InitConfig()
+	return v, err
 }

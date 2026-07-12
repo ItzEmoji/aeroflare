@@ -33,7 +33,12 @@ const defaultConfig = `# Aeroflare Configuration
 // created fresh on this run. The AEROFLARE_* environment prefix is registered
 // on the returned Viper.
 func InitConfig() (*viper.Viper, bool, error) {
-	v := viper.New()
+	// Use the global viper singleton, not a private instance. Production
+	// code elsewhere (internal/oci, internal/init) reads config via the
+	// package-level viper.GetString calls rather than a threaded *Viper, so
+	// this must populate the same instance those reads see, exactly as the
+	// pre-refactor cmd/root.go did.
+	v := viper.GetViper()
 
 	configDir := os.Getenv("XDG_CONFIG_HOME")
 	if configDir == "" {
