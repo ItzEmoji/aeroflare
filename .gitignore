@@ -1,5 +1,5 @@
 .env
-aeroflare
+/aeroflare
 coverage.out
 result
 docs/superpowers/

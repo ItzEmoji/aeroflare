@@ -102,8 +102,19 @@ Aeroflare allows you to seamlessly cache Nix binaries into an OCI registry
 Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			oci.DebugLogger = f.Overrides.Verbose >= 2
+
+			// Bind --cache-url to viper here, at Execute time, rather than
+			// while building the command. Building the command must not
+			// force config-file I/O (e.g. doc generation builds the root
+			// command purely to walk the tree, and should not create a
+			// user's config file as a side effect).
+			if v, err := f.Config(); err == nil {
+				_ = v.BindPFlag("cache-url", cmd.PersistentFlags().Lookup("cache-url"))
+			}
+
+			return nil
 		},
 	}
 
@@ -113,10 +124,6 @@ Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 	cmd.PersistentFlags().StringVar(&f.Overrides.GitlabToken, "gitlab-token", "", "GitLab Token")
 	cmd.PersistentFlags().StringVar(&f.Overrides.CfToken, "cf-token", "", "Cloudflare API Token")
 	cmd.PersistentFlags().StringVar(&f.Overrides.CfUserID, "cf-user-id", "", "Cloudflare Account ID")
-
-	if v, err := f.Config(); err == nil {
-		_ = v.BindPFlag("cache-url", cmd.PersistentFlags().Lookup("cache-url"))
-	}
 
 	cmd.AddCommand(version.NewCmdVersion(f, buildVersion, buildDate))
 	cmd.AddCommand(auth.NewCmdAuth(f))
