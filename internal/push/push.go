@@ -14,13 +14,13 @@ import (
 
 	"github.com/itzemoji/aeroflare/internal/backend"
 	"github.com/itzemoji/aeroflare/internal/oci"
-	"github.com/itzemoji/aeroflare/internal/prepare/cache"
-	"github.com/itzemoji/aeroflare/internal/prepare/compress"
-	"github.com/itzemoji/aeroflare/internal/prepare/narinfo"
-	"github.com/itzemoji/aeroflare/internal/prepare/prepare"
-	"github.com/itzemoji/aeroflare/internal/prepare/signing"
 	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/internal/ui"
+	"github.com/itzemoji/aeroflare/pkg/prepare/cache"
+	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
+	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
+	"github.com/itzemoji/aeroflare/pkg/prepare/prepare"
+	"github.com/itzemoji/aeroflare/pkg/prepare/signing"
 
 	"strconv"
 

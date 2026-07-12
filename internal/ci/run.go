@@ -6,9 +6,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/internal/prepare/cache"
 	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/internal/push"
+	"github.com/itzemoji/aeroflare/pkg/prepare/cache"
 )
 
 // summaryLine renders the final one-line roll-up.

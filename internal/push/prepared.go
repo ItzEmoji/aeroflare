@@ -9,11 +9,11 @@ import (
 
 	"github.com/itzemoji/aeroflare/internal/backend"
 	"github.com/itzemoji/aeroflare/internal/oci"
-	"github.com/itzemoji/aeroflare/internal/prepare/compress"
-	"github.com/itzemoji/aeroflare/internal/prepare/narinfo"
-	"github.com/itzemoji/aeroflare/internal/prepare/prepare"
-	"github.com/itzemoji/aeroflare/internal/prepare/signing"
 	"github.com/itzemoji/aeroflare/internal/proxy"
+	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
+	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
+	"github.com/itzemoji/aeroflare/pkg/prepare/prepare"
+	"github.com/itzemoji/aeroflare/pkg/prepare/signing"
 
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"golang.org/x/sync/errgroup"

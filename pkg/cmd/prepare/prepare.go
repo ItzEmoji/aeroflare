@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/itzemoji/aeroflare/internal/prepare/compress"
-	"github.com/itzemoji/aeroflare/internal/prepare/prepare"
-	"github.com/itzemoji/aeroflare/internal/prepare/signing"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
+	"github.com/itzemoji/aeroflare/pkg/prepare/prepare"
+	"github.com/itzemoji/aeroflare/pkg/prepare/signing"
 
 	"github.com/spf13/cobra"
 )

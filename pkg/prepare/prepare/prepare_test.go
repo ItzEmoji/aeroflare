@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/internal/prepare/compress"
-	"github.com/itzemoji/aeroflare/internal/prepare/narinfo"
-	"github.com/itzemoji/aeroflare/internal/prepare/signing"
-	"github.com/itzemoji/aeroflare/internal/prepare/store"
+	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
+	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
+	"github.com/itzemoji/aeroflare/pkg/prepare/signing"
+	"github.com/itzemoji/aeroflare/pkg/prepare/store"
 )
 
 func TestWriteNarAndNarinfo(t *testing.T) {

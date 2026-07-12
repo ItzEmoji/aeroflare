@@ -3,7 +3,7 @@ package ci
 import (
 	"context"
 
-	"github.com/itzemoji/aeroflare/internal/prepare/store"
+	"github.com/itzemoji/aeroflare/pkg/prepare/store"
 )
 
 // upstreamChecker reports which store path hashes an upstream cache already

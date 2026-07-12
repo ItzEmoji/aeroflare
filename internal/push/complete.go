@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	"github.com/itzemoji/aeroflare/internal/backend"
-	"github.com/itzemoji/aeroflare/internal/prepare/prepare"
+	"github.com/itzemoji/aeroflare/pkg/prepare/prepare"
 )
 
 // completeReceipts filters receipts down to store paths whose full closure
