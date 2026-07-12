@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/itzemoji/aeroflare/internal/backend"
-	"github.com/itzemoji/aeroflare/internal/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
 	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"

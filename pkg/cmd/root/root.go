@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/internal/oci"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth"
 	"github.com/itzemoji/aeroflare/pkg/cmd/blob"
 	"github.com/itzemoji/aeroflare/pkg/cmd/configure"
@@ -18,6 +17,7 @@ import (
 	"github.com/itzemoji/aeroflare/pkg/cmd/settings"
 	"github.com/itzemoji/aeroflare/pkg/cmd/version"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -33,7 +33,7 @@ const defaultConfig = `# Aeroflare Configuration
 // on the returned Viper.
 func InitConfig() (*viper.Viper, bool, error) {
 	// Use the global viper singleton, not a private instance. Production
-	// code elsewhere (internal/oci, internal/init) reads config via the
+	// code elsewhere (pkg/oci, internal/init) reads config via the
 	// package-level viper.GetString calls rather than a threaded *Viper, so
 	// this must populate the same instance those reads see, exactly as the
 	// pre-refactor cmd/root.go did.
@@ -107,7 +107,7 @@ Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(invoked *cobra.Command, args []string) error {
-			oci.DebugLogger = f.Overrides.Verbose >= 2
+			oci.SetDebugHTTP(f.Overrides.Verbose >= 2)
 
 			// Bind --cache-url to viper here, at Execute time, rather than
 			// while building the command. Building the command must not

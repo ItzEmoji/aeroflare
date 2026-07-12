@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sync/atomic"
 
 	narhash "github.com/itzemoji/aeroflare/pkg/prepare/hash"
 	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
@@ -29,15 +30,26 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var DebugLogger bool
+// debugHTTP gates per-request debug logging. It is a process-wide diagnostic
+// switch rather than a field because the transport it guards is itself a
+// process-wide singleton; atomic access keeps it safe for concurrent callers.
+var debugHTTP atomic.Bool
+
+// SetDebugHTTP turns per-request debug logging on or off. Logs are written to
+// standard error. It is safe to call from any goroutine at any time.
+//
+// This is a diagnostic switch for the whole process, in the spirit of
+// log.SetOutput; it is not per-request configuration.
+func SetDebugHTTP(enabled bool) { debugHTTP.Store(enabled) }
 
 type loggingTransport struct {
 	Transport http.RoundTripper
 }
 
 func (t *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if DebugLogger {
-		fmt.Printf("[DEBUG] %s %s\n", req.Method, req.URL.String())
+	if debugHTTP.Load() {
+		// stderr, never stdout: a library must not corrupt its caller's output.
+		fmt.Fprintf(os.Stderr, "[DEBUG] %s %s\n", req.Method, req.URL.String())
 	}
 	return t.Transport.RoundTrip(req)
 }

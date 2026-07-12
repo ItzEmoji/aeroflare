@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/itzemoji/aeroflare/internal/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
 

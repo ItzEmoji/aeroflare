@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	setup "github.com/itzemoji/aeroflare/internal/init"
-	"github.com/itzemoji/aeroflare/internal/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"

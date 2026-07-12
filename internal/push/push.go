@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/itzemoji/aeroflare/internal/backend"
-	"github.com/itzemoji/aeroflare/internal/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/internal/ui"
 	"github.com/itzemoji/aeroflare/pkg/prepare/cache"

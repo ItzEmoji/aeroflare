@@ -6,7 +6,7 @@ package push
 import (
 	"os"
 
-	"github.com/itzemoji/aeroflare/internal/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	internalpush "github.com/itzemoji/aeroflare/internal/push"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"

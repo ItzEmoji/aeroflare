@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"github.com/itzemoji/aeroflare/internal/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"

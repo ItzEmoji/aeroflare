@@ -4,7 +4,7 @@ package run
 import (
 	"fmt"
 
-	"github.com/itzemoji/aeroflare/internal/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	internalpush "github.com/itzemoji/aeroflare/internal/push"
 	nixrun "github.com/itzemoji/aeroflare/internal/run"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"

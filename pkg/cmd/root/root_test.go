@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/internal/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 	"github.com/spf13/viper"
 )
@@ -78,12 +78,12 @@ func TestCacheURLFlagOverridesConfigOnSubcommand(t *testing.T) {
 
 // TestInitConfigUsesGlobalViper is a regression test for a bug where
 // InitConfig() created a private viper.New() instance instead of binding
-// the global viper.GetViper() singleton. internal/oci and internal/init read
+// the global viper.GetViper() singleton. pkg/oci and internal/init read
 // config via package-level viper.GetString calls (i.e. the global
 // singleton), so a private instance meant --cache-url, AEROFLARE_CACHE, and
 // the config file were silently ignored everywhere except NIXCACHE_REGISTRY
 // /NIXCACHE_REPO. This must be exercised through an executed command (not a
-// direct InitConfig() call) and through internal/oci.GetRegistryAndRepository,
+// direct InitConfig() call) and through pkg/oci.GetRegistryAndRepository,
 // the same path production code takes, to actually catch the regression.
 func TestInitConfigUsesGlobalViper(t *testing.T) {
 	t.Run("cache-url flag", func(t *testing.T) {
