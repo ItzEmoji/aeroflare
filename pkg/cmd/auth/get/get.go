@@ -57,7 +57,7 @@ func getRun(opts *Options) error {
 		}
 		val, err := field.Resolve(manager)
 		if err != nil {
-			return err
+			return fmt.Errorf("no value found for %s %s: %w", svc.DisplayName, field.Name, err)
 		}
 		_, err = fmt.Fprintln(f.IOStreams.Out, val)
 		return err

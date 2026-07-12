@@ -1,9 +1,11 @@
 package get
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
+	"github.com/itzemoji/aeroflare/internal/secrets"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 )
 
@@ -31,4 +33,51 @@ func TestGet_MissingCredential_Errors(t *testing.T) {
 	if err := cmd.Execute(); err == nil {
 		t.Fatalf("expected error when credential is missing")
 	}
+}
+
+func TestGet_FieldResolutionError_WrappsContextAndUnderlying(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "")
+	t.Setenv("GH_TOKEN", "")
+	f, _, _ := cmdutiltest.NewTestFactory(t, map[string]string{})
+
+	// Replace the secrets manager with one that returns an error on Get
+	mockErr := errors.New("keychain access denied")
+	mock := &errorReturningManager{err: mockErr}
+	f.Secrets = func() secrets.Manager { return mock }
+
+	cmd := NewCmdGet(f)
+	cmd.SetArgs([]string{"github", "token"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected an error, got nil")
+	}
+
+	// Verify error message includes both context and underlying cause
+	if !strings.Contains(err.Error(), "no value found for GitHub token") {
+		t.Errorf("error message missing context: %v", err)
+	}
+	if !errors.Is(err, mockErr) {
+		t.Errorf("error does not wrap underlying error; errors.Is(err, mockErr) = false")
+	}
+}
+
+// errorReturningManager is a test secrets manager that returns an error on Get.
+type errorReturningManager struct {
+	err error
+}
+
+func (m *errorReturningManager) Get(key string) (string, error) {
+	return "", m.err
+}
+
+func (m *errorReturningManager) Set(key, value string) error {
+	return nil
+}
+
+func (m *errorReturningManager) List() ([]string, error) {
+	return nil, nil
+}
+
+func (m *errorReturningManager) Delete(key string) error {
+	return nil
 }
