@@ -43,7 +43,10 @@ func NewCmdProxy(f *cmdutil.Factory) *cobra.Command {
 }
 
 func proxyRun(f *cmdutil.Factory, opts *Options) error {
-	registry, repository := oci.GetRegistryAndRepository()
+	registry, repository, err := oci.GetRegistryAndRepository()
+	if err != nil {
+		return err
+	}
 
 	// Settings below are read from NIXCACHE_* env vars rather than flags so
 	// the proxy can be configured the same way whether it's run directly

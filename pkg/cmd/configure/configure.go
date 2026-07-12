@@ -39,7 +39,10 @@ func NewCmdConfigure(f *cmdutil.Factory) *cobra.Command {
 }
 
 func configureRun(f *cmdutil.Factory, opts *Options) error {
-	registry, repository := oci.GetRegistryAndRepository()
+	registry, repository, err := oci.GetRegistryAndRepository()
+	if err != nil {
+		return err
+	}
 	ociToken := oci.GetToken(registry, repository, "")
 	if ociToken == "" {
 		return fmt.Errorf("Authentication token missing (oci_token, GITHUB_TOKEN or GH_TOKEN)")

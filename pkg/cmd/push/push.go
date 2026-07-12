@@ -67,7 +67,10 @@ func NewCmdPush(f *cmdutil.Factory) *cobra.Command {
 }
 
 func pushRun(f *cmdutil.Factory, opts *Options, args []string) error {
-	registry, _ := oci.GetRegistryAndRepository()
+	registry, _, err := oci.GetRegistryAndRepository()
+	if err != nil {
+		return err
+	}
 	// Called for its side effect: resolves and exports the registry token
 	// (oci_token / GITHUB_TOKEN) into the environment for downstream push steps.
 	if _, err := shared.TokenForRegistry(f, registry); err != nil {

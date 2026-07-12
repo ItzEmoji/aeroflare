@@ -151,8 +151,11 @@ func DisplaySummary(plan *PushPlan) {
 // RunPush preserves the legacy CLI entry point: it resolves the target from
 // viper/env and renders progress with the charm UI, exactly as before.
 func RunPush(plan *PushPlan) error {
-	registry, repository := oci.GetRegistryAndRepository()
-	_, err := RunPushTo(plan, Target{Registry: registry, Repository: repository}, uiReporter{verbose: plan.Config.Verbosity >= 1})
+	registry, repository, err := oci.GetRegistryAndRepository()
+	if err != nil {
+		return err
+	}
+	_, err = RunPushTo(plan, Target{Registry: registry, Repository: repository}, uiReporter{verbose: plan.Config.Verbosity >= 1})
 	return err
 }
 

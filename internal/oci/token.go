@@ -140,8 +140,8 @@ func GetToken(registry, repository, explicitToken string) string {
 // GetRegistryAndRepository derives the target registry and repository from
 // viper config / environment: an explicit cache-url (oci://registry/repo)
 // takes precedence, otherwise it falls back to using the cache name as the
-// repository. Exits the process if neither is set.
-func GetRegistryAndRepository() (string, string) {
+// repository. Returns an error if neither is set.
+func GetRegistryAndRepository() (string, string, error) {
 	registry := viper.GetString("registry")
 	if registry == "" {
 		registry = os.Getenv("NIXCACHE_REGISTRY")
@@ -168,11 +168,10 @@ func GetRegistryAndRepository() (string, string) {
 			cacheName = os.Getenv("NIXCACHE_REPO")
 		}
 		if cacheName == "" {
-			fmt.Fprintln(os.Stderr, "Error: AEROFLARE_CACHE or AEROFLARE_CACHE_URL configuration is required")
-			os.Exit(1)
+			return "", "", errors.New("AEROFLARE_CACHE or AEROFLARE_CACHE_URL configuration is required")
 		}
 		repository = strings.ToLower(cacheName)
 	}
 
-	return registry, repository
+	return registry, repository, nil
 }

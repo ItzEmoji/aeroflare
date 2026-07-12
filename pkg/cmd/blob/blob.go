@@ -41,7 +41,10 @@ func NewCmdPushBlob(f *cmdutil.Factory) *cobra.Command {
 }
 
 func pushBlobRun(opts *PushOptions) error {
-	registry, repository := oci.GetRegistryAndRepository()
+	registry, repository, err := oci.GetRegistryAndRepository()
+	if err != nil {
+		return err
+	}
 
 	ociToken := oci.GetToken(registry, repository, "")
 	if ociToken == "" {
@@ -89,7 +92,10 @@ func NewCmdPullBlob(f *cmdutil.Factory) *cobra.Command {
 }
 
 func pullBlobRun(opts *PullOptions) error {
-	registry, repository := oci.GetRegistryAndRepository()
+	registry, repository, err := oci.GetRegistryAndRepository()
+	if err != nil {
+		return err
+	}
 
 	ociToken := oci.GetToken(registry, repository, "")
 	if ociToken == "" {

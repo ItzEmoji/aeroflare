@@ -100,7 +100,10 @@ func TestInitConfigUsesGlobalViper(t *testing.T) {
 			t.Fatalf("Execute() = %v, want nil", err)
 		}
 
-		registry, repository := oci.GetRegistryAndRepository()
+		registry, repository, err := oci.GetRegistryAndRepository()
+		if err != nil {
+			t.Fatalf("GetRegistryAndRepository() error = %v, want nil", err)
+		}
 		if registry != "ghcr.io" || repository != "foo/bar" {
 			t.Errorf("GetRegistryAndRepository() = (%q, %q), want (%q, %q)", registry, repository, "ghcr.io", "foo/bar")
 		}
@@ -121,7 +124,10 @@ func TestInitConfigUsesGlobalViper(t *testing.T) {
 			t.Fatalf("Execute() = %v, want nil", err)
 		}
 
-		registry, repository := oci.GetRegistryAndRepository()
+		registry, repository, err := oci.GetRegistryAndRepository()
+		if err != nil {
+			t.Fatalf("GetRegistryAndRepository() error = %v, want nil", err)
+		}
 		if registry != "ghcr.io" || repository != "foo/bar" {
 			t.Errorf("GetRegistryAndRepository() = (%q, %q), want (%q, %q)", registry, repository, "ghcr.io", "foo/bar")
 		}

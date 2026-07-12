@@ -1,0 +1,88 @@
+package oci
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/spf13/viper"
+)
+
+func TestGetRegistryAndRepository(t *testing.T) {
+	tests := []struct {
+		name     string
+		cacheURL string
+		cache    string
+		registry string
+		wantReg  string
+		wantRepo string
+		wantErr  bool
+	}{
+		{
+			name:     "cache-url with host splits into registry and repository",
+			cacheURL: "oci://ghcr.io/foo/bar",
+			wantReg:  "ghcr.io",
+			wantRepo: "foo/bar",
+		},
+		{
+			name:     "cache shorthand falls back to ghcr.io and lowercases",
+			cache:    "Foo/Bar",
+			wantReg:  "ghcr.io",
+			wantRepo: "foo/bar",
+		},
+		{
+			name:     "explicit registry key is honored",
+			registry: "example.com",
+			cache:    "foo/bar",
+			wantReg:  "example.com",
+			wantRepo: "foo/bar",
+		},
+		{
+			// The case that used to call os.Exit(1) and kill the process.
+			name:    "no cache configured returns an error instead of exiting",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			// NIXCACHE_* env vars are a fallback path inside the function;
+			// clear them so they can't leak in from the developer's shell.
+			t.Setenv("NIXCACHE_REGISTRY", "")
+			t.Setenv("NIXCACHE_REPO", "")
+
+			if tt.cacheURL != "" {
+				viper.Set("cache-url", tt.cacheURL)
+			}
+			if tt.cache != "" {
+				viper.Set("cache", tt.cache)
+			}
+			if tt.registry != "" {
+				viper.Set("registry", tt.registry)
+			}
+
+			reg, repo, err := GetRegistryAndRepository()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("GetRegistryAndRepository() = nil error, want an error when no cache is configured")
+				}
+				if !strings.Contains(err.Error(), "AEROFLARE_CACHE") {
+					t.Errorf("error %q should name the AEROFLARE_CACHE config the user must set", err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("GetRegistryAndRepository() error = %v, want nil", err)
+			}
+			if reg != tt.wantReg {
+				t.Errorf("registry = %q, want %q", reg, tt.wantReg)
+			}
+			if repo != tt.wantRepo {
+				t.Errorf("repository = %q, want %q", repo, tt.wantRepo)
+			}
+		})
+	}
+}

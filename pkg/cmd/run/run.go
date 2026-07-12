@@ -47,7 +47,10 @@ func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 }
 
 func runRun(f *cmdutil.Factory, opts *Options, args []string) error {
-	registry, repository := oci.GetRegistryAndRepository()
+	registry, repository, err := oci.GetRegistryAndRepository()
+	if err != nil {
+		return err
+	}
 
 	cfg := &nixrun.RunConfig{
 		Command: args,

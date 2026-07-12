@@ -142,7 +142,9 @@ func scaffoldRun(opts *Options) error {
 	}
 
 	// Patch wrangler.toml with environment values if available.
-	opts.patchWranglerToml(proxyDir)
+	if err := opts.patchWranglerToml(proxyDir); err != nil {
+		return err
+	}
 
 	opts.IO.Success(fmt.Sprintf("Project scaffolded at %s", proxyDir))
 	opts.IO.Info("You can now customize the worker and deploy with 'aeroflare init' or 'npx wrangler deploy'.")
@@ -152,7 +154,7 @@ func scaffoldRun(opts *Options) error {
 
 // patchWranglerToml applies configuration values from environment variables
 // to the scaffolded wrangler.toml template.
-func (opts *Options) patchWranglerToml(proxyDir string) {
+func (opts *Options) patchWranglerToml(proxyDir string) error {
 	registry, repository := "", ""
 	if r := os.Getenv("AEROFLARE_REGISTRY"); r != "" {
 		registry = r
@@ -168,7 +170,10 @@ func (opts *Options) patchWranglerToml(proxyDir string) {
 
 	// Try from the network package if env vars are set.
 	if registry == "" || repository == "" {
-		r, repo := oci.GetRegistryAndRepository()
+		r, repo, err := oci.GetRegistryAndRepository()
+		if err != nil {
+			return err
+		}
 		if registry == "" {
 			registry = r
 		}
@@ -181,7 +186,7 @@ func (opts *Options) patchWranglerToml(proxyDir string) {
 	content, err := os.ReadFile(wranglerPath)
 	if err != nil {
 		opts.IO.Warning(fmt.Sprintf("Could not read wrangler.toml: %v", err))
-		return
+		return nil
 	}
 
 	// Set the two vars the worker reads, replacing either a commented placeholder
@@ -195,6 +200,7 @@ func (opts *Options) patchWranglerToml(proxyDir string) {
 	}
 
 	_ = os.WriteFile(wranglerPath, []byte(s), 0644)
+	return nil
 }
 
 // setWranglerVar sets `key = "value"` in a wrangler.toml body, replacing an
