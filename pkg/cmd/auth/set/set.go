@@ -32,7 +32,7 @@ Examples:
   aeroflare auth set oci registry.example.com <username> <token>
 
 With no values, you are prompted for each field (requires a terminal).`,
-		Args: cobra.MinimumNArgs(1),
+		Args: cmdutil.FlagErrorArgs(cobra.MinimumNArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Args = args
 			return setRun(opts)

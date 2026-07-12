@@ -28,7 +28,7 @@ func NewCmdRemove(f *cmdutil.Factory) *cobra.Command {
 Examples:
   aeroflare auth remove github
   aeroflare auth remove oci registry.example.com`,
-		Args: cobra.MinimumNArgs(1),
+		Args: cmdutil.FlagErrorArgs(cobra.MinimumNArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Args = args
 			return removeRun(opts)

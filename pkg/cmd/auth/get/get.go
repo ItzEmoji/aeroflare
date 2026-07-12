@@ -32,7 +32,7 @@ Examples:
 
 For a multi-field service with no field given, each field is printed as
 "name=value".`,
-		Args: cobra.MinimumNArgs(1),
+		Args: cmdutil.FlagErrorArgs(cobra.MinimumNArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Args = args
 			return getRun(opts)
