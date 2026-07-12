@@ -24,6 +24,11 @@ buildGoModule (finalAttrs: {
     "-X github.com/itzemoji/aeroflare/internal/build.Version=${finalAttrs.version}"
   ];
 
+  subPackages = [
+    "cmd/aeroflare"
+    "cmd/aeroflare-ci"
+  ];
+
   meta = {
     description = "The OCI-based Nix-Binary-Cache written in Go";
     homepage = "https://github.com/itzemoji/aeroflare";

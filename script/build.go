@@ -106,7 +106,7 @@ type distBinary struct {
 	pkg  string // package path passed to `go build`
 }
 
-var aeroflareBin = distBinary{name: "aeroflare", pkg: "."}
+var aeroflareBin = distBinary{name: "aeroflare", pkg: "./cmd/aeroflare"}
 var aeroflareCIBin = distBinary{name: "aeroflare-ci", pkg: "./cmd/aeroflare-ci"}
 
 func main() {
