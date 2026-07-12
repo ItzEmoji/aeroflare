@@ -10,9 +10,13 @@ import (
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth"
 	"github.com/itzemoji/aeroflare/pkg/cmd/blob"
 	"github.com/itzemoji/aeroflare/pkg/cmd/configure"
+	initcmd "github.com/itzemoji/aeroflare/pkg/cmd/init"
+	"github.com/itzemoji/aeroflare/pkg/cmd/prepare"
 	"github.com/itzemoji/aeroflare/pkg/cmd/proxy"
 	"github.com/itzemoji/aeroflare/pkg/cmd/push"
 	"github.com/itzemoji/aeroflare/pkg/cmd/run"
+	"github.com/itzemoji/aeroflare/pkg/cmd/scaffold"
+	"github.com/itzemoji/aeroflare/pkg/cmd/settings"
 	"github.com/itzemoji/aeroflare/pkg/cmd/version"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -122,6 +126,10 @@ Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 	cmd.AddCommand(blob.NewCmdPullBlob(f))
 	cmd.AddCommand(proxy.NewCmdProxy(f))
 	cmd.AddCommand(configure.NewCmdConfigure(f))
+	cmd.AddCommand(prepare.NewCmdPrepare(f))
+	cmd.AddCommand(settings.NewCmdSettings(f))
+	cmd.AddCommand(scaffold.NewCmdScaffold(f))
+	cmd.AddCommand(initcmd.NewCmdInit(f))
 
 	return cmd
 }
