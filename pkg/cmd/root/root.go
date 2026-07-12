@@ -8,6 +8,8 @@ import (
 
 	"github.com/itzemoji/aeroflare/internal/oci"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth"
+	"github.com/itzemoji/aeroflare/pkg/cmd/push"
+	"github.com/itzemoji/aeroflare/pkg/cmd/run"
 	"github.com/itzemoji/aeroflare/pkg/cmd/version"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -111,6 +113,8 @@ Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 
 	cmd.AddCommand(version.NewCmdVersion(f, buildVersion, buildDate))
 	cmd.AddCommand(auth.NewCmdAuth(f))
+	cmd.AddCommand(push.NewCmdPush(f))
+	cmd.AddCommand(run.NewCmdRun(f))
 
 	return cmd
 }
