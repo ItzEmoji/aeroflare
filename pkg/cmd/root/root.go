@@ -102,7 +102,7 @@ Aeroflare allows you to seamlessly cache Nix binaries into an OCI registry
 Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(invoked *cobra.Command, args []string) error {
 			oci.DebugLogger = f.Overrides.Verbose >= 2
 
 			// Bind --cache-url to viper here, at Execute time, rather than
@@ -110,8 +110,15 @@ Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 			// force config-file I/O (e.g. doc generation builds the root
 			// command purely to walk the tree, and should not create a
 			// user's config file as a side effect).
+			//
+			// cobra invokes an inherited PersistentPreRunE with its cmd
+			// parameter bound to the actually-executed leaf command, not the
+			// root command that defines --cache-url. Use invoked.Root() to
+			// reach the persistent flag set that actually holds the flag.
 			if v, err := f.Config(); err == nil {
-				_ = v.BindPFlag("cache-url", cmd.PersistentFlags().Lookup("cache-url"))
+				if err := v.BindPFlag("cache-url", invoked.Root().PersistentFlags().Lookup("cache-url")); err != nil {
+					return fmt.Errorf("could not bind --cache-url: %w", err)
+				}
 			}
 
 			return nil
