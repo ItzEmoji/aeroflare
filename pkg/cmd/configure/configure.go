@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	setup "github.com/itzemoji/aeroflare/internal/init"
 	"github.com/itzemoji/aeroflare/internal/oci"
 	"github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
@@ -76,7 +77,7 @@ func configureRun(f *cmdutil.Factory, opts *Options) error {
 				Description("Enter your nix cache public key (optional)").
 				Value(&publicKey),
 		),
-	)
+	).WithTheme(setup.AeroflareTheme())
 
 	if err := form.Run(); err != nil {
 		if err.Error() != "user aborted" {

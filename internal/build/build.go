@@ -1,5 +1,5 @@
 // Package build holds version metadata for aeroflare binaries. Version and
-// Date are set at link time via `-ldflags -X`, computed by script/build.go
+// Date are set at link time via `-ldflags -X`, computed by scripts/build.go
 // and baked in by the Makefile, the release workflow, and default.nix.
 package build
 

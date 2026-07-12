@@ -1,9 +1,9 @@
 // Command build provides build tasks for aeroflare, mirroring the pattern
-// used by github/cli's script/build.go: a small Go program that computes
+// used by github/cli's scripts/build.go: a small Go program that computes
 // version/date metadata and invokes `go build` with the right ldflags, so
 // the same logic runs locally and in CI.
 //
-// Usage: go run script/build.go <task> [--prefix=VALUE]
+// Usage: go run scripts/build.go <task> [--prefix=VALUE]
 //
 // Known tasks:
 //
@@ -113,7 +113,7 @@ func main() {
 	task, prefixFlag, err := parseArgs(os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, "usage: go run script/build.go <task> [--prefix=VALUE]")
+		fmt.Fprintln(os.Stderr, "usage: go run scripts/build.go <task> [--prefix=VALUE]")
 		os.Exit(1)
 	}
 

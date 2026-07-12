@@ -15,7 +15,6 @@ import (
 	"github.com/itzemoji/aeroflare/pkg/cmd/proxy"
 	"github.com/itzemoji/aeroflare/pkg/cmd/push"
 	"github.com/itzemoji/aeroflare/pkg/cmd/run"
-	"github.com/itzemoji/aeroflare/pkg/cmd/scaffold"
 	"github.com/itzemoji/aeroflare/pkg/cmd/settings"
 	"github.com/itzemoji/aeroflare/pkg/cmd/version"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
@@ -147,7 +146,6 @@ Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 	cmd.AddCommand(configure.NewCmdConfigure(f))
 	cmd.AddCommand(prepare.NewCmdPrepare(f))
 	cmd.AddCommand(settings.NewCmdSettings(f))
-	cmd.AddCommand(scaffold.NewCmdScaffold(f))
 	cmd.AddCommand(initcmd.NewCmdInit(f))
 
 	// Wrap cobra's own flag-parse errors (e.g. unknown flag, invalid value)

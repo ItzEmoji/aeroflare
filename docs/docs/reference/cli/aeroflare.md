@@ -33,7 +33,6 @@ Use it as a proxy cache, or push/pull blobs directly to/from the registry.
 * [aeroflare push](aeroflare_push.md)	 - Push a build to the cache
 * [aeroflare push-blob](aeroflare_push-blob.md)	 - Push a blob to the registry
 * [aeroflare run](aeroflare_run.md)	 - Run a command with proxy substituter and push the output paths
-* [aeroflare scaffold](aeroflare_scaffold.md)	 - Generate local project files for an Aeroflare worker
 * [aeroflare settings](aeroflare_settings.md)	 - Configure Aeroflare interactively
 * [aeroflare version](aeroflare_version.md)	 - Print the version number of aeroflare
 

@@ -9,67 +9,67 @@ tasks:
   build:
     desc: Build the aeroflare binary for the host OS/arch into ./out/aeroflare
     cmds:
-      - go run script/build.go build
+      - go run scripts/build.go build
 
   build-ci:
     desc: Build the aeroflare-ci binary for the host OS/arch into ./out/aeroflare-ci
     cmds:
-      - go run script/build.go build-ci
+      - go run scripts/build.go build-ci
 
   build-all:
     desc: Build both aeroflare and aeroflare-ci for the host OS/arch
     cmds:
-      - go run script/build.go build-all
+      - go run scripts/build.go build-all
 
   dist:
     desc: Cross-compile aeroflare release tarballs (linux/amd64, linux/arm64) into ./out/
     cmds:
-      - go run script/build.go dist
+      - go run scripts/build.go dist
 
   dist-ci:
     desc: Cross-compile aeroflare-ci release tarballs into ./out/
     cmds:
-      - go run script/build.go dist-ci
+      - go run scripts/build.go dist-ci
 
   dist-all:
     desc: Cross-compile release tarballs for both binaries
     cmds:
-      - go run script/build.go dist-all
+      - go run scripts/build.go dist-all
 
   install:
     desc: Build aeroflare and install it to PREFIX/bin (default /usr/local)
     cmds:
-      - go run script/build.go install {{.CLI_ARGS}}
+      - go run scripts/build.go install {{.CLI_ARGS}}
 
   install-ci:
     desc: Build aeroflare-ci and install it to PREFIX/bin (default /usr/local)
     cmds:
-      - go run script/build.go install-ci {{.CLI_ARGS}}
+      - go run scripts/build.go install-ci {{.CLI_ARGS}}
 
   install-all:
     desc: Build both and install them to PREFIX/bin (default /usr/local)
     cmds:
-      - go run script/build.go install-all {{.CLI_ARGS}}
+      - go run scripts/build.go install-all {{.CLI_ARGS}}
 
   install-release:
     desc: Fetch the aeroflare release from GitHub and install it to PREFIX/bin
     cmds:
-      - go run script/build.go install-release {{.CLI_ARGS}}
+      - go run scripts/build.go install-release {{.CLI_ARGS}}
 
   install-release-ci:
     desc: Fetch the aeroflare-ci release from GitHub and install it to PREFIX/bin
     cmds:
-      - go run script/build.go install-release-ci {{.CLI_ARGS}}
+      - go run scripts/build.go install-release-ci {{.CLI_ARGS}}
 
   install-release-all:
     desc: Fetch both releases from GitHub and install them to PREFIX/bin
     cmds:
-      - go run script/build.go install-release-all {{.CLI_ARGS}}
+      - go run scripts/build.go install-release-all {{.CLI_ARGS}}
 
   clean:
     desc: Remove ./out/
     cmds:
-      - go run script/build.go clean
+      - go run scripts/build.go clean
 
   lint:
     desc: Run golangci-lint

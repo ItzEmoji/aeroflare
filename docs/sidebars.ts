@@ -43,7 +43,6 @@ const sidebars: SidebarsConfig = {
             'reference/cli/aeroflare_proxy',
             'reference/cli/aeroflare_run',
             'reference/cli/aeroflare_push',
-            'reference/cli/aeroflare_scaffold',
             'reference/cli/aeroflare_prepare',
             'reference/cli/aeroflare_push-blob',
             'reference/cli/aeroflare_pull-blob',

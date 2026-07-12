@@ -2,55 +2,55 @@
 
 .PHONY: build
 build: ## Build the aeroflare binary for the host OS/arch into ./out/aeroflare
-	go run script/build.go build
+	go run scripts/build.go build
 
 .PHONY: build-ci
 build-ci: ## Build the aeroflare-ci binary for the host OS/arch into ./out/aeroflare-ci
-	go run script/build.go build-ci
+	go run scripts/build.go build-ci
 
 .PHONY: build-all
 build-all: ## Build both aeroflare and aeroflare-ci for the host OS/arch
-	go run script/build.go build-all
+	go run scripts/build.go build-all
 
 .PHONY: dist
 dist: ## Cross-compile aeroflare release tarballs (linux/amd64, linux/arm64) into ./out/
-	go run script/build.go dist
+	go run scripts/build.go dist
 
 .PHONY: dist-ci
 dist-ci: ## Cross-compile aeroflare-ci release tarballs into ./out/
-	go run script/build.go dist-ci
+	go run scripts/build.go dist-ci
 
 .PHONY: dist-all
 dist-all: ## Cross-compile release tarballs for both binaries
-	go run script/build.go dist-all
+	go run scripts/build.go dist-all
 
 .PHONY: install
 install: ## Build aeroflare and install it to PREFIX/bin (default /usr/local)
-	go run script/build.go install
+	go run scripts/build.go install
 
 .PHONY: install-ci
 install-ci: ## Build aeroflare-ci and install it to PREFIX/bin (default /usr/local)
-	go run script/build.go install-ci
+	go run scripts/build.go install-ci
 
 .PHONY: install-all
 install-all: ## Build both and install them to PREFIX/bin (default /usr/local)
-	go run script/build.go install-all
+	go run scripts/build.go install-all
 
 .PHONY: install-release
 install-release: ## Fetch the aeroflare release from GitHub and install it to PREFIX/bin
-	go run script/build.go install-release
+	go run scripts/build.go install-release
 
 .PHONY: install-release-ci
 install-release-ci: ## Fetch the aeroflare-ci release from GitHub and install it to PREFIX/bin
-	go run script/build.go install-release-ci
+	go run scripts/build.go install-release-ci
 
 .PHONY: install-release-all
 install-release-all: ## Fetch both releases from GitHub and install them to PREFIX/bin
-	go run script/build.go install-release-all
+	go run scripts/build.go install-release-all
 
 .PHONY: clean
 clean: ## Remove ./out/
-	go run script/build.go clean
+	go run scripts/build.go clean
 
 .PHONY: lint
 lint: ## Run golangci-lint
