@@ -4,10 +4,24 @@
 package cmdutil
 
 import (
-	"github.com/itzemoji/aeroflare/internal/secrets"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
 	"github.com/spf13/viper"
 )
+
+// SecretsManager stores and retrieves named secrets. Implementations may back
+// onto the OS keychain, a file, or (in tests) an in-memory map.
+//
+// The interface is declared here rather than in internal/secrets so that
+// Factory is nameable from outside the module: a field typed with an internal
+// package's type would compile for us but leave external importers unable to
+// construct or substitute it. Go interfaces are structural, so
+// internal/secrets' implementations satisfy this without naming it.
+type SecretsManager interface {
+	Set(key, value string) error
+	Get(key string) (string, error)
+	List() ([]string, error)
+	Delete(key string) error
+}
 
 // Overrides holds credential values supplied as root persistent flags. They
 // take precedence over the secrets manager and the environment when a command
@@ -32,7 +46,7 @@ type Factory struct {
 	// never needs them (e.g. `version`) does not pay to construct a keychain
 	// client or read a config file, and so tests can substitute fakes without
 	// touching global state.
-	Secrets func() secrets.Manager
+	Secrets func() SecretsManager
 	Config  func() (*viper.Viper, error)
 
 	// CacheURL resolves the effective OCI cache URL: an explicit --cache-url

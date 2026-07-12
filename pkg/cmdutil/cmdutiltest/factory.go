@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/internal/secrets"
 	"github.com/itzemoji/aeroflare/internal/secrets/secretstest"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
@@ -28,7 +27,7 @@ func NewTestFactory(t *testing.T, stored map[string]string) (*cmdutil.Factory, *
 	f := &cmdutil.Factory{
 		IOStreams:   io,
 		Overrides:   &cmdutil.Overrides{},
-		Secrets:     func() secrets.Manager { return mgr },
+		Secrets:     func() cmdutil.SecretsManager { return mgr },
 		Config:      func() (*viper.Viper, error) { return v, nil },
 		CacheURL:    func() string { return "" },
 		IsNewConfig: func() bool { return false },

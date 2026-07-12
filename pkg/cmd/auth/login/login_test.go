@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/internal/secrets"
 	"github.com/itzemoji/aeroflare/internal/secrets/secretstest"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 )
 
@@ -43,7 +43,7 @@ func TestLogin_PropagatesSecretsManagerError(t *testing.T) {
 	f, _, _ := cmdutiltest.NewTestFactory(t, map[string]string{})
 	mock := secretstest.NewMockManager(map[string]string{})
 	mock.Err = errors.New("mock error")
-	f.Secrets = func() secrets.Manager { return mock }
+	f.Secrets = func() cmdutil.SecretsManager { return mock }
 	f.Overrides.GithubToken = "fail"
 
 	cmd := NewCmdLogin(f)

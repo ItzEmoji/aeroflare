@@ -60,6 +60,10 @@ lint: ## Run golangci-lint
 test: ## Run go test ./...
 	go test ./...
 
+.PHONY: check-api
+check-api: ## Verify no internal/ types leak into the public pkg/ API
+	@./scripts/check_api_leaks.sh
+
 .PHONY: help
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-12s\033[0m %s\n", $$1, $$2}'

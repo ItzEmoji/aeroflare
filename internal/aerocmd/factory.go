@@ -30,7 +30,7 @@ func NewFactory(appVersion string) *cmdutil.Factory {
 		Overrides:  &cmdutil.Overrides{},
 	}
 
-	f.Secrets = func() secrets.Manager {
+	f.Secrets = func() cmdutil.SecretsManager {
 		secretsOnce.Do(func() { secretsMgr = secrets.NewManager() })
 		return secretsMgr
 	}

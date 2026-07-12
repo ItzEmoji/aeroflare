@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/internal/secrets"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 )
 
@@ -43,7 +43,7 @@ func TestGet_FieldResolutionError_WrappsContextAndUnderlying(t *testing.T) {
 	// Replace the secrets manager with one that returns an error on Get
 	mockErr := errors.New("keychain access denied")
 	mock := &errorReturningManager{err: mockErr}
-	f.Secrets = func() secrets.Manager { return mock }
+	f.Secrets = func() cmdutil.SecretsManager { return mock }
 
 	cmd := NewCmdGet(f)
 	cmd.SetArgs([]string{"github", "token"})

@@ -13,6 +13,8 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12
+      - name: check public API boundaries
+        run: make check-api
   nix-build:
     runs-on: ubuntu-latest
     steps:
