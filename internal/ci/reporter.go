@@ -41,3 +41,17 @@ func (r *PlainReporter) Summary(title string, fields [][2]string) {
 	}
 	_, _ = fmt.Fprintf(r.w, "%s  (%s)\n", r.prefix, strings.Join(parts, ", "))
 }
+
+// Failed, Warn, and Info previously escaped this reporter: the push engine
+// printed them straight to stdout, so they bypassed r.w and lost the indent.
+func (r *PlainReporter) Failed(storePath, stage string, err error) {
+	_, _ = fmt.Fprintf(r.w, "%s  ✗ failed    %s  (%s: %v)\n", r.prefix, storePath, stage, err)
+}
+
+func (r *PlainReporter) Warn(msg string) {
+	_, _ = fmt.Fprintf(r.w, "%s  ! %s\n", r.prefix, msg)
+}
+
+func (r *PlainReporter) Info(msg string) {
+	_, _ = fmt.Fprintf(r.w, "%s  %s\n", r.prefix, strings.TrimSpace(msg))
+}

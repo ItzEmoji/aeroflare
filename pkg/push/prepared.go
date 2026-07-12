@@ -164,7 +164,7 @@ func uploadTaskSet(ctx context.Context, tasks []preparedTask, registry, reposito
 			r := t.r
 			fail := func(stage string, err error) {
 				mu.Lock()
-				fmt.Printf("ERROR: %s (%s): %v\n", stage, r.StorePath, err)
+				reporter.Failed(r.StorePath, stage, err)
 				failed = append(failed, r.StorePath)
 				mu.Unlock()
 			}

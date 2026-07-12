@@ -93,7 +93,7 @@ func pushRun(f *cmdutil.Factory, opts *Options, args []string) error {
 	return Run(f, opts, cfg)
 }
 
-// Run drives the shared push pipeline: Preflight -> DisplaySummary -> RunPush.
+// Run drives the shared push pipeline: Preflight -> summary -> RunPushTo.
 // It is the extracted, identical tail of both `push` and `run`.
 func Run(f *cmdutil.Factory, opts *Options, cfg *internalpush.PushConfig) error {
 	target, err := Target()
@@ -106,9 +106,13 @@ func Run(f *cmdutil.Factory, opts *Options, cfg *internalpush.PushConfig) error 
 		return err
 	}
 
-	internalpush.DisplaySummary(plan)
+	// The command layer owns presentation: it renders the summary and hands the
+	// pipeline a reporter, rather than the pipeline printing for itself.
+	reporter := NewUIReporter(cfg.Verbosity >= 1)
+	reporter.Summary("Push Summary", internalpush.SummaryFields(plan))
 
-	return internalpush.RunPush(plan, target)
+	_, err = internalpush.RunPushTo(plan, target, reporter)
+	return err
 }
 
 // Target resolves the push destination from CLI config: registry and repository

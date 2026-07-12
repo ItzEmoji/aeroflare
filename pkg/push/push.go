@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/itzemoji/aeroflare/internal/backend"
-	"github.com/itzemoji/aeroflare/internal/ui"
 	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/pkg/prepare/cache"
 	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
@@ -24,7 +23,6 @@ import (
 
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"golang.org/x/sync/errgroup"
 )
@@ -156,35 +154,30 @@ func Preflight(cfg *PushConfig) (*PushPlan, error) {
 	}, nil
 }
 
-// DisplaySummary prints what is about to happen.
-func DisplaySummary(plan *PushPlan) {
-	fields := []ui.BoxField{
-		{Label: "Total paths", Value: strconv.Itoa(len(plan.Config.TargetPaths))},
+// SummaryFields describes what a push is about to do, as label/value pairs
+// ready to hand to Reporter.Summary. It renders nothing itself.
+func SummaryFields(plan *PushPlan) [][2]string {
+	fields := [][2]string{
+		{"Total paths", strconv.Itoa(len(plan.Config.TargetPaths))},
 	}
 	if plan.SkippedCount > 0 {
-		fields = append(fields, ui.BoxField{Label: "Already cached", Value: strconv.Itoa(plan.SkippedCount)})
+		fields = append(fields, [2]string{"Already cached", strconv.Itoa(plan.SkippedCount)})
 	}
-	fields = append(fields, ui.BoxField{Label: "To be pushed", Value: strconv.Itoa(len(plan.FilteredPaths))})
-
-	ui.PrintSummaryBox("Push Summary", fields)
+	return append(fields, [2]string{"To be pushed", strconv.Itoa(len(plan.FilteredPaths))})
 }
 
-// RunPush executes a PushPlan end to end: it authenticates against the
-// registry, filters out paths already present in the cache index or upstream
-// cache (unless ForcePush is set), then prepares and uploads the remaining
-// paths in fixed-size chunks. Receipts are flushed to the cache backend after
-// each chunk so an interrupted push keeps whatever it already uploaded, and
-// per-path upload failures are reported at the end rather than aborting the
-// whole run (a chunk only aborts outright if every upload in it fails).
-// RunPush renders progress with the charm UI. The caller supplies the target;
-// this package does not resolve one from viper or the environment.
-func RunPush(plan *PushPlan, target Target) error {
-	_, err := RunPushTo(plan, target, uiReporter{verbose: plan.Config.Verbosity >= 1})
-	return err
-}
-
-// RunPushTo executes a PushPlan against an explicit target, reporting progress
-// through reporter. See RunPush for the legacy viper/env-backed entry point.
+// RunPushTo executes a PushPlan end to end against an explicit target: it
+// authenticates against the registry, filters out paths already present in the
+// cache index or upstream cache (unless ForcePush is set), then prepares and
+// uploads the remaining paths in fixed-size chunks. Receipts are flushed to the
+// cache backend after each chunk so an interrupted push keeps whatever it
+// already uploaded, and per-path upload failures are reported at the end rather
+// than aborting the whole run (a chunk only aborts outright if every upload in
+// it fails).
+//
+// Progress is reported through reporter; nothing is written to stdout. The
+// caller supplies the target, so this package resolves nothing from viper or
+// the environment.
 func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, error) {
 	startTime := time.Now()
 	var totalUploaded int
@@ -218,7 +211,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 	if !plan.Config.KeepFiles {
 		defer func() { _ = os.RemoveAll(outputDir) }()
 	} else {
-		fmt.Printf("Generated files will be kept in: %s\n", outputDir)
+		reporter.Info(fmt.Sprintf("Generated files will be kept in: %s", outputDir))
 	}
 
 	var upstreamURLs []string
@@ -257,7 +250,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 
 			existsMap, err := c.ExistsBatch(ctx, hashes, plan.Config.Workers)
 			if err != nil {
-				fmt.Printf("WARNING: upstream cache check failed: %v\n", err)
+				reporter.Warn(fmt.Sprintf("upstream cache check failed: %v", err))
 			} else {
 				var trulyFiltered []string
 				for _, p := range filteredPaths {
@@ -276,7 +269,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 	}
 
 	if len(filteredPaths) == 0 {
-		fmt.Println("No new paths to push.")
+		reporter.Info("No new paths to push.")
 		return &PushResult{}, nil
 	}
 	tokenMgr := proxy.NewTokenManager(registry, repository, target.Token)
@@ -297,7 +290,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 
 		numChunks := (len(filteredPaths) + chunkSize - 1) / chunkSize
 		currentChunk := (i / chunkSize) + 1
-		fmt.Printf("\n--- Processing chunk %d/%d ---\n\n", currentChunk, numChunks)
+		reporter.Info(fmt.Sprintf("\n--- Processing chunk %d/%d ---\n", currentChunk, numChunks))
 
 		var results []*prepare.Result
 		reporter.Step(1, 3, "Preparing (Generating NAR and narinfo files)")
@@ -381,7 +374,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 
 				fail := func(stage string, err error) {
 					mu.Lock()
-					fmt.Printf("ERROR: %s (%s): %v\n", stage, r.StorePath, err)
+					reporter.Failed(r.StorePath, stage, err)
 					chunkFailed = append(chunkFailed, r.StorePath)
 					mu.Unlock()
 				}
@@ -501,15 +494,4 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 	}
 
 	return result, nil
-}
-
-// printStep prints a "[step/total] msg" progress line, e.g. "[2/3] Uploading...".
-func printStep(step, total int, msg string) {
-	fmt.Printf("\n  [%d/%d] %s\n", step, total, msg)
-}
-
-// printSuccess prints msg prefixed with a green checkmark.
-func printSuccess(msg string) {
-	checkMark := lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("✓")
-	fmt.Printf("  %s %s\n", checkMark, msg)
 }
