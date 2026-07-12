@@ -30,7 +30,7 @@ func NewCmdPushBlob(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "push-blob [file-path]",
 		Short: "Push a blob to the registry",
-		Args:  cobra.ExactArgs(1),
+		Args:  cmdutil.FlagErrorArgs(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.FilePath = args[0]
 			return pushBlobRun(opts)
@@ -77,7 +77,7 @@ func NewCmdPullBlob(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pull-blob [digest] [output-file]",
 		Short: "Pull a blob from the registry",
-		Args:  cobra.ExactArgs(2),
+		Args:  cmdutil.FlagErrorArgs(cobra.ExactArgs(2)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Digest = args[0]
 			opts.OutFile = args[1]

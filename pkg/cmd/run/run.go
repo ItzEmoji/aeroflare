@@ -34,7 +34,7 @@ func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run [--] <command>...",
 		Short: "Run a command with proxy substituter and push the output paths",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cmdutil.FlagErrorArgs(cobra.MinimumNArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runRun(f, opts, args)
 		},

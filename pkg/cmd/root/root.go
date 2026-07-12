@@ -150,5 +150,14 @@ Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 	cmd.AddCommand(scaffold.NewCmdScaffold(f))
 	cmd.AddCommand(initcmd.NewCmdInit(f))
 
+	// Wrap cobra's own flag-parse errors (e.g. unknown flag, invalid value)
+	// as cmdutil.FlagError, so aerocmd's handleError can print the failing
+	// command's usage for them while leaving genuine runtime failures usage
+	// free. Set via SetFlagErrorFunc, not the struct literal: cobra.Command's
+	// FlagErrorFunc field is unexported.
+	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		return cmdutil.FlagErrorWrap(err)
+	})
+
 	return cmd
 }
