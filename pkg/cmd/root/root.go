@@ -1,3 +1,7 @@
+// Package root assembles the aeroflare command tree and owns the config
+// bootstrap: InitConfig locates (or creates) aeroflare.yaml and binds the
+// AEROFLARE_* environment prefix, and NewCmdRoot wires every subcommand onto
+// the root command. It is the single place the tree is defined.
 package root
 
 import (

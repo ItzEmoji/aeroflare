@@ -1,3 +1,5 @@
+// Package version implements `aeroflare version`, reporting the build version
+// and date stamped into the binary at link time.
 package version
 
 import (

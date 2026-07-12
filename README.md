@@ -71,26 +71,55 @@ generic runners, and binary verification:
 
 ## Codebase Directory Map
 
+Everything under `pkg/` is public and importable; `internal/` is the CLI's own plumbing and cannot be imported from outside the module.
+
 ```
 .
-├── cmd/                # Cobra CLI commands (flag parsing, Viper configurations)
-│   ├── root.go         # Entry point, environment bindings
-│   ├── proxy.go        # Proxy CLI command definition
-│   ├── run.go          # CLI command for build wrapper
-│   └── ...             # Settings, auth, and push CLI commands
-├── internal/           # Core logic packages (decoupled from Cobra/CLI)
-│   ├── oci/            # OCI registry transport: layers, pushers, auth, retry
-│   ├── backend/        # CacheBackend abstraction + native OCI-tag implementation
-│   ├── auth/           # OAuth token flows, Device authorization
+├── cmd/                # Binary entry points (aeroflare, aeroflare-ci)
+├── pkg/                # Public API — see "Using Aeroflare as a Go library"
+│   ├── oci/            # OCI registry transport: layers, pushers, token exchange, retry
+│   ├── prepare/        # NAR serialization, hashing, compression, signing, upstream lookup
+│   ├── push/           # Push pipeline (prepare -> upload), Reporter-driven
+│   ├── proxy/          # Substituter HTTP server, handlers, token management
+│   ├── cmd/            # Cobra command tree, one package per command
+│   ├── cmdutil/        # Factory + the CLI's config/credential resolution (Viper, env, keyring)
+│   └── iostreams/      # stdin/stdout/stderr abstraction
+├── internal/           # CLI-only packages, not importable by other modules
+│   ├── auth/           # OAuth token flows, device authorization
 │   ├── secrets/        # Credentials manager (keyring + plaintext fallback)
-│   ├── proxy/          # HTTP server, proxy handlers, token management
-│   ├── prepare/        # Local NAR serialization, compression, and signing
-│   ├── push/           # Push pipeline (prepare -> backend publish)
+│   ├── backend/        # CacheBackend abstraction + native OCI-tag implementation
+│   ├── ci/             # `aeroflare-ci` build orchestration
 │   ├── run/            # `aeroflare run` build wrapper
 │   ├── init/           # Interactive provisioning wizards
 │   └── ui/             # Shared terminal UI components
 └── docs/               # Docusaurus documentation website
 ```
+
+---
+
+## Using Aeroflare as a Go library
+
+Aeroflare's engines are importable, not just runnable. The packages under `pkg/` are documented for `go doc`:
+
+| Package | What it does |
+| --- | --- |
+| [`pkg/oci`](pkg/oci) | Registry client: token exchange, blobs, manifests |
+| [`pkg/prepare`](pkg/prepare) | Nix store path → NAR + narinfo (hashing, compression, signing) |
+| [`pkg/push`](pkg/push) | The NAR/narinfo → registry upload pipeline |
+| [`pkg/proxy`](pkg/proxy) | The Nix substituter HTTP server |
+
+```console
+$ go doc github.com/itzemoji/aeroflare/pkg/push
+$ go doc github.com/itzemoji/aeroflare/pkg/oci ExchangeToken
+```
+
+These packages take their configuration as explicit parameters. They do not read Viper, the environment, or the OS keyring, and they never write to stdout — resolving credentials and rendering progress are the caller's job. `pkg/cmdutil` holds the CLI's own answers to those questions and is a worked example. Each package's `doc.go` carries a runnable example.
+
+### API stability
+
+> **The Go API under `pkg/` is _not_ covered by this module's semantic version.**
+
+Aeroflare is versioned as a command-line tool. A release may change, rename, or remove any exported Go symbol without a major version bump, and the project makes no compatibility promise to importers. If these packages are useful to you, import them — but pin an exact version and expect to make adjustments when you upgrade.
 
 ---
 
