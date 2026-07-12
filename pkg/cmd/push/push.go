@@ -6,7 +6,6 @@ package push
 import (
 	"os"
 
-	"github.com/itzemoji/aeroflare/pkg/oci"
 	internalpush "github.com/itzemoji/aeroflare/internal/push"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
@@ -67,7 +66,7 @@ func NewCmdPush(f *cmdutil.Factory) *cobra.Command {
 }
 
 func pushRun(f *cmdutil.Factory, opts *Options, args []string) error {
-	registry, _, err := oci.GetRegistryAndRepository()
+	registry, _, err := cmdutil.RegistryAndRepository()
 	if err != nil {
 		return err
 	}
@@ -97,6 +96,11 @@ func pushRun(f *cmdutil.Factory, opts *Options, args []string) error {
 // Run drives the shared push pipeline: Preflight -> DisplaySummary -> RunPush.
 // It is the extracted, identical tail of both `push` and `run`.
 func Run(f *cmdutil.Factory, opts *Options, cfg *internalpush.PushConfig) error {
+	target, err := Target()
+	if err != nil {
+		return err
+	}
+
 	plan, err := internalpush.Preflight(cfg)
 	if err != nil {
 		return err
@@ -104,5 +108,24 @@ func Run(f *cmdutil.Factory, opts *Options, cfg *internalpush.PushConfig) error 
 
 	internalpush.DisplaySummary(plan)
 
-	return internalpush.RunPush(plan)
+	return internalpush.RunPush(plan, target)
+}
+
+// Target resolves the push destination from CLI config: registry and repository
+// from viper/env, and a TokenSource that re-resolves the registry credential on
+// demand. The token is supplied as a source rather than a value because registry
+// bearer tokens are short-lived and a long push refreshes between chunks.
+func Target() (internalpush.Target, error) {
+	registry, repository, err := cmdutil.RegistryAndRepository()
+	if err != nil {
+		return internalpush.Target{}, err
+	}
+
+	return internalpush.Target{
+		Registry:   registry,
+		Repository: repository,
+		TokenSource: func() string {
+			return cmdutil.RegistryToken(registry, repository, "")
+		},
+	}, nil
 }

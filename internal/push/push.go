@@ -43,11 +43,34 @@ type PushConfig struct {
 	Verbosity   int
 }
 
-// Target is an explicit push destination, replacing viper/env resolution.
+// Target is an explicit push destination. It carries everything the push
+// pipeline needs to authenticate, so this package never consults viper, the
+// environment, or the OS keyring itself.
 type Target struct {
 	Registry   string
 	Repository string
-	Token      string // raw token (e.g. GITHUB_TOKEN); exchanged internally
+
+	// Token is a ready-to-use registry bearer token. Ignored when TokenSource
+	// is set.
+	Token string
+
+	// TokenSource, when non-nil, is called to obtain a bearer token, and is
+	// called again before each upload chunk. Registry bearer tokens are
+	// short-lived, so a long push must be able to refresh; a static Token
+	// would expire partway through. Returning "" means no credential is
+	// available.
+	//
+	// The CLI supplies cmdutil.RegistryToken here.
+	TokenSource func() string
+}
+
+// token returns a fresh bearer token for the target, preferring TokenSource so
+// that long-running pushes pick up a refreshed credential.
+func (t Target) token() string {
+	if t.TokenSource != nil {
+		return t.TokenSource()
+	}
+	return t.Token
 }
 
 // PushResult summarizes a completed RunPushTo call.
@@ -148,14 +171,10 @@ func DisplaySummary(plan *PushPlan) {
 // each chunk so an interrupted push keeps whatever it already uploaded, and
 // per-path upload failures are reported at the end rather than aborting the
 // whole run (a chunk only aborts outright if every upload in it fails).
-// RunPush preserves the legacy CLI entry point: it resolves the target from
-// viper/env and renders progress with the charm UI, exactly as before.
-func RunPush(plan *PushPlan) error {
-	registry, repository, err := oci.GetRegistryAndRepository()
-	if err != nil {
-		return err
-	}
-	_, err = RunPushTo(plan, Target{Registry: registry, Repository: repository}, uiReporter{verbose: plan.Config.Verbosity >= 1})
+// RunPush renders progress with the charm UI. The caller supplies the target;
+// this package does not resolve one from viper or the environment.
+func RunPush(plan *PushPlan, target Target) error {
+	_, err := RunPushTo(plan, target, uiReporter{verbose: plan.Config.Verbosity >= 1})
 	return err
 }
 
@@ -166,9 +185,8 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 	var totalUploaded int
 	var skippedUpstream int
 
-	// Resolve the registry token from the explicit target (exchanges a PAT if needed).
 	registry, repository := target.Registry, target.Repository
-	ociToken := oci.GetToken(registry, repository, target.Token)
+	ociToken := target.token()
 	if ociToken == "" {
 		return nil, errors.New("authentication token missing for registry")
 	}
@@ -331,7 +349,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 
 		// Registry bearer tokens are short-lived; refresh per chunk so long
 		// pushes don't fail partway with auth errors.
-		if t := oci.GetToken(registry, repository, target.Token); t != "" {
+		if t := target.token(); t != "" {
 			ociToken = t
 		}
 

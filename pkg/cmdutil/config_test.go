@@ -1,18 +1,21 @@
-package oci
+package cmdutil_test
 
 import (
 	"strings"
 	"testing"
 
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/spf13/viper"
 )
 
-func TestGetRegistryAndRepository(t *testing.T) {
+func TestRegistryAndRepository(t *testing.T) {
 	tests := []struct {
 		name     string
 		cacheURL string
 		cache    string
 		registry string
+		envReg   string
+		envRepo  string
 		wantReg  string
 		wantRepo string
 		wantErr  bool
@@ -37,6 +40,13 @@ func TestGetRegistryAndRepository(t *testing.T) {
 			wantRepo: "foo/bar",
 		},
 		{
+			name:     "NIXCACHE_* env vars are the fallback when viper is unset",
+			envReg:   "docker.io",
+			envRepo:  "MyCache",
+			wantReg:  "docker.io",
+			wantRepo: "mycache",
+		},
+		{
 			// The case that used to call os.Exit(1) and kill the process.
 			name:    "no cache configured returns an error instead of exiting",
 			wantErr: true,
@@ -49,8 +59,8 @@ func TestGetRegistryAndRepository(t *testing.T) {
 			t.Cleanup(viper.Reset)
 			// NIXCACHE_* env vars are a fallback path inside the function;
 			// clear them so they can't leak in from the developer's shell.
-			t.Setenv("NIXCACHE_REGISTRY", "")
-			t.Setenv("NIXCACHE_REPO", "")
+			t.Setenv("NIXCACHE_REGISTRY", tt.envReg)
+			t.Setenv("NIXCACHE_REPO", tt.envRepo)
 
 			if tt.cacheURL != "" {
 				viper.Set("cache-url", tt.cacheURL)
@@ -62,11 +72,11 @@ func TestGetRegistryAndRepository(t *testing.T) {
 				viper.Set("registry", tt.registry)
 			}
 
-			reg, repo, err := GetRegistryAndRepository()
+			reg, repo, err := cmdutil.RegistryAndRepository()
 
 			if tt.wantErr {
 				if err == nil {
-					t.Fatal("GetRegistryAndRepository() = nil error, want an error when no cache is configured")
+					t.Fatal("RegistryAndRepository() = nil error, want an error when no cache is configured")
 				}
 				if !strings.Contains(err.Error(), "AEROFLARE_CACHE") {
 					t.Errorf("error %q should name the AEROFLARE_CACHE config the user must set", err)
@@ -75,7 +85,7 @@ func TestGetRegistryAndRepository(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("GetRegistryAndRepository() error = %v, want nil", err)
+				t.Fatalf("RegistryAndRepository() error = %v, want nil", err)
 			}
 			if reg != tt.wantReg {
 				t.Errorf("registry = %q, want %q", reg, tt.wantReg)

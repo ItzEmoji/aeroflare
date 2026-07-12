@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/pkg/oci"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 	"github.com/spf13/viper"
 )
@@ -83,7 +83,7 @@ func TestCacheURLFlagOverridesConfigOnSubcommand(t *testing.T) {
 // singleton), so a private instance meant --cache-url, AEROFLARE_CACHE, and
 // the config file were silently ignored everywhere except NIXCACHE_REGISTRY
 // /NIXCACHE_REPO. This must be exercised through an executed command (not a
-// direct InitConfig() call) and through pkg/oci.GetRegistryAndRepository,
+// direct InitConfig() call) and through pkg/cmdutil.RegistryAndRepository,
 // the same path production code takes, to actually catch the regression.
 func TestInitConfigUsesGlobalViper(t *testing.T) {
 	t.Run("cache-url flag", func(t *testing.T) {
@@ -100,7 +100,7 @@ func TestInitConfigUsesGlobalViper(t *testing.T) {
 			t.Fatalf("Execute() = %v, want nil", err)
 		}
 
-		registry, repository, err := oci.GetRegistryAndRepository()
+		registry, repository, err := cmdutil.RegistryAndRepository()
 		if err != nil {
 			t.Fatalf("GetRegistryAndRepository() error = %v, want nil", err)
 		}
@@ -124,7 +124,7 @@ func TestInitConfigUsesGlobalViper(t *testing.T) {
 			t.Fatalf("Execute() = %v, want nil", err)
 		}
 
-		registry, repository, err := oci.GetRegistryAndRepository()
+		registry, repository, err := cmdutil.RegistryAndRepository()
 		if err != nil {
 			t.Fatalf("GetRegistryAndRepository() error = %v, want nil", err)
 		}

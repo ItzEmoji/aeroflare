@@ -11,7 +11,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/itzemoji/aeroflare/pkg/oci"
 	proxysrv "github.com/itzemoji/aeroflare/internal/proxy"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
@@ -69,7 +68,7 @@ func proxySettingsFromEnv() (port int, listenAddr string, upstreams []string) {
 }
 
 func proxyRun(f *cmdutil.Factory, opts *Options) error {
-	registry, repository, err := oci.GetRegistryAndRepository()
+	registry, repository, err := cmdutil.RegistryAndRepository()
 	if err != nil {
 		return err
 	}

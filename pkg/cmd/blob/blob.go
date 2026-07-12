@@ -41,12 +41,12 @@ func NewCmdPushBlob(f *cmdutil.Factory) *cobra.Command {
 }
 
 func pushBlobRun(opts *PushOptions) error {
-	registry, repository, err := oci.GetRegistryAndRepository()
+	registry, repository, err := cmdutil.RegistryAndRepository()
 	if err != nil {
 		return err
 	}
 
-	ociToken := oci.GetToken(registry, repository, "")
+	ociToken := cmdutil.RegistryToken(registry, repository, "")
 	if ociToken == "" {
 		return errors.New("oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
 	}
@@ -92,12 +92,12 @@ func NewCmdPullBlob(f *cmdutil.Factory) *cobra.Command {
 }
 
 func pullBlobRun(opts *PullOptions) error {
-	registry, repository, err := oci.GetRegistryAndRepository()
+	registry, repository, err := cmdutil.RegistryAndRepository()
 	if err != nil {
 		return err
 	}
 
-	ociToken := oci.GetToken(registry, repository, "")
+	ociToken := cmdutil.RegistryToken(registry, repository, "")
 	if ociToken == "" {
 		return errors.New("oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
 	}

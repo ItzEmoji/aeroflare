@@ -2,19 +2,14 @@ package oci
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/itzemoji/aeroflare/internal/auth"
-
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/spf13/viper"
 )
 
 // ExchangeToken performs a token exchange for a given OCI registry.
@@ -92,86 +87,3 @@ func ExchangeToken(registry, repository, username, basicAuthToken string) (strin
 	return "", fmt.Errorf("failed to exchange token (HTTP %d): %s", resp.StatusCode, string(bodyBytes))
 }
 
-// GetToken attempts to get a valid token, exchanging a GitHub/GitLab PAT if necessary
-func GetToken(registry, repository, explicitToken string) string {
-	token := explicitToken
-	if token == "" {
-		var err error
-		token, err = auth.ResolveRegistryToken(registry)
-		if err != nil && !errors.Is(err, auth.ErrTokenNotFound) {
-			fmt.Fprintf(os.Stderr, "Warning: failed to resolve registry token: %v\n", err)
-		}
-	}
-
-	if token == "" {
-		return ""
-	}
-
-	username, _ := auth.NewResolver(fmt.Sprintf("oci-%s-username", registry)).Resolve()
-	if username == "" {
-		username = os.Getenv("AEROFLARE_GIT_USERNAME")
-	}
-
-	isGitToken := strings.HasPrefix(token, "ghp_") || strings.HasPrefix(token, "github_pat_") || strings.HasPrefix(token, "glpat-") || strings.HasPrefix(token, "gho_") || strings.HasPrefix(token, "ghu_") || strings.HasPrefix(token, "ghs_")
-	isDockerToken := strings.HasPrefix(token, "dckr_pat_")
-
-	// If it's a JWT, or we have no username and it doesn't look like a known PAT, assume it's already a Bearer token.
-	if strings.HasPrefix(token, "eyJ") || (!isGitToken && !isDockerToken && username == "") {
-		return token
-	}
-
-	if username == "" {
-		username = "token"
-	}
-
-	// Try to exchange it
-	exchanged, err := ExchangeToken(registry, repository, username, token)
-	if err == nil && exchanged != "" {
-		return exchanged
-	}
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG ExchangeToken error: %v\n", err)
-	}
-
-	return token // Fallback
-}
-
-// GetRegistryAndRepository derives the target registry and repository from
-// viper config / environment: an explicit cache-url (oci://registry/repo)
-// takes precedence, otherwise it falls back to using the cache name as the
-// repository. Returns an error if neither is set.
-func GetRegistryAndRepository() (string, string, error) {
-	registry := viper.GetString("registry")
-	if registry == "" {
-		registry = os.Getenv("NIXCACHE_REGISTRY")
-	}
-	if registry == "" {
-		registry = "ghcr.io"
-	}
-
-	ociURL := viper.GetString("cache-url")
-	var repository string
-
-	if ociURL != "" {
-		ociURL = strings.TrimPrefix(ociURL, "oci://")
-		parts := strings.SplitN(ociURL, "/", 2)
-		if len(parts) == 2 && strings.Contains(parts[0], ".") {
-			registry = parts[0]
-			repository = parts[1]
-		} else {
-			repository = ociURL
-		}
-	} else {
-		cacheName := viper.GetString("cache")
-		if cacheName == "" {
-			cacheName = os.Getenv("NIXCACHE_REPO")
-		}
-		if cacheName == "" {
-			return "", "", errors.New("AEROFLARE_CACHE or AEROFLARE_CACHE_URL configuration is required")
-		}
-		repository = strings.ToLower(cacheName)
-	}
-
-	return registry, repository, nil
-}

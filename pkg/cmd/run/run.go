@@ -4,7 +4,6 @@ package run
 import (
 	"fmt"
 
-	"github.com/itzemoji/aeroflare/pkg/oci"
 	internalpush "github.com/itzemoji/aeroflare/internal/push"
 	nixrun "github.com/itzemoji/aeroflare/internal/run"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
@@ -47,7 +46,7 @@ func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 }
 
 func runRun(f *cmdutil.Factory, opts *Options, args []string) error {
-	registry, repository, err := oci.GetRegistryAndRepository()
+	registry, repository, err := cmdutil.RegistryAndRepository()
 	if err != nil {
 		return err
 	}

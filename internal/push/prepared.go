@@ -222,7 +222,7 @@ func uploadTaskSet(ctx context.Context, tasks []preparedTask, registry, reposito
 func (ps *PreparedSet) PushTo(target Target, reporter Reporter) (*PushResult, error) {
 	ctx := context.Background()
 
-	ociToken := oci.GetToken(target.Registry, target.Repository, target.Token)
+	ociToken := target.token()
 	if ociToken == "" {
 		return nil, errors.New("authentication token missing for registry")
 	}
