@@ -1,7 +1,4 @@
-.env
-/aeroflare
 coverage.out
-result
 docs/superpowers/
 .superpowers/
 .wrangler
