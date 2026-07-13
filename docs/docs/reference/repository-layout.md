@@ -5,64 +5,97 @@ title: Repository Layout & Codebase
 
 # Repository Layout & Codebase Walkthrough
 
-For contributors and advanced users, understanding exactly how Aeroflare is structured makes it much easier to debug issues or extend functionality. 
+Aeroflare is a Go module split along one line that matters: **`pkg/` is the
+importable engine, `internal/` is everything that only makes sense inside the
+CLI.** The Go toolchain enforces the second half of that (no external module can
+import `internal/`), and `make check-api` enforces the first half by failing if an
+`internal/` type leaks into a `pkg/` signature.
 
-Aeroflare is written in Go and structured into two primary domains: the **CLI boundary** (`cmd/`) and the **Core library** (`internal/`), following the [golang-standards/project-layout](https://github.com/golang-standards/project-layout) convention.
+If you intend to *use* Aeroflare as a library rather than modify it, read the
+[Go API](./go-api.md) page instead — this one is about finding your way around
+the source.
 
-## The `cmd/` Directory (CLI Boundary)
+## `cmd/` — binaries
 
-This directory contains the [Cobra](https://github.com/spf13/cobra) command definitions. Each file here maps directly to a subcommand you can run in your terminal. 
+| Path | What it is |
+|---|---|
+| `cmd/aeroflare/` | The interactive CLI. `main.go` only. |
+| `cmd/aeroflare-ci/` | The non-interactive CI runner, which the GitHub Action wraps. |
+| `cmd/gen_docs/` | Generates the CLI reference pages under `docs/docs/reference/cli/` from the Cobra tree. |
 
-These files are deliberately kept thin. They are responsible for parsing flags, reading configuration via [Viper](https://github.com/spf13/viper), and passing arguments into the `internal/` core logic.
+## `pkg/` — the engines
 
-* `root.go`: The entrypoint of the CLI. Initializes Viper and loads `aeroflare.yaml`.
-* `proxy.go`: Maps to `aeroflare proxy`. Invokes the `internal/proxy` package.
-* `run.go`: Maps to `aeroflare run`. Starts the ephemeral proxy and wraps the Nix command.
-* `init.go` / `configure.go` / `settings.go`: Maps to the interactive wizards (`aeroflare init` and `aeroflare settings`). These invoke the `huh` TUI forms.
-* `auth*.go`: Handles all `aeroflare auth` subcommands, routing credential resolution to the `internal/secrets` package.
-* `push.go`: CLI binding for the cache push command.
+The four library packages, in dependency order. None of them read a config file,
+an environment variable, or the keychain; none of them write to stdout. Registry,
+repository, and credential are always parameters.
 
-## The `internal/` Directory (Core Logic)
+* **`pkg/prepare/`** — turning a store path into artifacts. Sub-packages: `store`
+  (querying the Nix store), `hash`, `compress` (zstd/xz/gzip), `narinfo`
+  (generating and serialising the metadata), `signing`, `cache`, and `prepare`
+  itself.
+* **`pkg/oci/`** — the registry layer, and the most load-bearing package in the
+  project. `network.go` streams `.nar` blobs as OCI layers and maps `.narinfo`
+  fields onto manifest annotations (`vnd.aeroflare.nar.*`) using
+  `google/go-containerregistry`. `oci.go` parses those annotations back.
+  `auth.go` builds credentials — and *only* builds them: the token exchange, the
+  retry policy, and re-authentication on expiry are all delegated to
+  go-containerregistry's transport rather than reimplemented.
+  `config_manifest.go` reads and writes the `cache-config` manifest.
+* **`pkg/push/`** — the push pipeline. Prepares each path, filters out what the
+  registry or the upstream cache already has, uploads the rest in chunks, and
+  flushes receipts after each chunk so an interrupted push keeps what it
+  uploaded. A per-path failure is collected, not fatal. Progress goes through a
+  `Reporter` the caller supplies.
+* **`pkg/proxy/`** — the substituter. `proxy_server.go` answers
+  `/nix-cache-info`, `/<hash>.narinfo`, `/nar/<…>`, and `/public-key`, resolving
+  each narinfo from manifest annotations and streaming each NAR straight from the
+  registry blob without buffering to disk. `bootstrap.go` starts it and resolves
+  cache-wide config. Requests the registry cannot satisfy fall through to the
+  configured upstreams.
 
-This is where the actual magic happens. The logic is heavily decoupled so that network operations, local file preparations, and proxying do not depend on CLI state. The storage-facing packages form a strict dependency layering — `backend` → `oci` — so lower layers never import the ones above them.
+Supporting packages: **`pkg/cmd/*`** holds the Cobra command constructors (one
+sub-package per command, each thin: parse flags, resolve config, call an engine);
+**`pkg/cmdutil`** is the `Factory` plus registry/credential resolution — the
+worked example of how to feed the engines; **`pkg/iostreams`** abstracts
+stdin/stdout/stderr for testability.
 
-### 1. Networking & Storage
-* `internal/oci/`: **The most critical package in the project.** It implements the OCI network layer (`network.go`), using `google/go-containerregistry` to stream `.nar` blobs as OCI layers and map Nix `.narinfo` metadata onto OCI Manifest Annotations (`vnd.aeroflare.nar.*`). It also owns registry credentials (`auth.go` — which delegates the token exchange, the retry policy and the re-authentication on expiry to go-containerregistry rather than reimplementing them), annotation parsing (`oci.go`), and writing the `cache-config` manifest (`config_manifest.go`).
-* `internal/backend/`: The `CacheBackend` abstraction and its `NativeBackend` implementation (`native.go`), which publishes each completed push as its own OCI image. Also defines the `PushReceipt` type threaded through the push pipeline.
+## `internal/` — CLI-only logic
 
-### 2. The Proxy Server
-* `internal/proxy/`: Contains the HTTP server logic that tricks the Nix daemon into thinking it's talking to a standard binary cache.
-  * `proxy_server.go`: Intercepts `/*.narinfo` and `/*.nar` HTTP requests. It parses the incoming Nix Hash, and dynamically translates the request into an OCI manifest fetch using `network.go`. It reconstructs the `.narinfo` plain text format on the fly.
-  * `token_manager.go`: Handles authorization headers if the upstream registry requires authentication.
+* `internal/aerocmd/` — assembles the command tree and the factory.
+* `internal/auth/` — token resolution and validation. The `Resolver` walks flags →
+  environment (`GITHUB_TOKEN`, `GH_TOKEN`, …) → secrets manager, in that order,
+  and validates that a PAT actually carries `write:packages`.
+* `internal/secrets/` — token storage, backed by the OS keychain via
+  `zalando/go-keyring`.
+* `internal/backend/` — the `CacheBackend` abstraction and its `NativeBackend`
+  implementation, which publishes each completed push as its own OCI image.
+* `internal/run/` — the `aeroflare run` wrapper: spawn an ephemeral proxy on a
+  free port, inject `--option extra-substituters`, run the subprocess, push what
+  it printed.
+* `internal/ci/` — the `aeroflare-ci` runner: config parsing, cache specs, build
+  filtering, signing-key resolution, reporting.
+* `internal/init/` — the provisioning wizard (GitHub/GitLab repo creation,
+  Cloudflare Worker deployment) and the `huh` theme.
+* `internal/ui/` — terminal output primitives (boxes, tables). Deliberately
+  unreachable from the engines.
+* `internal/build/` — `Version` and `Date`, injected at link time.
 
-### 3. Execution Wrapper
-* `internal/run/`: Implements the `aeroflare run` logic.
-  * It spawns the proxy server on an ephemeral port.
-  * It instruments the `nix` subprocess with `--option extra-substituters`.
-  * Post-execution, it computes the newly generated Nix derivations and triggers a concurrent push operation.
+## How data flows through a push
 
-### 4. Nix Artifact Preparation
-* `internal/prepare/`: Before a local Nix store path can be pushed, it must be packaged.
-  * This package generates the `.nar` (Nix Archive) format from local store paths.
-  * It compresses the archive (e.g., using `zstd`).
-  * It extracts dependencies and computes cryptographic hashes to generate the `.narinfo` map.
+Tracing `aeroflare push --store-path /nix/store/abc…-package`:
 
-### 5. Security & Authentication
-* `internal/secrets/`: Abstracts token storage. It integrates directly with the OS Native Keychain (using `zalando/go-keyring`) to ensure Cloudflare and GitHub tokens are encrypted at rest.
-* `internal/auth/`: Implements OAuth flows and token validation with remote providers (e.g., verifying a GitHub PAT has `write:packages` scopes).
-
-### 6. Wizards & UI
-* `internal/init/`: Contains the complex infrastructure provisioning logic. It talks directly to the Cloudflare API to provision Edge Workers based on user selections.
-* `internal/ui/`: Shared terminal UI components (progress bars, spinners, and customized `huh` themes) used across the CLI.
-
----
-
-## How Data Flows Through the Codebase
-
-To truly understand Aeroflare, let's trace exactly what happens when you run `aeroflare push --store-path /nix/store/abc-package`:
-
-1. **Entry**: `cmd/push.go` parses the flags and passes `/nix/store/abc-package` to the core.
-2. **Prepare**: `internal/prepare` serializes the directory into a `.nar` file and compresses it via `zstd`. It generates a `.narinfo` struct in memory.
-3. **Upload Blob**: `internal/oci/network.go` opens a stream to the OCI Registry (e.g., GHCR). It uploads the compressed `.nar` as a raw `v1.Layer`.
-4. **Map Metadata**: `internal/oci/network.go` creates a new OCI Manifest. It takes the `.narinfo` struct and maps every field (FileHash, StorePath, Sig) into `vnd.aeroflare.nar.*` annotations on the manifest.
-5. **Tagging**: The manifest is tagged with `abc` (the 32-character Nix hash) and pushed to the registry. The operation completes with O(1) fetch capability guaranteed for the future.
+1. **Entry.** `pkg/cmd/push` parses the flags. `pkg/cmdutil` resolves the registry,
+   the repository, and a credential, and builds an `authn.Authenticator`.
+2. **Preflight.** `pkg/push` decides what actually needs uploading, dropping paths
+   the registry or the upstream cache already serves.
+3. **Prepare.** `pkg/prepare` serialises the store path into a `.nar`, compresses
+   it (zstd by default), hashes it, and builds the `.narinfo` in memory — signing
+   it if a key was supplied.
+4. **Upload blob.** `pkg/oci` streams the compressed NAR to the registry as a raw
+   `v1.Layer`.
+5. **Map metadata.** `pkg/oci` builds an OCI manifest and writes every narinfo
+   field (`StorePath`, `FileHash`, `NarHash`, `Sig`, …) into `vnd.aeroflare.nar.*`
+   annotations on it.
+6. **Tag.** The manifest is tagged with the 32-character Nix store hash (`abc…`).
+   That tag *is* the index: a later `<hash>.narinfo` request becomes a single
+   manifest fetch, with no database to consult.
