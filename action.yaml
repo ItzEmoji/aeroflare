@@ -1,4 +1,4 @@
-name: Aeroflare
+name: Aeroflare CI
 description: Build Nix flake installables and push them to one or more OCI binary caches.
 author: ItzEmoji
 branding:
