@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 
 	"github.com/spf13/cobra"
 )
@@ -46,14 +46,14 @@ func pushBlobRun(opts *PushOptions) error {
 		return err
 	}
 
-	ociToken := cmdutil.RegistryToken(registry, repository, "")
-	if ociToken == "" {
-		return errors.New("oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
+	auth := cmdutil.RegistryAuth(registry, "")
+	if auth == nil {
+		return errors.New("no registry credential found: set oci_token, GITHUB_TOKEN or GH_TOKEN, or run aeroflare auth login")
 	}
 
 	opts.IO.Info(fmt.Sprintf("Pushing blob: %s", opts.FilePath))
 
-	digest, err := oci.PushBlob(opts.FilePath, registry, repository, ociToken)
+	digest, err := oci.PushBlob(opts.FilePath, registry, repository, auth)
 	if err != nil {
 		return fmt.Errorf("failed to push blob: %w", err)
 	}
@@ -97,14 +97,14 @@ func pullBlobRun(opts *PullOptions) error {
 		return err
 	}
 
-	ociToken := cmdutil.RegistryToken(registry, repository, "")
-	if ociToken == "" {
-		return errors.New("oci_token, GITHUB_TOKEN or GH_TOKEN environment variable is required")
+	auth := cmdutil.RegistryAuth(registry, "")
+	if auth == nil {
+		return errors.New("no registry credential found: set oci_token, GITHUB_TOKEN or GH_TOKEN, or run aeroflare auth login")
 	}
 
 	opts.IO.Info(fmt.Sprintf("Pulling blob %s to %s", opts.Digest, opts.OutFile))
 
-	if err := oci.PullBlob(opts.Digest, opts.OutFile, registry, repository, ociToken); err != nil {
+	if err := oci.PullBlob(opts.Digest, opts.OutFile, registry, repository, auth); err != nil {
 		return fmt.Errorf("failed to pull blob: %w", err)
 	}
 

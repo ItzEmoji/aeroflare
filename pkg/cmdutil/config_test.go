@@ -8,53 +8,76 @@ import (
 	"github.com/spf13/viper"
 )
 
-// The proxy and push packages no longer read oci_token / NIXCACHE_TOKEN
-// themselves; this is the CLI-side lookup that feeds them.
-func TestRegistryOverrideToken(t *testing.T) {
+// A credential resolved from the environment is a password: the registry is
+// what turns it into a bearer token. Presenting it as a bearer instead is what
+// broke pushes from GitHub Actions, whose GITHUB_TOKEN is a "ghs_" PAT.
+func TestRegistryAuth_ResolvesCredentialsAsPasswords(t *testing.T) {
 	tests := []struct {
-		name        string
-		ociToken    string
-		nixcacheTok string
-		want        string
+		name     string
+		registry string
+		env      map[string]string
+		want     string
 	}{
 		{
-			name:     "oci_token is used verbatim",
-			ociToken: "direct-oci-token-value",
-			want:     "direct-oci-token-value",
+			name:     "a GitHub Actions token is a password, not a bearer",
+			registry: "ghcr.io",
+			env:      map[string]string{"GITHUB_TOKEN": "ghs_actionsToken"},
+			want:     "ghs_actionsToken",
 		},
 		{
-			name:        "NIXCACHE_TOKEN is the fallback",
-			nixcacheTok: "nixcache-direct-token",
-			want:        "nixcache-direct-token",
+			name:     "a classic PAT is a password too",
+			registry: "ghcr.io",
+			env:      map[string]string{"GITHUB_TOKEN": "ghp_classicToken"},
+			want:     "ghp_classicToken",
 		},
 		{
-			name:        "oci_token wins over NIXCACHE_TOKEN",
-			ociToken:    "first",
-			nixcacheTok: "second",
-			want:        "first",
-		},
-		{
-			// A raw PAT is not a bearer token: fall through to exchange
-			// rather than send an invalid Authorization header.
-			name:     "a raw PAT is rejected",
-			ociToken: "ghp_mypersonalaccesstoken",
-			want:     "",
-		},
-		{
-			name: "nothing set",
-			want: "",
+			name:     "oci_token supplies a generic registry's password",
+			registry: "harbor.example.com",
+			env:      map[string]string{"oci_token": "some-harbor-password"},
+			want:     "some-harbor-password",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("oci_token", tt.ociToken)
-			t.Setenv("NIXCACHE_TOKEN", tt.nixcacheTok)
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
 
-			if got := cmdutil.RegistryOverrideToken(); got != tt.want {
-				t.Errorf("RegistryOverrideToken() = %q, want %q", got, tt.want)
+			auth := cmdutil.RegistryAuth(tt.registry, "")
+			if auth == nil {
+				t.Fatal("RegistryAuth returned nil; expected a credential from the environment")
+			}
+			cfg, err := auth.Authorization()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if cfg.Password != tt.want {
+				t.Errorf("Password = %q, want %q", cfg.Password, tt.want)
+			}
+			if cfg.RegistryToken != "" {
+				t.Errorf("RegistryToken = %q; the credential must be exchanged by the registry, not sent as a bearer", cfg.RegistryToken)
 			}
 		})
+	}
+}
+
+// An explicit token (a --token flag, or the git token init already collected)
+// takes precedence, and is likewise a password.
+func TestRegistryAuth_ExplicitTokenWins(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "from-the-environment")
+
+	auth := cmdutil.RegistryAuth("ghcr.io", "explicitly-passed")
+	if auth == nil {
+		t.Fatal("RegistryAuth returned nil")
+	}
+	cfg, err := auth.Authorization()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Password != "explicitly-passed" {
+		t.Errorf("Password = %q, want the explicit token", cfg.Password)
 	}
 }
 

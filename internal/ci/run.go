@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/prepare/cache"
 	"github.com/itzemoji/aeroflare/pkg/proxy"
 	"github.com/itzemoji/aeroflare/pkg/push"
@@ -52,8 +51,8 @@ func Run(spec RunSpec, w io.Writer) bool {
 	defer cleanup()
 
 	primary := spec.Caches[0]
-	token0 := ResolveToken(primary.Registry)
-	if token0 == "" {
+	auth0 := ResolveAuth(primary.Registry)
+	if auth0 == nil {
 		_, _ = fmt.Fprintf(w, "✗ no token for primary cache %s (set %s)\n", primary.Raw, TokenEnvVar(primary.Registry))
 		return false
 	}
@@ -79,7 +78,7 @@ func Run(spec RunSpec, w io.Writer) bool {
 	buildCtx, stopProxy := context.WithCancel(context.Background())
 	defer stopProxy()
 
-	port, err := proxy.StartProxy(buildCtx, 0, "127.0.0.1", primary.Registry, primary.Repository, upstreams, token0, cmdutil.RegistryOverrideToken())
+	port, err := proxy.StartProxy(buildCtx, 0, "127.0.0.1", primary.Registry, primary.Repository, upstreams, auth0)
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "✗ proxy: %v\n", err)
 		return false
@@ -145,13 +144,13 @@ func Run(spec RunSpec, w io.Writer) bool {
 	pushesTotal := len(spec.Caches)
 	pushesOK := 0
 	for _, c := range spec.Caches {
-		token := ResolveToken(c.Registry)
-		if token == "" {
+		auth := ResolveAuth(c.Registry)
+		if auth == nil {
 			_, _ = fmt.Fprintf(w, "✗ push    → %s   auth: no token (set %s)\n", c.Raw, TokenEnvVar(c.Registry))
 			continue
 		}
 		reporter := NewPlainReporter(w, "  ")
-		target := push.Target{Registry: c.Registry, Repository: c.Repository, Token: token}
+		target := push.Target{Registry: c.Registry, Repository: c.Repository, Auth: auth}
 		res, err := prepared.PushTo(target, reporter)
 		if err != nil {
 			_, _ = fmt.Fprintf(w, "✗ push    → %s   %v\n", c.Raw, err)

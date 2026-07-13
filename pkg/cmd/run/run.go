@@ -62,7 +62,7 @@ func runRun(f *cmdutil.Factory, opts *Options, args []string) error {
 		return err
 	}
 
-	targetPaths, err := nixrun.ExecuteCommand(cfg, registry, repository, token)
+	targetPaths, err := nixrun.ExecuteCommand(cfg, registry, repository, cmdutil.RegistryAuth(registry, token))
 	if err != nil {
 		return err
 	}

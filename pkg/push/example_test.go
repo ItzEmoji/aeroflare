@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/google/go-containerregistry/pkg/authn"
+
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/pkg/push"
 )
 
@@ -39,10 +42,10 @@ func ExampleRunPushTo() {
 	target := push.Target{
 		Registry:   "ghcr.io",
 		Repository: "itzemoji/aeroflare-cache",
-		// A source rather than a string: registry bearer tokens expire, and the
-		// pipeline calls this again before each chunk so a long push does not
-		// die halfway through.
-		TokenSource: func() string { return freshBearerToken() },
+		// Hand over the personal access token itself. The registry exchange, and
+		// the refresh when the resulting token expires, happen in the transport,
+		// so a push long enough to outlive a token still finishes.
+		Auth: oci.PasswordAuth("itzemoji", "ghp_examplepersonalaccesstoken"),
 	}
 
 	result, err := push.RunPushTo(plan, target, silentReporter{})
@@ -70,9 +73,9 @@ func ExamplePreparedSet_PushTo() {
 
 	for _, repo := range []string{"itzemoji/cache-eu", "itzemoji/cache-us"} {
 		target := push.Target{
-			Registry:    "ghcr.io",
-			Repository:  repo,
-			TokenSource: func() string { return freshBearerToken() },
+			Registry:   "ghcr.io",
+			Repository: repo,
+			Auth:       registryAuth(),
 		}
 		if _, err := prepared.PushTo(target, silentReporter{}); err != nil {
 			log.Printf("push to %s failed: %v", repo, err)
@@ -80,6 +83,8 @@ func ExamplePreparedSet_PushTo() {
 	}
 }
 
-// freshBearerToken stands in for the caller's own credential lookup; the CLI
-// uses cmdutil.RegistryToken.
-func freshBearerToken() string { return "" }
+// registryAuth stands in for the caller.s own credential lookup; the CLI uses
+// cmdutil.RegistryAuth.
+func registryAuth() authn.Authenticator {
+	return oci.PasswordAuth("itzemoji", "ghp_examplepersonalaccesstoken")
+}

@@ -11,10 +11,10 @@ import (
 	"strings"
 	"syscall"
 
-	proxysrv "github.com/itzemoji/aeroflare/pkg/proxy"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
+	proxysrv "github.com/itzemoji/aeroflare/pkg/proxy"
 
 	"github.com/spf13/cobra"
 )
@@ -87,8 +87,7 @@ func proxyRun(f *cmdutil.Factory, opts *Options) error {
 		cancel()
 	}()
 
-	token := shared.OptionalTokenForRegistry(f, registry)
-	actualPort, err := proxysrv.StartProxy(ctx, port, listenAddr, registry, repository, upstreams, token, cmdutil.RegistryOverrideToken())
+	actualPort, err := proxysrv.StartProxy(ctx, port, listenAddr, registry, repository, upstreams, cmdutil.RegistryAuth(registry, shared.OptionalTokenForRegistry(f, registry)))
 	if err != nil {
 		return fmt.Errorf("proxy server failed: %w", err)
 	}

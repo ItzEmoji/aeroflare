@@ -26,7 +26,7 @@ type NativeBackend struct {
 func (b *NativeBackend) PushReceipts(ctx context.Context, receipts []PushReceipt) error {
 	// One shared pusher so all package image pushes reuse a single registry
 	// auth handshake instead of each repeating the /v2/ 401 challenge.
-	pusher, err := oci.NewImagePusher(b.cfg.Token)
+	pusher, err := oci.NewImagePusher(b.cfg.Auth)
 	if err != nil {
 		return fmt.Errorf("failed to create registry pusher: %w", err)
 	}

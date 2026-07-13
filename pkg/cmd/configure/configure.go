@@ -7,11 +7,11 @@ import (
 	"fmt"
 
 	setup "github.com/itzemoji/aeroflare/internal/init"
-	"github.com/itzemoji/aeroflare/pkg/oci"
-	"github.com/itzemoji/aeroflare/pkg/proxy"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/pkg/oci"
+	"github.com/itzemoji/aeroflare/pkg/proxy"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -44,20 +44,17 @@ func configureRun(f *cmdutil.Factory, opts *Options) error {
 	if err != nil {
 		return err
 	}
-	ociToken := cmdutil.RegistryToken(registry, repository, "")
-	if ociToken == "" {
-		return fmt.Errorf("authentication token missing (oci_token, GITHUB_TOKEN or GH_TOKEN)")
-	}
-
 	// Fetch existing config manifest so we can prefill the public key.
 	var existingPublicKey = ""
 
+	// TokenForRegistry already fails when no credential can be found, so there
+	// is no separate emptiness check to make here.
 	token, err := shared.TokenForRegistry(f, registry)
 	if err != nil {
 		return err
 	}
-	tokenMgr := proxy.NewTokenManager(registry, repository, token)
-	remoteConf, existingAnnotations, _ := proxy.BootstrapConfigWithAnnotations(context.Background(), nil, registry, repository, tokenMgr)
+	auth := cmdutil.RegistryAuth(registry, token)
+	remoteConf, existingAnnotations, _ := proxy.BootstrapConfigWithAnnotations(context.Background(), registry, repository, auth)
 	if existingAnnotations != nil {
 		if pk := existingAnnotations["aeroflare.public-key"]; pk != "" {
 			existingPublicKey = pk
@@ -92,7 +89,7 @@ func configureRun(f *cmdutil.Factory, opts *Options) error {
 
 	opts.IO.Info("Saving configuration to OCI manifest annotations...")
 
-	if err := oci.PushConfigManifest(registry, repository, ociToken, annotations); err != nil {
+	if err := oci.PushConfigManifest(registry, repository, auth, annotations); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 

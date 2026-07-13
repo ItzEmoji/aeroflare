@@ -204,4 +204,3 @@ func TestPullBlob_Error(t *testing.T) {
 		t.Fatal("Expected error for 404 response, got nil")
 	}
 }
-

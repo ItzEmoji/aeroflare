@@ -23,6 +23,7 @@ import (
 
 	"strconv"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"golang.org/x/sync/errgroup"
 )
@@ -48,32 +49,14 @@ type Target struct {
 	Registry   string
 	Repository string
 
-	// Token is a ready-to-use registry bearer token. Ignored when TokenSource
-	// is set.
-	Token string
-
-	// TokenSource, when non-nil, is called to obtain a bearer token, and is
-	// called again before each upload chunk. Registry bearer tokens are
-	// short-lived, so a long push must be able to refresh; a static Token
-	// would expire partway through. Returning "" means no credential is
-	// available.
+	// Auth is the registry credential. Build it with oci.PasswordAuth for a
+	// password or personal access token -- the registry exchange happens in the
+	// transport, which also refreshes the resulting token when it expires, so a
+	// push long enough to outlive a token does not need to do anything about
+	// it. A nil Auth pushes anonymously, which no real registry allows.
 	//
-	// The CLI supplies cmdutil.RegistryToken here.
-	TokenSource func() string
-
-	// OverrideToken, when non-empty, is used verbatim as the registry bearer
-	// token when reading cache metadata, skipping token exchange. The CLI
-	// supplies cmdutil.RegistryOverrideToken here.
-	OverrideToken string
-}
-
-// token returns a fresh bearer token for the target, preferring TokenSource so
-// that long-running pushes pick up a refreshed credential.
-func (t Target) token() string {
-	if t.TokenSource != nil {
-		return t.TokenSource()
-	}
-	return t.Token
+	// The CLI supplies cmdutil.RegistryAuth here.
+	Auth authn.Authenticator
 }
 
 // PushResult summarizes a completed RunPushTo call.
@@ -184,9 +167,8 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 	var skippedUpstream int
 
 	registry, repository := target.Registry, target.Repository
-	ociToken := target.token()
-	if ociToken == "" {
-		return nil, errors.New("authentication token missing for registry")
+	if target.Auth == nil {
+		return nil, errors.New("no registry credential for target")
 	}
 
 	compType, err := compress.ParseType(plan.Config.Compression)
@@ -272,9 +254,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 		reporter.Info("No new paths to push.")
 		return &PushResult{}, nil
 	}
-	tokenMgr := proxy.NewTokenManager(registry, repository, target.Token)
-	tokenMgr.SetOverrideToken(target.OverrideToken)
-	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, nil, registry, repository, tokenMgr)
+	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, registry, repository, target.Auth)
 
 	var totalReceipts []backend.PushReceipt
 	var failedPaths []string
@@ -346,16 +326,12 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 
 		reporter.Step(2, 3, fmt.Sprintf("Uploading %d packages to OCI registry", len(tasks)))
 
-		// Registry bearer tokens are short-lived; refresh per chunk so long
-		// pushes don't fail partway with auth errors.
-		if t := target.token(); t != "" {
-			ociToken = t
-		}
-
 		// Build a single authenticated pusher for the whole chunk so all
 		// concurrent layer uploads share one registry auth handshake instead
-		// of each repeating the /v2/ 401 challenge and token exchange.
-		pusher, repo, err := oci.NewLayerPusher(registry, repository, ociToken)
+		// of each repeating the /v2/ 401 challenge and token exchange. The
+		// credential refreshes itself inside the transport, so a push that
+		// outlives a token no longer has to re-resolve one per chunk.
+		pusher, repo, err := oci.NewLayerPusher(registry, repository, target.Auth)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create registry pusher: %v", err)
 		}
@@ -454,7 +430,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 			backend := backend.NewCacheBackend(backend.BackendConfig{
 				Registry:          registry,
 				Repository:        repository,
-				Token:             ociToken,
+				Auth:              target.Auth,
 				PubKeyPath:        plan.Config.SigningKey,
 				ConfigAnnotations: configAnnotations,
 				Workers:           plan.Config.Workers,

@@ -116,9 +116,9 @@ func Run(f *cmdutil.Factory, opts *Options, cfg *internalpush.PushConfig) error 
 }
 
 // Target resolves the push destination from CLI config: registry and repository
-// from viper/env, and a TokenSource that re-resolves the registry credential on
-// demand. The token is supplied as a source rather than a value because registry
-// bearer tokens are short-lived and a long push refreshes between chunks.
+// from viper/env, and the registry credential from the flag, environment or
+// keyring. The credential refreshes itself inside the transport, so a long push
+// no longer has to re-resolve one as it goes.
 func Target() (internalpush.Target, error) {
 	registry, repository, err := cmdutil.RegistryAndRepository()
 	if err != nil {
@@ -128,8 +128,6 @@ func Target() (internalpush.Target, error) {
 	return internalpush.Target{
 		Registry:   registry,
 		Repository: repository,
-		TokenSource: func() string {
-			return cmdutil.RegistryToken(registry, repository, "")
-		},
+		Auth:       cmdutil.RegistryAuth(registry, ""),
 	}, nil
 }

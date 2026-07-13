@@ -6,9 +6,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/go-containerregistry/pkg/authn"
+
 	"github.com/itzemoji/aeroflare/internal/auth"
 	"github.com/itzemoji/aeroflare/pkg/oci"
-	"github.com/itzemoji/aeroflare/pkg/proxy"
 
 	"github.com/spf13/viper"
 )
@@ -59,33 +60,27 @@ func RegistryAndRepository() (string, string, error) {
 	return registry, repository, nil
 }
 
-// RegistryOverrideToken returns a verbatim registry bearer token from the
-// environment (oci_token, then NIXCACHE_TOKEN), or "" if neither is set to a
-// usable bearer. For GHCR this is the base64-encoded PAT, which the registry
-// accepts directly, skipping token exchange.
+// RegistryAuth resolves the credential for a registry and returns it as an
+// authn.Authenticator, ready to hand to pkg/oci, pkg/push, or pkg/proxy. It
+// returns nil when no credential can be found at all, which means anonymous
+// access — enough to read a public cache, never enough to push.
 //
-// The proxy and push packages take this as a parameter rather than reading the
-// environment themselves; this is the CLI-side lookup that feeds them.
-func RegistryOverrideToken() string {
-	for _, key := range []string{"oci_token", "NIXCACHE_TOKEN"} {
-		if t := os.Getenv(key); proxy.IsBearerToken(t) {
-			return t
-		}
-	}
-	return ""
-}
-
-// RegistryToken resolves a usable registry credential, exchanging a GitHub or
-// GitLab PAT for a short-lived bearer token when the registry requires it. It
-// falls back to the raw token if the exchange fails, and returns "" when no
-// credential can be found at all.
+// explicitToken, when non-empty, takes precedence over the environment and the
+// keyring.
 //
-// explicitToken, when non-empty, takes precedence over the keyring.
+// Nothing here inspects the token's shape. Every credential the CLI can find --
+// a flag, oci_token, GITHUB_TOKEN, the keyring -- is a password, and the
+// registry is what turns passwords into bearer tokens. Guessing from a "ghp_"
+// or "eyJ" prefix whether a given string had already been exchanged is how the
+// wrong credential used to end up in an Authorization header.
 //
-// Registry bearer tokens expire. Callers holding one for a long operation
-// should call this again to refresh rather than caching the result; see
-// push.Target.TokenSource.
-func RegistryToken(registry, repository, explicitToken string) string {
+// There is deliberately no way to inject a pre-exchanged bearer from the
+// environment. The old oci_token override meant that, but oci_token is also
+// declared in the credential catalog as a *password* source (see
+// internal/auth), and auth login writes raw PATs into it -- so the override
+// spent most of its life being handed a PAT and having to detect it by prefix.
+// Embedders that genuinely hold a bearer can build oci.BearerAuth themselves.
+func RegistryAuth(registry, explicitToken string) authn.Authenticator {
 	token := explicitToken
 	if token == "" {
 		var err error
@@ -94,36 +89,16 @@ func RegistryToken(registry, repository, explicitToken string) string {
 			fmt.Fprintf(os.Stderr, "Warning: failed to resolve registry token: %v\n", err)
 		}
 	}
-
 	if token == "" {
-		return ""
+		return nil
 	}
 
+	// The username is only consulted by registries that check it: ghcr.io
+	// ignores it, Docker Hub requires it to be the real account name.
 	username, _ := auth.NewResolver(fmt.Sprintf("oci-%s-username", registry)).Resolve()
 	if username == "" {
 		username = os.Getenv("AEROFLARE_GIT_USERNAME")
 	}
 
-	isGitToken := strings.HasPrefix(token, "ghp_") || strings.HasPrefix(token, "github_pat_") || strings.HasPrefix(token, "glpat-") || strings.HasPrefix(token, "gho_") || strings.HasPrefix(token, "ghu_") || strings.HasPrefix(token, "ghs_")
-	isDockerToken := strings.HasPrefix(token, "dckr_pat_")
-
-	// If it's a JWT, or we have no username and it doesn't look like a known PAT, assume it's already a Bearer token.
-	if strings.HasPrefix(token, "eyJ") || (!isGitToken && !isDockerToken && username == "") {
-		return token
-	}
-
-	if username == "" {
-		username = "token"
-	}
-
-	exchanged, err := oci.ExchangeToken(registry, repository, username, token)
-	if err == nil && exchanged != "" {
-		return exchanged
-	}
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG ExchangeToken error: %v\n", err)
-	}
-
-	return token // Fallback
+	return oci.PasswordAuth(username, token)
 }

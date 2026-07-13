@@ -95,20 +95,20 @@ func createOCIRepository(cfg *InitConfig) error {
 	// When the registry is the provider's own container registry (ghcr.io
 	// for GitHub, registry.gitlab.com for GitLab), the git token we already
 	// collected also works as the OCI token, so pass it through explicitly
-	// instead of making cmdutil.RegistryToken look for a separate credential.
+	// instead of making cmdutil.RegistryAuth look for a separate credential.
 	var explicitToken string
 	if (cfg.Registry == "ghcr.io" && cfg.GitProvider == GitGitHub) ||
 		(cfg.Registry == "registry.gitlab.com" && cfg.GitProvider == GitGitLab) {
 		explicitToken = cfg.GitToken
 	}
 
-	ociToken := cmdutil.RegistryToken(cfg.Registry, cfg.Repository, explicitToken)
-	if ociToken == "" {
+	auth := cmdutil.RegistryAuth(cfg.Registry, explicitToken)
+	if auth == nil {
 		return fmt.Errorf("no OCI authentication token found \u2014 configure your environment or secrets manager")
 	}
-	cfg.OCIToken = ociToken
+	cfg.OCIToken = explicitToken
 
-	return oci.PushConfigManifest(cfg.Registry, cfg.Repository, ociToken, map[string]string{})
+	return oci.PushConfigManifest(cfg.Registry, cfg.Repository, auth, map[string]string{})
 }
 
 // checkRepositoryVisibility reminds the user to set package visibility.

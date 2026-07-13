@@ -15,6 +15,7 @@ import (
 	"github.com/itzemoji/aeroflare/pkg/prepare/signing"
 	"github.com/itzemoji/aeroflare/pkg/proxy"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"golang.org/x/sync/errgroup"
 )
@@ -145,8 +146,8 @@ type uploadOutcome struct {
 
 // uploadTaskSet uploads every task concurrently to the target registry, reporting
 // each success via reporter.Uploaded. It never aborts on individual failures.
-func uploadTaskSet(ctx context.Context, tasks []preparedTask, registry, repository, token string, reporter Reporter, workers int) (uploadOutcome, error) {
-	pusher, repo, err := oci.NewLayerPusher(registry, repository, token)
+func uploadTaskSet(ctx context.Context, tasks []preparedTask, registry, repository string, auth authn.Authenticator, reporter Reporter, workers int) (uploadOutcome, error) {
+	pusher, repo, err := oci.NewLayerPusher(registry, repository, auth)
 	if err != nil {
 		return uploadOutcome{}, fmt.Errorf("failed to create registry pusher: %v", err)
 	}
@@ -222,17 +223,14 @@ func uploadTaskSet(ctx context.Context, tasks []preparedTask, registry, reposito
 func (ps *PreparedSet) PushTo(target Target, reporter Reporter) (*PushResult, error) {
 	ctx := context.Background()
 
-	ociToken := target.token()
-	if ociToken == "" {
-		return nil, errors.New("authentication token missing for registry")
+	if target.Auth == nil {
+		return nil, errors.New("no registry credential for target")
 	}
 
-	tokenMgr := proxy.NewTokenManager(target.Registry, target.Repository, target.Token)
-	tokenMgr.SetOverrideToken(target.OverrideToken)
-	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, nil, target.Registry, target.Repository, tokenMgr)
+	_, configAnnotations, _ := proxy.BootstrapConfigWithAnnotations(ctx, target.Registry, target.Repository, target.Auth)
 
 	reporter.Step(1, 2, fmt.Sprintf("Uploading %d packages to OCI registry", len(ps.tasks)))
-	out, err := uploadTaskSet(ctx, ps.tasks, target.Registry, target.Repository, ociToken, reporter, ps.workers)
+	out, err := uploadTaskSet(ctx, ps.tasks, target.Registry, target.Repository, target.Auth, reporter, ps.workers)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +247,7 @@ func (ps *PreparedSet) PushTo(target Target, reporter Reporter) (*PushResult, er
 		b := backend.NewCacheBackend(backend.BackendConfig{
 			Registry:          target.Registry,
 			Repository:        target.Repository,
-			Token:             ociToken,
+			Auth:              target.Auth,
 			PubKeyPath:        ps.signingKey,
 			ConfigAnnotations: configAnnotations,
 			Workers:           ps.workers,
