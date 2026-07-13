@@ -36,29 +36,6 @@ func TestGetProtocol(t *testing.T) {
 	}
 }
 
-func TestExchangeToken(t *testing.T) {
-	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/token" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"token": "my-bearer-token-123"}`))
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer mockRegistry.Close()
-
-	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	token, err := ExchangeToken(u, "test-repo", "token", "my-basic-auth-pat")
-	if err != nil {
-		t.Fatalf("ExchangeToken failed: %v", err)
-	}
-
-	if token != "my-bearer-token-123" {
-		t.Errorf("Expected my-bearer-token-123, got %s", token)
-	}
-}
-
 func TestPushAndPullBlob(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "aeroflare-test-*")
 	if err != nil {
@@ -124,7 +101,7 @@ func TestPushAndPullBlob(t *testing.T) {
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
 
 	// 1. Push
-	digest, err := PushBlob(testFilePath, u, "test-repo", "mock-token")
+	digest, err := PushBlob(testFilePath, u, "test-repo", BearerAuth("mock-token"))
 	if err != nil {
 		t.Fatalf("PushBlob failed: %v", err)
 	}
@@ -138,7 +115,7 @@ func TestPushAndPullBlob(t *testing.T) {
 
 	// 2. Pull
 	outFilePath := filepath.Join(tmpDir, "out.txt")
-	err = PullBlob(digest, outFilePath, u, "test-repo", "mock-token")
+	err = PullBlob(digest, outFilePath, u, "test-repo", BearerAuth("mock-token"))
 	if err != nil {
 		t.Fatalf("PullBlob failed: %v", err)
 	}
@@ -150,21 +127,6 @@ func TestPushAndPullBlob(t *testing.T) {
 
 	if string(pulledData) != testContent {
 		t.Errorf("Expected %s, got %s", testContent, string(pulledData))
-	}
-}
-
-// TestExchangeToken_Error verifies that a non-200 response returns an error.
-func TestExchangeToken_Error(t *testing.T) {
-	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte("unauthorized"))
-	}))
-	defer mockRegistry.Close()
-
-	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	_, err := ExchangeToken(u, "test-repo", "token", "bad-token")
-	if err == nil {
-		t.Fatal("Expected error for 401 response, got nil")
 	}
 }
 
@@ -203,7 +165,7 @@ func TestPushBlob_AlreadyExists(t *testing.T) {
 	defer mockRegistry.Close()
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
-	digest, err := PushBlob(testFilePath, u, "test-repo", "mock-token")
+	digest, err := PushBlob(testFilePath, u, "test-repo", BearerAuth("mock-token"))
 	if err != nil {
 		t.Fatalf("PushBlob failed: %v", err)
 	}
@@ -237,28 +199,9 @@ func TestPullBlob_Error(t *testing.T) {
 
 	u := strings.TrimPrefix(mockRegistry.URL, "http://")
 	outFilePath := filepath.Join(tmpDir, "out.txt")
-	err = PullBlob("sha256:nonexistentdigest", outFilePath, u, "test-repo", "mock-token")
+	err = PullBlob("sha256:nonexistentdigest", outFilePath, u, "test-repo", BearerAuth("mock-token"))
 	if err == nil {
 		t.Fatal("Expected error for 404 response, got nil")
 	}
 }
 
-// TestExchangeToken_UsesHttpForLocalhost verifies that ExchangeToken uses http:// for localhost registries.
-func TestExchangeToken_UsesHttpForLocalhost(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"token": "localhost-token"}`))
-	}))
-	defer ts.Close()
-
-	u := strings.TrimPrefix(ts.URL, "http://")
-
-	token, err := ExchangeToken(u, "my-org", "token", "test-pat")
-	if err != nil {
-		t.Fatalf("ExchangeToken failed for localhost registry: %v", err)
-	}
-	if token != "localhost-token" {
-		t.Errorf("expected localhost-token, got %s", token)
-	}
-}

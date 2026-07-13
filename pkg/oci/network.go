@@ -168,13 +168,13 @@ func NewLayerFast(filePath string, mediaType types.MediaType, ni *narinfo.Narinf
 
 // PushBlob natively hashes and streams a file to any OCI registry.
 // repository should be the full repository path (e.g. "itzemoji/nix-cache-test")
-func PushBlob(filePath, registry, repository, token string) (string, error) {
+func PushBlob(filePath, registry, repository string, auth authn.Authenticator) (string, error) {
 	layer, digestStr, err := NewLayer(filePath, "")
 	if err != nil {
 		return "", err
 	}
 
-	err = PushLayer(layer, registry, repository, token)
+	err = PushLayer(layer, registry, repository, auth)
 	if err != nil {
 		return "", err
 	}
@@ -183,70 +183,51 @@ func PushBlob(filePath, registry, repository, token string) (string, error) {
 }
 
 // PushBlobBytes pushes an in-memory blob to the OCI registry and returns its digest.
-func PushBlobBytes(data []byte, registry, repository, token string) (string, error) {
+func PushBlobBytes(data []byte, registry, repository string, auth authn.Authenticator) (string, error) {
 	layer := static.NewLayer(data, types.MediaType("application/octet-stream"))
 	digest, err := layer.Digest()
 	if err != nil {
 		return "", err
 	}
-	if err := PushLayer(layer, registry, repository, token); err != nil {
+	if err := PushLayer(layer, registry, repository, auth); err != nil {
 		return "", err
 	}
 	return digest.String(), nil
 }
 
 // PushLayer pushes an existing v1.Layer to the OCI registry.
-func PushLayer(layer v1.Layer, registry, repository, token string) error {
-	opts := []name.Option{}
-	if GetProtocol(registry) == "http" {
-		opts = append(opts, name.Insecure)
-	}
-
-	repoStr := fmt.Sprintf("%s/%s", registry, repository)
-	repo, err := name.NewRepository(repoStr, opts...)
+func PushLayer(layer v1.Layer, registry, repository string, auth authn.Authenticator) error {
+	repo, err := Repository(registry, repository)
 	if err != nil {
 		return err
 	}
 
-	remoteOpts := []remote.Option{
+	return remote.WriteLayer(repo, layer,
 		remote.WithTransport(optimizedTransport),
-	}
-	if token != "" {
-		remoteOpts = append(remoteOpts, remote.WithAuth(&authn.Bearer{Token: token}))
-	}
-
-	return remote.WriteLayer(repo, layer, remoteOpts...)
+		remoteAuth(auth),
+	)
 }
 
 // newPusher builds a remote.Pusher that authenticates once and can be reused
 // across many Upload/Push calls, so a batch of concurrent operations shares a
 // single registry auth handshake instead of repeating the /v2/ 401 challenge
 // and token exchange each time.
-func newPusher(token string) (*remote.Pusher, error) {
-	remoteOpts := []remote.Option{
+func newPusher(auth authn.Authenticator) (*remote.Pusher, error) {
+	return remote.NewPusher(
 		remote.WithTransport(optimizedTransport),
-	}
-	if token != "" {
-		remoteOpts = append(remoteOpts, remote.WithAuth(&authn.Bearer{Token: token}))
-	}
-	return remote.NewPusher(remoteOpts...)
+		remoteAuth(auth),
+	)
 }
 
 // NewLayerPusher returns a shared pusher plus the target repository to pass to
 // pusher.Upload, for uploading many NAR layers under one auth handshake.
-func NewLayerPusher(registry, repository, token string) (*remote.Pusher, name.Repository, error) {
-	opts := []name.Option{}
-	if GetProtocol(registry) == "http" {
-		opts = append(opts, name.Insecure)
-	}
-
-	repoStr := fmt.Sprintf("%s/%s", registry, repository)
-	repo, err := name.NewRepository(repoStr, opts...)
+func NewLayerPusher(registry, repository string, auth authn.Authenticator) (*remote.Pusher, name.Repository, error) {
+	repo, err := Repository(registry, repository)
 	if err != nil {
 		return nil, name.Repository{}, err
 	}
 
-	pusher, err := newPusher(token)
+	pusher, err := newPusher(auth)
 	if err != nil {
 		return nil, name.Repository{}, err
 	}
@@ -255,32 +236,23 @@ func NewLayerPusher(registry, repository, token string) (*remote.Pusher, name.Re
 
 // NewImagePusher returns a shared pusher for pushing per-package OCI images via
 // PushNarPackageWith, so a batch of image pushes shares one auth handshake.
-func NewImagePusher(token string) (*remote.Pusher, error) {
-	return newPusher(token)
+func NewImagePusher(auth authn.Authenticator) (*remote.Pusher, error) {
+	return newPusher(auth)
 }
 
 // PullBlob fetches a blob from any OCI registry and writes it to outFile.
 // repository should be the full repository path (e.g. "itzemoji/nix-cache-test")
-func PullBlob(digest, outFile, registry, repository, token string) error {
-	opts := []name.Option{}
-	if GetProtocol(registry) == "http" {
-		opts = append(opts, name.Insecure)
-	}
-
+func PullBlob(digest, outFile, registry, repository string, auth authn.Authenticator) error {
 	refStr := fmt.Sprintf("%s/%s@%s", registry, repository, digest)
-	ref, err := name.NewDigest(refStr, opts...)
+	ref, err := name.NewDigest(refStr, nameOptions(registry)...)
 	if err != nil {
 		return err
 	}
 
-	remoteOpts := []remote.Option{
+	layer, err := remote.Layer(ref,
 		remote.WithTransport(optimizedTransport),
-	}
-	if token != "" {
-		remoteOpts = append(remoteOpts, remote.WithAuth(&authn.Bearer{Token: token}))
-	}
-
-	layer, err := remote.Layer(ref, remoteOpts...)
+		remoteAuth(auth),
+	)
 	if err != nil {
 		return err
 	}
@@ -304,8 +276,8 @@ func PullBlob(digest, outFile, registry, repository, token string) error {
 // PushNarPackage creates an OCI image from an existing layer, annotates it with narinfo metadata, and pushes it.
 // O(1) Lookup Tagging Rule: The tag passed to this function MUST strictly be the 32-character Nix hash
 // (e.g., xn2nlmvng2im9mgrq46y3wkbz4ll1hnp) to ensure O(1) lookups during pulls later.
-func PushNarPackage(layer v1.Layer, ni *narinfo.Narinfo, tag, registry, repository, token string) error {
-	pusher, err := newPusher(token)
+func PushNarPackage(layer v1.Layer, ni *narinfo.Narinfo, tag, registry, repository string, auth authn.Authenticator) error {
+	pusher, err := newPusher(auth)
 	if err != nil {
 		return err
 	}
@@ -343,13 +315,8 @@ func PushNarPackageWith(ctx context.Context, pusher *remote.Pusher, layer v1.Lay
 		artifactType: "application/vnd.aeroflare.nar.v1",
 	}
 
-	opts := []name.Option{}
-	if GetProtocol(registry) == "http" {
-		opts = append(opts, name.Insecure)
-	}
-
 	refStr := fmt.Sprintf("%s/%s:%s", registry, repository, tag)
-	ref, err := name.NewTag(refStr, opts...)
+	ref, err := name.NewTag(refStr, nameOptions(registry)...)
 	if err != nil {
 		return err
 	}
@@ -359,8 +326,8 @@ func PushNarPackageWith(ctx context.Context, pusher *remote.Pusher, layer v1.Lay
 
 // PullOCINativeManifest pulls the OCI image manifest by tag (e.g., <nix-hash>)
 // and reconstructs the Narinfo metadata from the manifest annotations.
-func PullOCINativeManifest(tag, registry, repository, token string) (*narinfo.Narinfo, error) {
-	anns, err := FetchAeroflareAnnotations(context.Background(), nil, registry, repository, tag, token)
+func PullOCINativeManifest(tag, registry, repository string, auth authn.Authenticator) (*narinfo.Narinfo, error) {
+	anns, err := FetchAeroflareAnnotations(context.Background(), registry, repository, tag, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +367,7 @@ type PushJob struct {
 // PushNarPackagesBatch uploads multiple Nix packages concurrently.
 // O(1) Lookup Tagging Rule: The Tag passed in PushJob MUST strictly be the 32-character Nix hash
 // (e.g., xn2nlmvng2im9mgrq46y3wkbz4ll1hnp) to ensure O(1) lookups during pulls later.
-func PushNarPackagesBatch(registry, repository, token string, jobs []PushJob, maxWorkers int) error {
+func PushNarPackagesBatch(registry, repository string, auth authn.Authenticator, jobs []PushJob, maxWorkers int) error {
 	var eg errgroup.Group
 	eg.SetLimit(maxWorkers)
 
@@ -437,25 +404,16 @@ func PushNarPackagesBatch(registry, repository, token string, jobs []PushJob, ma
 				artifactType: "application/vnd.aeroflare.nar.v1",
 			}
 
-			opts := []name.Option{}
-			if GetProtocol(registry) == "http" {
-				opts = append(opts, name.Insecure)
-			}
-
 			refStr := fmt.Sprintf("%s/%s:%s", registry, repository, job.Tag)
-			ref, err := name.NewTag(refStr, opts...)
+			ref, err := name.NewTag(refStr, nameOptions(registry)...)
 			if err != nil {
 				return err
 			}
 
-			remoteOpts := []remote.Option{
+			if err := remote.Write(ref, finalNarImg,
 				remote.WithTransport(optimizedTransport),
-			}
-			if token != "" {
-				remoteOpts = append(remoteOpts, remote.WithAuth(&authn.Bearer{Token: token}))
-			}
-
-			if err := remote.Write(ref, finalNarImg, remoteOpts...); err != nil {
+				remoteAuth(auth),
+			); err != nil {
 				return err
 			}
 			return nil
@@ -463,6 +421,15 @@ func PushNarPackagesBatch(registry, repository, token string, jobs []PushJob, ma
 	}
 
 	return eg.Wait()
+}
+
+// nameOptions marks loopback registries insecure, so references to them are
+// resolved over http (see GetProtocol).
+func nameOptions(registry string) []name.Option {
+	if GetProtocol(registry) == "http" {
+		return []name.Option{name.Insecure}
+	}
+	return nil
 }
 
 // GetProtocol chooses http for localhost/loopback registries (e.g. mock

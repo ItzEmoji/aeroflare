@@ -15,14 +15,9 @@ import (
 
 // PushConfigManifest pushes the cache-config manifest with the provided
 // annotations (cache-wide settings such as the public signing key).
-func PushConfigManifest(registry, repository, token string, annotations map[string]string) error {
-	opts := []name.Option{}
-	if GetProtocol(registry) == "http" {
-		opts = append(opts, name.Insecure)
-	}
-
+func PushConfigManifest(registry, repository string, auth authn.Authenticator, annotations map[string]string) error {
 	refStr := fmt.Sprintf("%s/%s:cache-config", registry, repository)
-	tagRef, err := name.NewTag(refStr, opts...)
+	tagRef, err := name.NewTag(refStr, nameOptions(registry)...)
 	if err != nil {
 		return fmt.Errorf("failed to create tag: %w", err)
 	}
@@ -41,14 +36,10 @@ func PushConfigManifest(registry, repository, token string, annotations map[stri
 
 	finalCacheImg := NewArtifactTypeImage(cacheImg, "application/vnd.aeroflare.cache-config.v1")
 
-	remoteOpts := []remote.Option{
+	if err := remote.Write(tagRef, finalCacheImg,
 		remote.WithTransport(WriteTransport()),
-	}
-	if token != "" {
-		remoteOpts = append(remoteOpts, remote.WithAuth(&authn.Bearer{Token: token}))
-	}
-
-	if err := remote.Write(tagRef, finalCacheImg, remoteOpts...); err != nil {
+		remoteAuth(auth),
+	); err != nil {
 		return fmt.Errorf("failed to push config manifest: %w", err)
 	}
 

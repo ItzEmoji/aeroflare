@@ -13,7 +13,8 @@ func ExamplePullOCINativeManifest() {
 	// The 32-character store hash of /nix/store/<hash>-<name>, used as the tag.
 	const storeHash = "0nlp2xwzavr9dyrsdhcgnq2h4qxsi8bp"
 
-	ni, err := oci.PullOCINativeManifest(storeHash, "ghcr.io", "itzemoji/aeroflare-cache", "")
+	// A nil Authenticator reads anonymously, which is all a public cache needs.
+	ni, err := oci.PullOCINativeManifest(storeHash, "ghcr.io", "itzemoji/aeroflare-cache", nil)
 	if err != nil {
 		// A miss is an error here: the tag simply does not exist.
 		fmt.Println("not cached:", err)
@@ -23,17 +24,19 @@ func ExamplePullOCINativeManifest() {
 	fmt.Println(ni.StorePath, ni.NarSize)
 }
 
-// Registries such as ghcr.io will not accept a personal access token directly;
-// they hand out a short-lived bearer token in exchange for one. The token comes
-// back scoped to a single repository.
-func ExampleExchangeToken() {
-	bearer, err := oci.ExchangeToken("ghcr.io", "itzemoji/aeroflare-cache", "itzemoji", "ghp_examplepersonalaccesstoken")
+// Registries such as ghcr.io will not accept a personal access token as a
+// bearer credential; they hand out a short-lived bearer token in exchange for
+// one. Aeroflare does not perform that exchange itself. Describe the credential
+// you hold, and pass the result to any function in this package that takes an
+// authn.Authenticator: the exchange, and the refresh when the token expires,
+// happen inside the transport.
+func ExamplePasswordAuth() {
+	auth := oci.PasswordAuth("itzemoji", "ghp_examplepersonalaccesstoken")
+
+	ni, err := oci.PullOCINativeManifest("xn2nlmvng2im9mgrq46y3wkbz4ll1hnp", "ghcr.io", "itzemoji/aeroflare-cache", auth)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Pass the bearer to any of this package's functions as the token argument.
-	// It expires: fetch a new one for a long-running operation rather than
-	// holding this one.
-	_ = bearer
+	fmt.Println(ni.StorePath)
 }

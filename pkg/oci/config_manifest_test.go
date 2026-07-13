@@ -25,7 +25,7 @@ func TestPushConfigManifest(t *testing.T) {
 		"aeroflare.test":                  "true",
 	}
 
-	err := PushConfigManifest(registryURL, repository, "", annotations)
+	err := PushConfigManifest(registryURL, repository, nil, annotations)
 	if err != nil {
 		t.Fatalf("PushConfigManifest failed: %v", err)
 	}

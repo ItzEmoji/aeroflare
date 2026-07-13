@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -98,30 +97,20 @@ func ParseAeroflareMetadata(content string) (map[string]string, error) {
 
 // FetchAeroflareAnnotations fetches an OCI manifest by tag and returns its
 // annotations merged with its labels (labels are checked as a fallback for
-// registries/tools that surface metadata under "labels" instead). If token
-// is empty, it falls back to the default keychain for auth.
-func FetchAeroflareAnnotations(ctx context.Context, client *http.Client, registry, repository, tag, token string) (map[string]string, error) {
+// registries/tools that surface metadata under "labels" instead). A nil auth
+// means anonymous access.
+func FetchAeroflareAnnotations(ctx context.Context, registry, repository, tag string, auth authn.Authenticator) (map[string]string, error) {
 	imageRef := fmt.Sprintf("%s/%s:%s", registry, repository, tag)
-	ref, err := name.ParseReference(imageRef)
+	ref, err := name.ParseReference(imageRef, nameOptions(registry)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse reference: %w", err)
 	}
 
-	opts := []remote.Option{
+	img, err := remote.Image(ref,
 		remote.WithContext(ctx),
-	}
-	if client != nil && client.Transport != nil {
-		opts = append(opts, remote.WithTransport(client.Transport))
-	} else if client != nil {
-		opts = append(opts, remote.WithTransport(http.DefaultTransport))
-	}
-	if token != "" {
-		opts = append(opts, remote.WithAuth(&authn.Bearer{Token: token}))
-	} else {
-		opts = append(opts, remote.WithAuthFromKeychain(authn.DefaultKeychain))
-	}
-
-	img, err := remote.Image(ref, opts...)
+		remote.WithTransport(optimizedTransport),
+		remoteAuth(auth),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch image: %w", err)
 	}
