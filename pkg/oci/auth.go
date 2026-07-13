@@ -66,6 +66,16 @@ func remoteAuth(auth authn.Authenticator) remote.Option {
 	return remote.WithAuth(authOrAnonymous(auth))
 }
 
+// Puller returns a remote.Puller that reads with auth over the shared tuned
+// transport, so a run of manifest and blob fetches shares one auth handshake
+// instead of re-challenging on each.
+func Puller(auth authn.Authenticator) (*remote.Puller, error) {
+	return remote.NewPuller(
+		remote.WithTransport(optimizedTransport),
+		remoteAuth(auth),
+	)
+}
+
 // Repository parses registry and repository into a name.Repository, marking it
 // insecure for loopback registries so http is used (see GetProtocol).
 func Repository(registry, repository string) (name.Repository, error) {

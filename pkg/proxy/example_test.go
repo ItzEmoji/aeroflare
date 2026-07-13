@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/itzemoji/aeroflare/pkg/oci"
 	"github.com/itzemoji/aeroflare/pkg/proxy"
 )
 
@@ -23,8 +24,11 @@ func ExampleStartProxy() {
 		"ghcr.io",
 		"itzemoji/aeroflare-cache",
 		[]string{"https://cache.nixos.org"}, // upstreams for anything not in the registry
-		"",                                  // a GitHub PAT, to be exchanged for a bearer
-		"",                                  // or a verbatim bearer token, used as-is
+		// The credential. Hand over the personal access token itself: the
+		// registry exchange, and the refresh when the resulting token expires,
+		// happen inside the transport. Pass nil to read a public cache
+		// anonymously.
+		oci.PasswordAuth("itzemoji", "ghp_examplepersonalaccesstoken"),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -32,15 +36,4 @@ func ExampleStartProxy() {
 
 	// Point Nix at it: nix build --substituters http://127.0.0.1:<port>
 	fmt.Printf("substituter listening on http://127.0.0.1:%d\n", port)
-}
-
-// A raw personal access token is not an OCI bearer token. Anything that fails
-// this check falls through to normal token exchange rather than being sent as
-// an invalid Authorization header.
-func ExampleIsBearerToken() {
-	fmt.Println(proxy.IsBearerToken("ghp_arawpersonalaccesstoken"))
-	fmt.Println(proxy.IsBearerToken("eyJhbGciOiJSUzI1NiJ9.a-real-bearer"))
-	// Output:
-	// false
-	// true
 }

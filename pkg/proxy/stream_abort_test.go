@@ -7,40 +7,43 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
+
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
-// TestStreamBlob_TruncatedUpstreamAbortsResponse verifies that when the
-// registry connection dies mid-stream, the proxy aborts its own response
-// instead of terminating it cleanly — a clean termination would make a
-// truncated NAR look like a complete download to the client.
-func TestStreamBlob_TruncatedUpstreamAbortsResponse(t *testing.T) {
-	digest := "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+// TestStreamNar_TruncatedUpstreamAbortsResponse verifies that when the registry
+// connection dies mid-stream, the proxy aborts its own response instead of
+// terminating it cleanly — a clean termination would make a truncated NAR look
+// like a complete download to the client.
+func TestStreamNar_TruncatedUpstreamAbortsResponse(t *testing.T) {
+	const digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 
 	// Mock registry: sends partial blob data then kills the connection.
 	mockRegistry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "/blobs/") {
+		switch {
+		case r.URL.Path == "/v2/":
+			w.WriteHeader(http.StatusOK)
+		case strings.Contains(r.URL.Path, "/blobs/"):
 			_, _ = w.Write([]byte("partial data"))
 			w.(http.Flusher).Flush()
 			panic(http.ErrAbortHandler) // abrupt connection close, no clean end
+		default:
+			w.WriteHeader(http.StatusNotFound)
 		}
-		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer mockRegistry.Close()
 
 	registryHost := strings.TrimPrefix(mockRegistry.URL, "http://")
-	tokenMgr := NewTokenManager(registryHost, "test-repo", "")
-	tokenMgr.SetOverrideToken("mock-token")
+	ps := newTestProxy(t, registryHost, "test-repo")
 
-	ps := &ProxyServer{
-		Registry:   registryHost,
-		Repository: "test-repo",
-		TokenMgr:   tokenMgr,
-		HttpClient: &http.Client{Timeout: 10 * time.Second},
+	hash, err := v1.NewHash(digest)
+	if err != nil {
+		t.Fatal(err)
 	}
+	nar := v1.Descriptor{Digest: hash, Size: 1024}
 
 	front := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = ps.streamBlob(context.Background(), w, digest, "application/x-nix-nar", "GET")
+		_ = ps.streamNar(context.Background(), w, nar, "application/x-nix-nar", "GET")
 	}))
 	defer front.Close()
 

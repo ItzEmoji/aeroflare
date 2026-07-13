@@ -10,11 +10,10 @@
 // The server holds no local binary state, which is what makes it viable to run
 // as a sidecar or inside a Cloudflare Worker.
 //
-// TokenManager handles registry authentication, caching the bearer token until
-// shortly before the registry says it expires. It does not read the
-// environment: a caller that already has a verbatim bearer token passes it to
-// SetOverrideToken (StartProxy takes one as a parameter), and anything that is
-// not a usable bearer, such as a raw GitHub PAT, is rejected by IsBearerToken
-// so it falls through to normal token exchange instead of being sent as an
-// invalid Authorization header.
+// Registry credentials are supplied as an authn.Authenticator (see pkg/oci),
+// which StartProxy takes as a parameter rather than reading from the
+// environment. The proxy performs no token bookkeeping of its own: the
+// credential is negotiated with the registry on first use and refreshed
+// whenever the registry says it has expired, inside the transport. A nil
+// authenticator reads anonymously, which is all a public cache needs.
 package proxy

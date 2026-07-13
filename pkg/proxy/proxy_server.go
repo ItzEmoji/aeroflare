@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"github.com/itzemoji/aeroflare/pkg/oci"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,23 +10,65 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+
+	"github.com/itzemoji/aeroflare/pkg/oci"
 )
 
-// ProxyServer bridges the Nix binary cache protocol to GHCR and upstream caches.
+// ProxyServer bridges the Nix binary cache protocol to an OCI registry and
+// upstream caches.
 //
 // It holds no cache of its own: every narinfo, NAR, and public-key lookup is
 // resolved with a direct request to the OCI registry (the per-package manifest
 // tagged with the store hash, or the "cache-config" manifest for the public
 // key). There is no index blob, no TTL, and nothing to refresh.
+//
+// Registry credentials live in the puller's transport, not in this struct: it
+// authenticates on first use and re-authenticates whenever the registry says
+// the credential has expired, so nothing here tracks token lifetimes.
 type ProxyServer struct {
-	Port            int
-	ListenAddr      string
-	Registry        string
-	Repository      string
-	UpstreamCaches  []string
-	TokenMgr        *TokenManager
-	HttpClient      *http.Client
-	HttpShortClient *http.Client
+	Port           int
+	ListenAddr     string
+	Registry       string
+	Repository     string
+	UpstreamCaches []string
+
+	repo   name.Repository
+	auth   authn.Authenticator
+	puller *remote.Puller
+
+	// upstream deliberately carries no registry credentials: the upstream
+	// caches are unrelated hosts, and a credential must not be sent to one.
+	upstream *http.Client
+}
+
+// NewProxyServer builds a server that serves repository on registry, falling
+// back to upstreams for anything the registry cannot satisfy. A nil auth reads
+// anonymously, which is all a public cache needs.
+func NewProxyServer(registry, repository string, upstreams []string, auth authn.Authenticator) (*ProxyServer, error) {
+	repo, err := oci.Repository(registry, repository)
+	if err != nil {
+		return nil, fmt.Errorf("invalid registry/repository: %w", err)
+	}
+	puller, err := oci.Puller(auth)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create registry puller: %w", err)
+	}
+
+	return &ProxyServer{
+		Registry:       registry,
+		Repository:     repository,
+		UpstreamCaches: upstreams,
+		repo:           repo,
+		auth:           auth,
+		puller:         puller,
+		upstream:       &http.Client{Timeout: 30 * time.Minute}, // high, for massive NARs
+	}, nil
 }
 
 // Handler handles all incoming HTTP requests for the Nix binary cache proxy.
@@ -57,16 +98,100 @@ func (ps *ProxyServer) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// pkg is one package's OCI manifest, reduced to what the proxy serves from it:
+// the descriptor of the NAR layer, and the aeroflare.* narinfo fields. A NAR
+// request needs only the former, so the fields are read lazily: recovering them
+// can cost a second request, and there is no reason to pay it for a blob fetch.
+type pkg struct {
+	desc   *remote.Descriptor
+	labels map[string]string // annotations as found on the manifest; may carry no narinfo
+	nar    v1.Descriptor
+}
+
+// fetchPackage fetches the manifest tagged with the store hash.
+func (ps *ProxyServer) fetchPackage(ctx context.Context, tag string) (*pkg, error) {
+	desc, err := ps.puller.Get(ctx, ps.repo.Tag(tag))
+	if err != nil {
+		return nil, err
+	}
+
+	var mf struct {
+		Annotations map[string]string `json:"annotations"`
+		Labels      map[string]string `json:"labels"`
+		Layers      []v1.Descriptor   `json:"layers"`
+	}
+	if err := json.Unmarshal(desc.Manifest, &mf); err != nil {
+		return nil, err
+	}
+	if len(mf.Layers) == 0 {
+		return nil, fmt.Errorf("no layers in manifest for %s", tag)
+	}
+
+	labels := mf.Annotations
+	if labels["aeroflare.storepath"] == "" {
+		labels = mf.Labels
+	}
+
+	return &pkg{desc: desc, labels: labels, nar: mf.Layers[0]}, nil
+}
+
+// narinfoLabels returns the aeroflare.* fields describing the package. Aeroflare
+// writes them as manifest annotations; the image config's labels are a fallback
+// for images written by other tools, which put their metadata there instead.
+func (p *pkg) narinfoLabels() (map[string]string, error) {
+	if p.labels["aeroflare.storepath"] != "" {
+		return p.labels, nil
+	}
+
+	labels, err := configLabels(p.desc)
+	if err != nil {
+		return nil, err
+	}
+	if labels["aeroflare.storepath"] == "" {
+		return nil, errors.New("no narinfo metadata in manifest annotations or image config")
+	}
+	return labels, nil
+}
+
+// configLabels reads the labels from an image's config blob, checking both the
+// standard "config.Labels" location and the top-level one, since different
+// tools populate different places.
+func configLabels(desc *remote.Descriptor) (map[string]string, error) {
+	img, err := desc.Image()
+	if err != nil {
+		return nil, err
+	}
+	raw, err := img.RawConfigFile()
+	if err != nil {
+		return nil, err
+	}
+
+	var cfg struct {
+		Config struct {
+			Labels      map[string]string `json:"Labels"`
+			LabelsLower map[string]string `json:"labels"`
+		} `json:"config"`
+		Labels      map[string]string `json:"Labels"`
+		LabelsLower map[string]string `json:"labels"`
+	}
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		return nil, err
+	}
+
+	for _, m := range []map[string]string{cfg.Config.Labels, cfg.Labels, cfg.Config.LabelsLower, cfg.LabelsLower} {
+		if len(m) > 0 {
+			return m, nil
+		}
+	}
+	return nil, nil
+}
+
 // fetchPublicKey fetches the cache's public key straight from the
 // "cache-config" OCI manifest annotations. There is no caching: each call is a
 // fresh registry request. Returns "" if the manifest can't be fetched or has no
 // key configured.
 func (ps *ProxyServer) fetchPublicKey(ctx context.Context) string {
-	token, err := ps.TokenMgr.GetToken(ctx)
-	if err != nil {
-		return ""
-	}
-	anns, err := oci.FetchAeroflareAnnotations(ctx, ps.HttpShortClient, ps.Registry, ps.Repository, "cache-config", token)
+	anns, err := oci.FetchAeroflareAnnotations(ctx, ps.Registry, ps.Repository, "cache-config", ps.auth)
 	if err != nil {
 		return ""
 	}
@@ -135,9 +260,9 @@ func (ps *ProxyServer) serveNarInfo(w http.ResponseWriter, r *http.Request, path
 	http.Error(w, "Narinfo Not Found", http.StatusNotFound)
 }
 
-// serveNar resolves a "/nar/<basename>" request by deriving the GHCR blob
-// digest from the native OCI manifest tagged with the store hash, streaming it
-// from GHCR if found, and otherwise falling back to the upstream caches.
+// serveNar resolves a "/nar/<basename>" request by deriving the NAR blob's
+// digest from the OCI manifest tagged with the store hash, streaming it from
+// the registry if found, and otherwise falling back to the upstream caches.
 func (ps *ProxyServer) serveNar(w http.ResponseWriter, r *http.Request, path string, method string) {
 	narBasename := strings.TrimPrefix(path, "/nar/")
 	contentType := "application/x-nix-nar"
@@ -145,19 +270,18 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, r *http.Request, path str
 		contentType = "application/x-xz"
 	}
 
-	var digest string
-	if d, err := ps.digestFromNativeManifest(r.Context(), narBasename); err == nil && d != "" {
-		digest = d
-	} else if err != nil {
-		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to derive digest from native manifest for %s: %v. Trying upstream...\n", narBasename, err)
+	tag := narBasename
+	if idx := strings.Index(tag, ".nar"); idx != -1 {
+		tag = tag[:idx]
 	}
 
-	if digest != "" && strings.HasPrefix(digest, "sha256:") {
-		err := ps.streamBlob(r.Context(), w, digest, contentType, method)
-		if err == nil {
-			return
-		}
-		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to stream blob %s from GHCR: %v. Trying upstream...\n", digest, err)
+	p, err := ps.fetchPackage(r.Context(), tag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: no manifest for %s: %v. Trying upstream...\n", narBasename, err)
+	} else if err := ps.streamNar(r.Context(), w, p.nar, contentType, method); err == nil {
+		return
+	} else {
+		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: failed to stream blob %s: %v. Trying upstream...\n", p.nar.Digest, err)
 	}
 
 	if ps.proxyUpstream(w, r, path) {
@@ -168,58 +292,15 @@ func (ps *ProxyServer) serveNar(w http.ResponseWriter, r *http.Request, path str
 }
 
 // serveNativeNarinfo reconstructs a narinfo file from the OCI manifest tagged
-// with storeHash (native mode): the aeroflare.* fields are read from the
-// manifest's annotations/labels, falling back to the image config's labels
-// via fetchConfigLabels if the manifest itself doesn't carry them.
+// with storeHash.
 func (ps *ProxyServer) serveNativeNarinfo(w http.ResponseWriter, r *http.Request, storeHash string) error {
-	proto := oci.GetProtocol(ps.Registry)
-	manifestURL := fmt.Sprintf("%s://%s/v2/%s/manifests/%s", proto, ps.Registry, ps.Repository, storeHash)
-	req, err := http.NewRequestWithContext(r.Context(), "GET", manifestURL, nil)
+	p, err := ps.fetchPackage(r.Context(), storeHash)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json")
-	token, _ := ps.TokenMgr.GetToken(r.Context())
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := ps.HttpClient.Do(req)
+	labels, err := p.narinfoLabels()
 	if err != nil {
 		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-
-	var manifest struct {
-		Annotations map[string]string `json:"annotations"`
-		Labels      map[string]string `json:"labels"`
-		Config      struct {
-			Digest string `json:"digest"`
-		} `json:"config"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
-		return err
-	}
-
-	var labels map[string]string
-
-	if manifest.Annotations != nil && manifest.Annotations["aeroflare.storepath"] != "" {
-		labels = manifest.Annotations
-	} else if manifest.Labels != nil && manifest.Labels["aeroflare.storepath"] != "" {
-		labels = manifest.Labels
-	} else if manifest.Config.Digest != "" {
-		configLabels, err := ps.fetchConfigLabels(r.Context(), manifest.Config.Digest)
-		if err == nil && configLabels != nil {
-			labels = configLabels
-		}
-	}
-
-	if labels == nil {
-		return fmt.Errorf("no narinfo labels found in manifest or config")
 	}
 
 	var b strings.Builder
@@ -265,152 +346,41 @@ func (ps *ProxyServer) serveNativeNarinfo(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
-// digestFromNativeManifest fetches the OCI manifest tagged with the NAR's
-// store hash (native mode) and returns its first layer's digest, which is
-// the GHCR blob digest for that NAR.
-func (ps *ProxyServer) digestFromNativeManifest(ctx context.Context, narBasename string) (string, error) {
-	tag := narBasename
-	if idx := strings.Index(tag, ".nar"); idx != -1 {
-		tag = tag[:idx]
+// streamNar copies the NAR blob described by nar straight to w. The blob is
+// opened before any header is written, so a failure here can still fall through
+// to the upstream caches. If the copy is interrupted partway through, it panics
+// with http.ErrAbortHandler rather than returning normally, so the client sees
+// a broken connection instead of what looks like a complete-but-truncated body.
+func (ps *ProxyServer) streamNar(ctx context.Context, w http.ResponseWriter, nar v1.Descriptor, contentType string, method string) error {
+	writeHeaders := func() {
+		w.Header().Set("Content-Type", contentType)
+		if nar.Size > 0 {
+			w.Header().Set("Content-Length", strconv.FormatInt(nar.Size, 10))
+		}
+		w.WriteHeader(http.StatusOK)
 	}
 
-	proto := oci.GetProtocol(ps.Registry)
-	manifestURL := fmt.Sprintf("%s://%s/v2/%s/manifests/%s", proto, ps.Registry, ps.Repository, tag)
-	req, err := http.NewRequestWithContext(ctx, "GET", manifestURL, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json")
-	token, _ := ps.TokenMgr.GetToken(ctx)
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+	// A HEAD is answered from the manifest: the layer descriptor already
+	// carries the size, so there is no reason to open the blob at all.
+	if method == http.MethodHead {
+		writeHeaders()
+		return nil
 	}
 
-	resp, err := ps.HttpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-
-	var manifest struct {
-		Layers []struct {
-			Digest string `json:"digest"`
-		} `json:"layers"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
-		return "", err
-	}
-	if len(manifest.Layers) == 0 {
-		return "", fmt.Errorf("no layers in manifest")
-	}
-	return manifest.Layers[0].Digest, nil
-}
-
-// fetchConfigLabels downloads the OCI image config blob at configDigest and
-// returns its labels, checking both the "Labels"/"labels" key at the top
-// level and nested under "config" (different tools populate different
-// locations). Returns a nil map (no error) if no labels are present anywhere.
-func (ps *ProxyServer) fetchConfigLabels(ctx context.Context, configDigest string) (map[string]string, error) {
-	proto := oci.GetProtocol(ps.Registry)
-	blobURL := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, ps.Registry, ps.Repository, configDigest)
-	req, err := http.NewRequestWithContext(ctx, "GET", blobURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	token, _ := ps.TokenMgr.GetToken(ctx)
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := ps.HttpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("config blob HTTP %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var configData struct {
-		Config struct {
-			Labels      map[string]string `json:"Labels"`
-			LabelsLower map[string]string `json:"labels"`
-		} `json:"config"`
-		Labels      map[string]string `json:"Labels"`
-		LabelsLower map[string]string `json:"labels"`
-	}
-
-	if err := json.Unmarshal(body, &configData); err != nil {
-		return nil, err
-	}
-
-	if len(configData.Config.Labels) > 0 {
-		return configData.Config.Labels, nil
-	}
-	if len(configData.Labels) > 0 {
-		return configData.Labels, nil
-	}
-	if len(configData.Config.LabelsLower) > 0 {
-		return configData.Config.LabelsLower, nil
-	}
-	if len(configData.LabelsLower) > 0 {
-		return configData.LabelsLower, nil
-	}
-
-	return nil, nil
-}
-
-// streamBlob fetches the blob at digest from GHCR and copies it directly to
-// w. If the copy is interrupted partway through, it panics with
-// http.ErrAbortHandler rather than returning normally, so the client sees a
-// broken connection instead of what looks like a complete-but-truncated body.
-func (ps *ProxyServer) streamBlob(ctx context.Context, w http.ResponseWriter, digest string, contentType string, method string) error {
-	token, err := ps.TokenMgr.GetToken(ctx)
+	layer, err := ps.puller.Layer(ctx, ps.repo.Digest(nar.Digest.String()))
 	if err != nil {
 		return err
 	}
-
-	proto := oci.GetProtocol(ps.Registry)
-	blobURL := fmt.Sprintf("%s://%s/v2/%s/blobs/%s", proto, ps.Registry, ps.Repository, digest)
-	req, err := http.NewRequestWithContext(ctx, method, blobURL, nil)
+	rc, err := layer.Compressed()
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "aeroflare/1.0")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	defer func() { _ = rc.Close() }()
 
-	resp, err := ps.HttpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
+	writeHeaders()
 
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("GHCR blob download HTTP %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	w.Header().Set("Content-Type", contentType)
-	if resp.ContentLength > 0 {
-		w.Header().Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
-	}
-	w.WriteHeader(http.StatusOK)
-
-	_, err = io.Copy(w, resp.Body)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for blob %s: %v\n", digest, err)
+	if _, err := io.Copy(w, rc); err != nil {
+		fmt.Fprintf(os.Stderr, "[aeroflare proxy] Warning: stream interrupted for blob %s: %v\n", nar.Digest, err)
 		// Abort the connection so the client sees a transfer error; returning
 		// normally would cleanly terminate a truncated body, making it look
 		// like a complete download.
@@ -437,7 +407,7 @@ func (ps *ProxyServer) proxyUpstream(w http.ResponseWriter, r *http.Request, ups
 		}
 		req.Header.Set("User-Agent", "aeroflare/1.0")
 
-		resp, err := ps.HttpClient.Do(req)
+		resp, err := ps.upstream.Do(req)
 		if err != nil {
 			continue // Try next upstream on network error
 		}
