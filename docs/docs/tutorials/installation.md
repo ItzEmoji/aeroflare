@@ -65,26 +65,44 @@ archives are also **Linux-only** — on macOS or other platforms, use Nix or bui
 from source.
 :::
 
-## Option 3: Building from Source (Go)
+## Option 3: Go Toolchain
 
-Aeroflare requires Go 1.21 or later. 
+Aeroflare is a Go module — [`github.com/itzemoji/aeroflare`](https://pkg.go.dev/github.com/itzemoji/aeroflare) —
+so the Go toolchain can install it directly, with no clone:
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/ItzEmoji/aeroflare.git
-   cd aeroflare
-   ```
+```bash
+go install github.com/itzemoji/aeroflare/cmd/aeroflare@latest
+go install github.com/itzemoji/aeroflare/cmd/aeroflare-ci@latest
+```
 
-2. Compile the binaries:
-   ```bash
-   go build -o aeroflare .
-   go build -o aeroflare-ci ./cmd/aeroflare-ci
-   ```
+This puts the binaries in `$(go env GOPATH)/bin`. Version metadata is recovered
+from the module version, so `aeroflare version` reports the real release rather
+than `dev`.
 
-3. Move them to your `PATH`:
-   ```bash
-   sudo mv aeroflare aeroflare-ci /usr/local/bin/
-   ```
+To build from a clone instead:
+
+```bash
+git clone https://github.com/ItzEmoji/aeroflare.git
+cd aeroflare
+
+go build -o aeroflare ./cmd/aeroflare
+go build -o aeroflare-ci ./cmd/aeroflare-ci
+
+sudo mv aeroflare aeroflare-ci /usr/local/bin/
+```
+
+Requires the Go version declared in `go.mod`. Note that both binaries live under
+`cmd/` — there is no package at the repository root, so `go build .` will not
+work.
+
+:::tip Building for development
+A plain `go build` omits the version ldflags, so the binary reports a
+pseudo-version. Use `task build` (or `make`) to get a properly stamped binary.
+See [Development](../contributing/development.md).
+:::
+
+Aeroflare's engines can also be *imported* rather than installed — see the
+[Go API](../reference/go-api.md).
 
 
 ## Verification
