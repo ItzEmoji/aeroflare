@@ -57,7 +57,9 @@ func newAuthGatedRegistry(t *testing.T, pat string) *authGatedRegistry {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"token":%q,"expires_in":300}`, minted)
+		if _, err := fmt.Fprintf(w, `{"token":%q,"expires_in":300}`, minted); err != nil {
+			t.Errorf("writing token response: %v", err)
+		}
 	})
 
 	mux.HandleFunc("/v2/", func(w http.ResponseWriter, r *http.Request) {
