@@ -74,3 +74,20 @@ jobs:
           git push --force origin "refs/tags/$major"
 
           echo "Moved $major -> $TAG"
+
+  publish-docs:
+    needs: release
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      # proxy.golang.org never polls GitHub; it only fetches a version when a
+      # client asks for it. This request is what gets the tag onto pkg.go.dev.
+      - name: Request the new version from the module proxy
+        env:
+          TAG: ${{ needs.release.outputs.tag_name }}
+          GOPROXY: https://proxy.golang.org
+        run: go list -m "github.com/itzemoji/aeroflare@${TAG}"
