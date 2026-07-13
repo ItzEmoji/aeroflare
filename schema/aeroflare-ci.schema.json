@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ItzEmoji/aeroflare/v1/schema/aeroflare-ci.schema.json",
+  "title": "aeroflare-ci configuration",
+  "description": "Configuration for aeroflare-ci: build Nix flake installables and push them to OCI caches. Every build is pushed to every cache.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["builds", "caches"],
+  "properties": {
+    "builds": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Nix flake installables to build.",
+      "items": { "type": "string", "minLength": 1, "examples": [".#default"] }
+    },
+    "caches": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Push targets, each '<registry>;<repository>'.",
+      "items": {
+        "type": "string",
+        "pattern": "^[^;]+;[^;]+$",
+        "examples": ["ghcr.io;itzemoji/nix-cache"]
+      }
+    },
+    "compression": {
+      "type": "string",
+      "enum": ["zstd", "xz", "gzip", "none"],
+      "default": "zstd",
+      "description": "NAR compression algorithm."
+    },
+    "signing-key": {
+      "type": "string",
+      "description": "Path to a signing key, or the NAME of an environment variable holding the key material. Unsigned when omitted."
+    },
+    "workers": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 50,
+      "description": "Concurrent upload workers."
+    },
+    "upstream-cache": {
+      "default": "https://cache.nixos.org",
+      "description": "Upstream cache(s) whose paths are skipped, as a string or a list. Defaults to https://cache.nixos.org. An explicit value replaces the default rather than extending it, so list cache.nixos.org yourself if you still want it. Use 'none' (alone) to disable filtering.",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      ]
+    }
+  }
+}

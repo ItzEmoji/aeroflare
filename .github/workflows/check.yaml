@@ -5,15 +5,7 @@ jobs:
   go-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Generate App Token
-        id: app-token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - uses: actions/checkout@v5
-        with:
-          token: ${{ steps.app-token.outputs.token }}
       - uses: actions/setup-go@v6
         with:
           go-version: stable
@@ -21,3 +13,12 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12
+      - name: check public API boundaries
+        run: make check-api
+  nix-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: DeterminateSystems/nix-installer-action@v20
+      - name: nix build
+        run: nix build .#default --no-link --print-build-logs

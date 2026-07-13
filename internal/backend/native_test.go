@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/itzemoji/aeroflare/pkg/oci"
 )
 
 func TestNativeBackend_PushReceipts(t *testing.T) {
@@ -75,7 +77,7 @@ Sig: `
 	cfg := BackendConfig{
 		Registry:   u,
 		Repository: "test-repo",
-		Token:      "mock-token",
+		Auth:       oci.BearerAuth("mock-token"),
 	}
 	backend := &NativeBackend{cfg: cfg}
 

@@ -6,7 +6,7 @@ sidebar_position: 4
 
 # Maintenance & Utils
 
-Aeroflare provides a suite of utility commands for interacting directly with blobs and scaffolding local environments. These commands are useful for operators directly manipulating the cache states and for developers extending Aeroflare's core workflows.
+Aeroflare provides a suite of utility commands for interacting directly with blobs and preparing store paths. These commands are useful for operators directly manipulating the cache states and for developers extending Aeroflare's core workflows.
 
 ## `push-blob` and `pull-blob`
 
@@ -49,23 +49,3 @@ aeroflare prepare --input <file> [flags]
    - Single targets evaluate through `prepare.Prepare()`.
    - Batch targets utilize `prepare.PrepareBatch()`, dispatching to a worker pool bound by the `--workers` flag.
 3. **Reference Tracking:** It evaluates `.narinfo` files against the configured `--upstream-cache`. If `--prepare-refs` is true, the resolver fetches missing downstream dependency boundaries (one level deep) and prepares them concurrently. The results compile into a `prepare.Result` struct, detailing `MissingRefs`, `MissingRefResults`, and boolean signature status (`Signed`).
-
-## `scaffold`
-
-The `scaffold` command pulls a specified release from GitHub and establishes a local worker environment pre-configured with Cloudflare bindings.
-
-**Usage:**
-```bash
-aeroflare scaffold [flags]
-```
-
-**Flags:**
-- `--release`: Optional target GitHub release tag.
-- `--output-dir` (default: `./aeroflare-proxy`): Local path to extract proxy configurations.
-
-### Technical Mechanics
-
-1. **Release Resolution:** If `--release` is not explicitly declared, the CLI invokes an interactive prompt (using `huh` UI components) after fetching available releases from the GitHub API.
-2. **Extraction:** Downloads the corresponding tarball from `github.com/ItzEmoji/aeroflare/archive/refs/tags/...` and pipes it via `exec.Command` directly into `tar -xz -C <targetDir> --strip-components=1`.
-3. **Worker Selection:** The scaffold uses the native worker in `proxy/no-webui-native`.
-4. **Configuration Patching:** Executes `patchWranglerToml()`, reading `AEROFLARE_REGISTRY` / `NIXCACHE_REGISTRY` variables. It performs string substitutions on the template `wrangler.toml` file to inject runtime parameters (e.g. replacing `# NIXCACHE_REPO = "<NIXCACHE_REPO>"`).

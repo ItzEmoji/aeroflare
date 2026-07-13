@@ -1,0 +1,79 @@
+name: Aeroflare
+description: Build Nix flake installables and push them to one or more OCI binary caches.
+author: ItzEmoji
+branding:
+  icon: upload-cloud
+  color: blue
+
+inputs:
+  builds:
+    description: |
+      Newline- or comma-separated Nix flake installables to build, e.g. `.#default`.
+      Configless mode. Mutually exclusive with `config`.
+    required: false
+  cache:
+    description: |
+      Exactly one push target, as `<registry>;<repository>` (e.g. `ghcr.io;me/nix-cache`).
+      Configless mode. Mutually exclusive with `config`. For several caches, use `config`.
+    required: false
+  config:
+    description: |
+      Path to a `.aeroflare-ci.yaml` declaring `builds` and `caches`.
+      Mutually exclusive with `builds` and `cache`.
+    required: false
+  compression:
+    description: "NAR compression: zstd (default), xz, gzip, or none."
+    required: false
+  workers:
+    description: "Concurrent upload workers. Defaults to 50."
+    required: false
+  upstream-cache:
+    description: |
+      Upstream cache(s) used to skip already-cached paths, newline- or
+      comma-separated. Defaults to https://cache.nixos.org. An explicit value
+      replaces the default rather than extending it — list cache.nixos.org
+      yourself if you still want it. Use `none` (alone) to disable filtering
+      and upload the full closure.
+    required: false
+  signing-key:
+    description: |
+      Path to a Nix signing key, or the NAME of an environment variable holding
+      the key material. Unsigned when empty.
+    required: false
+  token:
+    description: |
+      Token for the GitHub API (asset download and provenance verification), and
+      the default push token for ghcr.io.
+    required: false
+    default: ${{ github.token }}
+  cache-token:
+    description: |
+      Push token for the registry named in `cache`. Exported as
+      AEROFLARE_TOKEN_<HOST>. Omit for ghcr.io, which falls back to `token`.
+      In config mode, set job-level `env:` vars instead, one per registry.
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Install aeroflare-ci
+      id: install
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/install.sh"
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+
+    - name: Run aeroflare-ci
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/run.sh"
+      env:
+        AEROFLARE_CI_BIN: ${{ steps.install.outputs.bin }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+        INPUT_BUILDS: ${{ inputs.builds }}
+        INPUT_CACHE: ${{ inputs.cache }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_COMPRESSION: ${{ inputs.compression }}
+        INPUT_WORKERS: ${{ inputs.workers }}
+        INPUT_UPSTREAM_CACHE: ${{ inputs.upstream-cache }}
+        INPUT_SIGNING_KEY: ${{ inputs.signing-key }}
+        INPUT_CACHE_TOKEN: ${{ inputs.cache-token }}

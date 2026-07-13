@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/itzemoji/aeroflare/cmd"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/itzemoji/aeroflare/internal/aerocmd"
+	"github.com/itzemoji/aeroflare/pkg/cmd/root"
 	"github.com/spf13/cobra/doc"
 )
 
@@ -47,7 +48,8 @@ func main() {
 	}
 
 	// Generate markdown documentation tree
-	rootCmd := cmd.GetRootCmd()
+	f := aerocmd.NewFactory("")
+	rootCmd := root.NewCmdRoot(f, "", "")
 	err := doc.GenMarkdownTree(rootCmd, outDir)
 	if err != nil {
 		fmt.Printf("Error generating markdown docs: %v\n", err)

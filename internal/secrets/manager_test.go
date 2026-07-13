@@ -1,8 +1,8 @@
 package secrets_test
 
 import (
-	"github.com/itzemoji/aeroflare/internal/secrets"
 	"errors"
+	"github.com/itzemoji/aeroflare/internal/secrets"
 	"os"
 	"testing"
 

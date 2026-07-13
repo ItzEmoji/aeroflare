@@ -6,56 +6,96 @@ sidebar_position: 1
 
 # Core Architecture
 
-Aeroflare's core architecture relies on an optimized networking layer for OCI interactions and a fully stateless, native OCI storage model. This document outlines the inner workings of `network.go` and `index.go`, targeting contributors and developers who need to understand the exact code mechanics and struct shapes utilized within the system.
+This page is about the mechanics of `pkg/oci` — the package that turns Nix cache
+semantics into OCI registry calls. It is for people changing that code, not using
+it. (For the importable surface, see the [Go API](../reference/go-api.md).)
 
-## HTTP Layer and Routing (`network.go`)
+Two ideas carry the whole design:
 
-Aeroflare operates primarily as an HTTP client interacting with OCI registries. Rather than a traditional HTTP server router, its "routing" and HTTP request handling are built around customized transports and registry clients.
+- **The tag is the index.** A package's OCI image is tagged with its 32-character
+  Nix store hash, so a narinfo lookup is one manifest fetch and there is no
+  database to keep in sync.
+- **Aeroflare implements no registry protocol.** Token exchange, retry, and
+  re-authentication on expiry are all go-containerregistry's job. Aeroflare's job
+  is only to say *which credential it holds*.
 
-### Optimized Transport and Logging
-All outgoing HTTP requests to OCI registries utilize a tailored `http.Transport` wrapped in a custom `loggingTransport`.
+## The transport (`network.go`)
 
-*   **`optimizedTransport`**: Configured to force HTTP/2 (`ForceAttemptHTTP2: true`) and tuned for high concurrency.
-    *   `MaxIdleConns`: 1000
-    *   `MaxIdleConnsPerHost`: 100
-    *   `MaxConnsPerHost`: 100
-    *   Timeout settings include a 30-second dial timeout, 90-second idle connection timeout, and 10-second TLS handshake timeout.
-*   **`loggingTransport`**: Implements `http.RoundTripper` to intercept requests. When `DebugLogger` is enabled, it logs the HTTP method and URL for every outgoing request before delegating to the underlying transport.
+Every outgoing request rides a single shared `optimizedTransport`: an
+`http.Transport` tuned for many concurrent blob uploads, wrapped in a
+`loggingTransport`.
 
-### Core OCI Request Handlers (Client-Side)
-Interactions with the registry are encapsulated in specific functions that act as the primary operational handlers:
-*   **`PushBlob` & `PushLayer`**: Compute the SHA256 digest of a local file to create a `fileLayer` (which implements `v1.Layer`). `PushLayer` uses `remote.WriteLayer` to stream this layer to the registry.
-*   **`PushNarPackage`**: Wraps a layer into an OCI image (`types.OCIManifestSchema1`). It annotates the manifest with `vnd.aeroflare.nar.*` metadata (e.g., `storepath`, `filehash`, `narhash`). Crucially, it enforces an **O(1) Lookup Tagging Rule**: the image tag is strictly set to the 32-character Nix hash (e.g., `xn2nlmvng2im9mgrq46y3wkbz4ll1hnp`) to allow direct pulls without traversing an index.
-*   **`PullOCINativeManifest`**: Fetches the image manifest by the 32-character tag and reconstructs the `narinfo.Narinfo` struct entirely from the manifest annotations.
+| Setting | Value |
+|---|---|
+| `ForceAttemptHTTP2` | `true` |
+| `MaxIdleConns` | 1000 |
+| `MaxIdleConnsPerHost` | 100 |
+| `MaxConnsPerHost` | 100 |
+| Dial timeout | 30s |
+| `IdleConnTimeout` | 90s |
+| `TLSHandshakeTimeout` | 10s |
+| `ExpectContinueTimeout` | 1s |
 
-## Storage Model and Metadata (`index.go`)
+`loggingTransport` implements `http.RoundTripper` and logs the method and URL of
+every request when debug logging is on. That is an atomic flag toggled by
+`SetDebugHTTP`, which the root command sets from `-vv`.
 
-Aeroflare is stateless: there is no central index to maintain. Each Nix package
-is published as its own OCI image tagged with its store hash, and its `.narinfo`
-metadata is carried directly in the image's manifest annotations. The only
-shared object is a small `cache-config` manifest that holds cache-wide settings
-(currently just the public signing key).
+In `auth.go`, `Transport` composes this with `retryBase` — go-containerregistry's
+`transport.NewRetry`, giving bounded exponential backoff on retryable status
+codes — and then `transport.NewWithContext`, which performs the registry token
+exchange and refreshes the token when it expires. Nothing above this layer tracks
+token lifetimes, which is why a push that runs longer than a token's validity
+still completes.
 
-### Metadata Struct Shapes
+## Credentials (`auth.go`)
 
-The push pipeline threads results through a single struct:
+A credential is an `authn.Authenticator`, and there are exactly three:
 
-```go
-type PushReceipt struct {
-	StorePath   string
-	NarinfoPath string
-	NarDigest   string
-	NarSize     int64
-	NarPath     string
-	Compression string
-	IsRoot      bool
-}
-```
+- **`PasswordAuth(username, password)`** — a password or PAT, which the registry
+  exchanges. Every credential the CLI resolves takes this path; nothing inspects a
+  token's prefix to guess what it is. The username matters to registries that
+  check it (Docker Hub) and is ignored by those that do not (ghcr.io); it defaults
+  to `"token"` when empty.
+- **`BearerAuth(token)`** — an already-exchanged token, sent verbatim.
+- **`nil`** — anonymous, which is all a public cache needs to be read.
 
-### Config Manifest Logic
+Supporting a registry other than ghcr.io is therefore a configuration question,
+not a code change.
 
-`PushConfigManifest` writes the `cache-config` manifest: an empty OCI image
-(artifact type `application/vnd.aeroflare.cache-config.v1`) whose annotations
-carry cache-wide settings such as `aeroflare.public-key`. The proxy reads these
-annotations to resolve the public key. Package metadata itself never touches
-this manifest — it lives on each package's own image (see `PushNarPackage`).
+## Push (`network.go`)
+
+- **`NewLayer` / `NewLayerFast`** wrap a local file as a `fileLayer` implementing
+  `v1.Layer`. `NewLayerFast` takes the narinfo, so it reuses hashes already
+  computed during prepare instead of re-digesting the file.
+- **`PushBlob` / `PushLayer`** stream a layer to the registry via
+  `remote.WriteLayer`.
+- **`PushNarPackage`** is where the storage model is realised. It wraps the NAR
+  layer into an OCI image (`types.OCIManifestSchema1`), writes each narinfo field
+  into a `vnd.aeroflare.nar.*` manifest annotation (`storepath`, `filehash`,
+  `narhash`, …), and **tags the image with the 32-character Nix hash** — the O(1)
+  lookup rule. `PushNarPackageWith` does the same against a caller-supplied
+  `remote.Pusher`, so a batch push reuses one authenticated pusher across many
+  packages instead of re-authenticating per package.
+
+## Read (`network.go`, `oci.go`)
+
+**`PullOCINativeManifest`** fetches the image manifest by its 32-character tag and
+reconstructs the `narinfo.Narinfo` entirely from the annotations — no blob is
+fetched to answer a narinfo request. `PullBlob` streams the layer when the NAR
+itself is wanted.
+
+`oci.go` holds the annotation parsing (`ParseAeroflareMetadata`,
+`FetchAeroflareAnnotations`) and `NewArtifactTypeImage`, a wrapper that stamps an
+`artifactType` onto an image — needed because go-containerregistry's image builder
+does not expose that field directly.
+
+## Cache-wide config (`config_manifest.go`)
+
+There is no central index, but there *is* one shared object: the `cache-config`
+manifest. `PushConfigManifest` writes an empty OCI image (artifact type
+`application/vnd.aeroflare.cache-config.v1`) whose annotations carry cache-wide
+settings — currently `aeroflare.public-key`, which `aeroflare configure` writes
+and the proxy reads to serve `/public-key`.
+
+Package metadata never touches this manifest. It lives on each package's own
+image.

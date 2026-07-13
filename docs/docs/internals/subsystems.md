@@ -20,10 +20,17 @@ The `Resolver` struct is responsible for locating authentication tokens. It foll
 
 Specific functions like `ResolveGithubToken` and `ResolveRegistryToken` wrap the resolver with the correct environment variables and secret keys depending on the target registry (e.g., mapping `ghcr.io` to the GitHub token).
 
-### Token Exchange (`internal/oci/token.go` & `internal/proxy/token_manager.go`)
-OCI registries often require a token exchange—trading a Personal Access Token (PAT) via Basic Auth for a short-lived JWT Bearer token.
-- `ExchangeToken()` discovers the authentication realm and service by probing the registry's `/v2/` endpoint and parsing the `Www-Authenticate` header. It then requests a token with `scope=repository:<repo>:pull,push`.
-- `TokenManager` (used in the proxy) caches the OCI Bearer token in memory. It uses a `sync.Mutex` for thread safety and caches tokens for 4 minutes before requiring a refresh via `fetchToken()`. It also supports static overrides via the `oci_token` environment variable.
+### Registry Authentication (`pkg/oci/auth.go`)
+OCI registries require a token exchange—trading a Personal Access Token (PAT) via Basic Auth for a short-lived Bearer token. **Aeroflare does not implement that exchange.** It is a protocol (the Docker Registry v2 token flow), and `go-containerregistry` implements it, so Aeroflare's job is only to say *which credential it holds*.
+
+A credential is an `authn.Authenticator`, built by one of three constructors:
+- `PasswordAuth(username, password)` — a password or PAT. The registry exchanges it. Every credential the CLI can resolve takes this path; nothing inspects the token's prefix to guess what it is.
+- `BearerAuth(token)` — a token the caller has already exchanged, sent verbatim.
+- `nil` — anonymous, which is enough to read a public cache.
+
+`Transport()` and `Client()` wrap `transport.NewWithContext`, which pings `/v2/`, parses the `WWW-Authenticate` challenge to find the realm and service (which may be on a different host — Docker Hub challenges to `auth.docker.io`), performs the exchange, and re-authenticates whenever the registry challenges again, whether because the token expired or because the request needs a wider scope. Nothing in Aeroflare tracks token lifetimes.
+
+This is why supporting a new registry is a matter of configuration rather than code.
 
 ### Device Flow Auth (`internal/auth/github.go`)
 For interactive logins, Aeroflare implements the OAuth 2.0 Device Authorization Grant flow for GitHub:

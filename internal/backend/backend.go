@@ -2,6 +2,8 @@ package backend
 
 import (
 	"context"
+
+	"github.com/google/go-containerregistry/pkg/authn"
 )
 
 // PushReceipt records the result of preparing and uploading a single store
@@ -27,7 +29,7 @@ type CacheBackend interface {
 type BackendConfig struct {
 	Registry          string
 	Repository        string
-	Token             string
+	Auth              authn.Authenticator
 	PubKeyPath        string
 	ConfigAnnotations map[string]string
 	Workers           int
