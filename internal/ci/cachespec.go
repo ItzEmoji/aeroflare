@@ -79,12 +79,20 @@ func ResolveToken(registry string) string {
 // first. There is no longer a field that means "bearer", so the mistake has
 // nowhere left to live.
 //
-// AEROFLARE_USERNAME_<HOST> supplies the username for registries that check it
-// (Docker Hub). ghcr.io ignores the username. Returns nil when no token is set.
+// The username comes from AEROFLARE_USERNAME_<HOST>, falling back to the
+// registry-agnostic AEROFLARE_GIT_USERNAME. It matters to registries that check
+// it -- GitLab wants "gitlab-ci-token" for a job token, Docker Hub wants the
+// real account name -- and is ignored by ghcr.io. Returns nil when no token is
+// set.
 func ResolveAuth(registry string) authn.Authenticator {
 	token := ResolveToken(registry)
 	if token == "" {
 		return nil
 	}
-	return oci.PasswordAuth(os.Getenv(UsernameEnvVar(registry)), token)
+
+	username := os.Getenv(UsernameEnvVar(registry))
+	if username == "" {
+		username = os.Getenv("AEROFLARE_GIT_USERNAME")
+	}
+	return oci.PasswordAuth(username, token)
 }

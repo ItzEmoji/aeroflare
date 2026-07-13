@@ -141,6 +141,14 @@ per registry instead, named `AEROFLARE_TOKEN_<HOST>` with `.` and `:`
 replaced by `_`. Above, `docker.io` needs `AEROFLARE_TOKEN_DOCKER_IO`;
 `ghcr.io` needs nothing, because of its `GITHUB_TOKEN` fallback.
 
+:::note Registries that check the username
+The token is presented to the registry as a password, over Basic auth, with
+the username defaulting to `token`. `ghcr.io` ignores the username, but Docker
+Hub and GitLab check it: pair their token with `AEROFLARE_USERNAME_<HOST>` —
+`AEROFLARE_USERNAME_DOCKER_IO` set to your Docker Hub account name, for
+instance. Omit it and the registry answers `401`.
+:::
+
 **Cache order matters.** The first entry is the primary: it backs the
 substituter used during the build, and its token is validated before
 anything is built.

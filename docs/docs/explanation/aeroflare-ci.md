@@ -144,23 +144,30 @@ aeroflare-ci: 1 builds, 1 caches
 
 ### How the token is presented to the registry
 
-Once resolved, the token is classified before use:
+The token is a **password**, and it is always presented as one. Aeroflare does
+not inspect its shape, and there is no classification step: it hands the
+credential to the registry over Basic auth, and the registry hands back the
+short-lived Bearer token it wants to see on subsequent requests.
 
-- A **JWT** (leading `eyJ`) is sent as a Bearer token unchanged.
-- A recognised **PAT** — GitHub (`ghp_`, `github_pat_`, `gho_`, `ghu_`, `ghs_`),
-  GitLab (`glpat-`), or Docker Hub (`dckr_pat_`) — is exchanged for a Bearer
-  token. Aeroflare pings `/v2/`, reads the `WWW-Authenticate` challenge to
-  discover the realm and service, and requests a `pull,push` scope.
-- Anything else, when no username is configured, is assumed to be a Bearer token
-  already.
+That exchange is the standard Docker Registry v2 token flow, and Aeroflare does
+not implement it — [go-containerregistry][gcr] does. It pings `/v2/`, reads the
+`WWW-Authenticate` challenge to discover the realm and service (which need not
+be on the registry's own host: Docker Hub challenges `registry-1.docker.io`
+requests to a realm on `auth.docker.io`), requests the scopes the operation
+needs, and re-authenticates whenever the registry says the token has expired.
+A push large enough to outlive a token therefore still finishes.
 
-The username used for that exchange comes from `AEROFLARE_GIT_USERNAME`, falling
-back to `token`. Setting it matters for registries that expect Basic
-credentials rather than a bare token — GitLab CI job tokens being the common
-case, where the username must be `gitlab-ci-token`.
+So a GitHub PAT (`ghp_`), an Actions token (`ghs_`), a GitLab job token, a
+Docker Hub PAT (`dckr_pat_`) and a self-hosted Harbor password all take exactly
+the same path. Any registry implementing the standard token flow works, with no
+per-registry code.
 
-Because the challenge is discovered rather than hard-coded, any OCI registry
-implementing the standard token flow works.
+The username is read from `AEROFLARE_USERNAME_<HOST>`, falling back to
+`AEROFLARE_GIT_USERNAME` and then to `token`. It matters only for registries
+that check it: GitLab expects `gitlab-ci-token` for a job token and Docker Hub
+expects the real account name, while `ghcr.io` ignores it entirely.
+
+[gcr]: https://github.com/google/go-containerregistry
 
 ## Signing key resolution
 

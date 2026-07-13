@@ -63,12 +63,13 @@ caches:
 
 The two GitLab-specific details:
 
-**`AEROFLARE_GIT_USERNAME: gitlab-ci-token`.** A GitLab job token is not a
-recognised PAT prefix, so without a username Aeroflare would send it straight
-through as a Bearer token and the registry would reject it. Setting the username
-sends it through the Basic-auth token exchange instead, which is what GitLab's
-registry expects. A `glpat-` personal access token is recognised on its own and
-does not need this.
+**`AEROFLARE_GIT_USERNAME: gitlab-ci-token`.** Aeroflare presents every
+credential to the registry as a password, over Basic auth, and GitLab checks the
+username that comes with it: a job token must be paired with `gitlab-ci-token`.
+Without it the username defaults to `token` and GitLab rejects the pair. A
+`glpat-` personal access token is paired with your own username instead. You can
+also set this per registry, as `AEROFLARE_USERNAME_<HOST>`, which takes
+precedence.
 
 **Deriving the token variable name.** `AEROFLARE_TOKEN_<HOST>` is a static name,
 but `$CI_REGISTRY` is only known at run time, so build the name in the script.
@@ -128,9 +129,11 @@ individually, remaining caches still receive artifacts, and the process exits
 `1`.
 
 **`401 Unauthorized` on a non-GitHub registry.**
-The token was probably sent as a Bearer token when the registry wanted Basic
-credentials. Set `AEROFLARE_GIT_USERNAME` to the registry's expected username to
-force the token exchange.
+Most likely the username. Aeroflare presents the token as a password over Basic
+auth, defaulting the username to `token`; registries that check it will reject
+that pair. Set `AEROFLARE_USERNAME_<HOST>` (or `AEROFLARE_GIT_USERNAME`) to the
+username the registry expects — `gitlab-ci-token` for a GitLab job token, your
+account name for Docker Hub.
 
 **The build rebuilds everything even though the cache is populated.**
 The Nix daemon is ignoring `extra-substituters` because the build user is not

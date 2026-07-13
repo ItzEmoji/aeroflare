@@ -27,7 +27,7 @@ These files are deliberately kept thin. They are responsible for parsing flags, 
 This is where the actual magic happens. The logic is heavily decoupled so that network operations, local file preparations, and proxying do not depend on CLI state. The storage-facing packages form a strict dependency layering — `backend` → `oci` — so lower layers never import the ones above them.
 
 ### 1. Networking & Storage
-* `internal/oci/`: **The most critical package in the project.** It implements the OCI network layer (`network.go`), using `google/go-containerregistry` to stream `.nar` blobs as OCI layers and map Nix `.narinfo` metadata onto OCI Manifest Annotations (`vnd.aeroflare.nar.*`). It also owns registry auth/token exchange (`token.go`), annotation parsing (`oci.go`), HTTP retry (`retry.go`), and writing the `cache-config` manifest (`config_manifest.go`).
+* `internal/oci/`: **The most critical package in the project.** It implements the OCI network layer (`network.go`), using `google/go-containerregistry` to stream `.nar` blobs as OCI layers and map Nix `.narinfo` metadata onto OCI Manifest Annotations (`vnd.aeroflare.nar.*`). It also owns registry credentials (`auth.go` — which delegates the token exchange, the retry policy and the re-authentication on expiry to go-containerregistry rather than reimplementing them), annotation parsing (`oci.go`), and writing the `cache-config` manifest (`config_manifest.go`).
 * `internal/backend/`: The `CacheBackend` abstraction and its `NativeBackend` implementation (`native.go`), which publishes each completed push as its own OCI image. Also defines the `PushReceipt` type threaded through the push pipeline.
 
 ### 2. The Proxy Server

@@ -14,10 +14,11 @@
 //
 // # Configuration and output
 //
-// A Target carries the destination and the credential. Because registry bearer
-// tokens are short-lived and a large push can outlive one, Target takes a
-// TokenSource that the pipeline calls again before each chunk rather than a
-// token string that would expire mid-push.
+// A Target carries the destination and the credential, as an authn.Authenticator
+// (see pkg/oci). Hand over the password or personal access token itself: the
+// registry exchange happens in the transport, which also refreshes the resulting
+// token when it expires, so a push large enough to outlive a token still
+// finishes without the caller doing anything about it.
 //
 // This package writes nothing to stdout. All progress, warnings, and per-path
 // failures go through a Reporter that the caller supplies, so an embedding
