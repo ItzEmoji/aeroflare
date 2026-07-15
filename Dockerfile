@@ -9,7 +9,7 @@ RUN make build
 FROM alpine:latest
 
 RUN apk add --no-cache ca-certificates && \
-    adduser -D -H -u 10001 aeroflare
+    adduser -D -u 10001 aeroflare
 
 COPY --from=builder /src/out/aeroflare /usr/local/bin/aeroflare
 
