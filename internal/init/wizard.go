@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/internal/auth"
-	"github.com/itzemoji/aeroflare/internal/secrets"
 	"github.com/itzemoji/aeroflare/internal/ui"
+	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/viper"
@@ -15,7 +15,7 @@ import (
 
 // RunWizard collects all configuration from the user through an interactive wizard.
 // No infrastructure changes are made during this phase.
-func RunWizard() (*InitConfig, error) {
+func RunWizard(f *cmdutil.Factory) (*InitConfig, error) {
 	fmt.Println()
 	fmt.Println("  \u2726 Aeroflare Setup")
 	fmt.Println()
@@ -28,7 +28,7 @@ func RunWizard() (*InitConfig, error) {
 
 	cfg.DeriveDefaults()
 
-	if err := promptCredentials(cfg); err != nil {
+	if err := promptCredentials(f, cfg); err != nil {
 		return nil, err
 	}
 
@@ -207,27 +207,31 @@ func promptCoreSettings(cfg *InitConfig) error {
 	return nil
 }
 
-// promptCredentials asks for only the credentials required by the selected options.
-func promptCredentials(cfg *InitConfig) error {
+// promptCredentials collects the credentials required by the selected options.
+//
+// Every credential is obtained through the auth module (pkg/cmd/auth/shared),
+// which owns the whole chain: resolve from flag/env/secrets, prompt only for
+// what's missing, and persist whatever it collects. The wizard must not grow
+// its own prompting or device-flow logic — a second, non-persisting copy is
+// what previously made `init` authenticate twice on a fresh machine.
+func promptCredentials(f *cmdutil.Factory, cfg *InitConfig) error {
+	seedOverridesFromConfig(f, cfg.GitProvider)
+
 	// Cloudflare credentials are always required (we deploy a Worker).
-	cfg.CloudflareAccountID = viper.GetString("cloudflare-account-id")
-	if cfg.CloudflareAccountID == "" {
-		cfg.CloudflareAccountID, _ = auth.NewResolver("cf-user-id").WithEnv("CLOUDFLARE_ACCOUNT_ID").Resolve()
-	}
-	cfg.CloudflareToken = viper.GetString("cloudflare-api-token")
-	if cfg.CloudflareToken == "" {
-		cfg.CloudflareToken, _ = auth.NewResolver("cf-token").WithEnv("CLOUDFLARE_API_TOKEN").Resolve()
+	var err error
+	cfg.CloudflareToken, cfg.CloudflareAccountID, err = shared.RequireCloudflareToken(f)
+	if err != nil {
+		return err
 	}
 
-	// Git token detection.
-	cfg.GitToken = viper.GetString("git-token")
-	if cfg.GitToken == "" {
-		switch cfg.GitProvider {
-		case GitGitHub:
-			cfg.GitToken = detectGitHubToken()
-		case GitGitLab:
-			cfg.GitToken = detectGitLabToken()
-		}
+	switch cfg.GitProvider {
+	case GitGitHub:
+		cfg.GitToken, err = shared.RequireGithubToken(f)
+	case GitGitLab:
+		cfg.GitToken, err = shared.RequireGitlabToken(f)
+	}
+	if err != nil {
+		return err
 	}
 
 	// A separate OCI credential is only needed when the registry isn't the
@@ -237,103 +241,21 @@ func promptCredentials(cfg *InitConfig) error {
 	needsOCIToken := (cfg.Registry != "ghcr.io" || cfg.GitProvider != GitGitHub) &&
 		(cfg.Registry != "registry.gitlab.com" || cfg.GitProvider != GitGitLab)
 
-	// Populated only if the credentials form below prompts for them; used
-	// afterwards to persist them to the secrets manager.
-	var ociUsername string
-	var ociToken string
-
+	// The well-known registries authenticate with their provider's token rather
+	// than a username/password pair, and reach here only when that provider
+	// wasn't chosen for git (otherwise GitToken above already covers them).
 	if needsOCIToken {
-		cfg.OCIToken, _ = auth.ResolveRegistryToken(cfg.Registry)
-	}
-
-	// Build the credentials form with only the fields that are missing.
-	var fields []huh.Field
-
-	if cfg.CloudflareAccountID == "" {
-		fields = append(fields, huh.NewInput().
-			Title("Cloudflare Account ID").
-			Value(&cfg.CloudflareAccountID).
-			Validate(notEmpty("Cloudflare Account ID")))
-	}
-	if cfg.CloudflareToken == "" {
-		fields = append(fields, huh.NewInput().
-			Title("Cloudflare API Token").
-			EchoMode(huh.EchoModePassword).
-			Value(&cfg.CloudflareToken).
-			Validate(notEmpty("Cloudflare API Token")))
-	}
-
-	if cfg.GitProvider == GitGitHub && cfg.GitToken == "" {
-		var useOAuth bool
-		err := huh.NewForm(
-			huh.NewGroup(
-				huh.NewConfirm().
-					Title("No GitHub token found. Authenticate via browser (OAuth Device Flow)?").
-					Value(&useOAuth),
-			),
-		).WithTheme(AeroflareTheme()).Run()
+		switch cfg.Registry {
+		case "ghcr.io":
+			cfg.OCIToken, err = shared.RequireGithubToken(f)
+		case "registry.gitlab.com":
+			cfg.OCIToken, err = shared.RequireGitlabToken(f)
+		default:
+			_, cfg.OCIToken, err = shared.RequireOCIToken(f, cfg.Registry)
+		}
 		if err != nil {
-			return fmt.Errorf("wizard cancelled")
+			return err
 		}
-
-		if useOAuth {
-			cfg.GitToken = githubDeviceFlow()
-		}
-
-		// Fall back to a manual token prompt if the user declined OAuth, or
-		// if the device flow was attempted but didn't yield a token.
-		if !useOAuth || cfg.GitToken == "" {
-			fields = append(fields, huh.NewInput().
-				Title("GitHub Token").
-				EchoMode(huh.EchoModePassword).
-				Value(&cfg.GitToken).
-				Validate(notEmpty("GitHub Token")))
-		}
-	}
-
-	if cfg.GitProvider == GitGitLab && cfg.GitToken == "" {
-		fields = append(fields, huh.NewInput().
-			Title("GitLab Token").
-			EchoMode(huh.EchoModePassword).
-			Value(&cfg.GitToken).
-			Validate(func(s string) error {
-				if err := notEmpty("GitLab Token")(s); err != nil {
-					return err
-				}
-				_, err := getGitLabUsername(s)
-				if err != nil {
-					return fmt.Errorf("invalid token: %v", err)
-				}
-				return nil
-			}))
-	}
-
-	if needsOCIToken && cfg.OCIToken == "" {
-		fields = append(fields, huh.NewInput().
-			Title(fmt.Sprintf("OCI Username for %s", cfg.Registry)).
-			Value(&ociUsername).
-			Validate(notEmpty("OCI Username")))
-
-		fields = append(fields, huh.NewInput().
-			Title(fmt.Sprintf("OCI Token / Password for %s", cfg.Registry)).
-			EchoMode(huh.EchoModePassword).
-			Value(&ociToken).
-			Validate(notEmpty("OCI Token")))
-	}
-
-	// Show the credentials form only if there are missing values.
-	if len(fields) > 0 {
-		if err := huh.NewForm(huh.NewGroup(fields...)).WithTheme(AeroflareTheme()).Run(); err != nil {
-			return fmt.Errorf("wizard cancelled")
-		}
-	}
-
-	// Save OCI credentials if provided
-	if ociToken != "" && ociUsername != "" {
-		cfg.OCIToken = ociToken
-		sm := secrets.NewManager()
-		_ = sm.Set(fmt.Sprintf("oci-%s-username", cfg.Registry), ociUsername)
-		_ = sm.Set(fmt.Sprintf("oci-%s-token", cfg.Registry), ociToken)
 	}
 
 	// Resolve Git username from token.
@@ -351,6 +273,36 @@ func promptCredentials(cfg *InitConfig) error {
 	}
 
 	return nil
+}
+
+// seedOverridesFromConfig copies credentials from the config file (the keys
+// `aeroflare settings` writes) into the factory's flag overrides, unless the
+// matching flag was already passed. The auth module resolves overrides ahead of
+// the environment and secrets manager, so this is what gives a configured
+// token the priority a flag has, without the wizard reading credentials itself.
+func seedOverridesFromConfig(f *cmdutil.Factory, provider GitProvider) {
+	if f.Overrides.CfToken == "" {
+		f.Overrides.CfToken = viper.GetString("cloudflare-api-token")
+	}
+	if f.Overrides.CfUserID == "" {
+		f.Overrides.CfUserID = viper.GetString("cloudflare-account-id")
+	}
+
+	// One `git-token` key serves whichever provider is configured.
+	gitToken := viper.GetString("git-token")
+	if gitToken == "" {
+		return
+	}
+	switch provider {
+	case GitGitHub:
+		if f.Overrides.GithubToken == "" {
+			f.Overrides.GithubToken = gitToken
+		}
+	case GitGitLab:
+		if f.Overrides.GitlabToken == "" {
+			f.Overrides.GitlabToken = gitToken
+		}
+	}
 }
 
 // DisplaySummary shows a configuration summary and asks for confirmation.

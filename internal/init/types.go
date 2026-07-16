@@ -2,7 +2,6 @@ package setup
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -77,10 +76,6 @@ func (c *InitConfig) DeriveDefaults() {
 
 // Print helpers below give the setup wizard and provisioning pipeline a
 // consistent terminal output style (icon + indented message).
-
-func printError(msg string) {
-	fmt.Fprintf(os.Stderr, "  \u2717 %s\n", msg)
-}
 
 func printSuccess(msg string) {
 	fmt.Printf("  \u2713 %s\n", msg)

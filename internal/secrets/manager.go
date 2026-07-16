@@ -167,9 +167,14 @@ func (m *defaultManager) Get(key string) (string, error) {
 		return val, nil
 	}
 
-	// Fall back to the plain-text JSON file.
+	// Fall back to the plain-text JSON file. Its absence means the secret was
+	// never stored, which callers must be able to tell apart from a real read
+	// failure by matching ErrNotFound.
 	file := getFallbackFile()
 	data, err := os.ReadFile(file)
+	if os.IsNotExist(err) {
+		return "", ErrNotFound
+	}
 	if err != nil {
 		return "", err
 	}

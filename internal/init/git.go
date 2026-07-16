@@ -10,33 +10,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
-
-	"github.com/itzemoji/aeroflare/internal/auth"
 
 	"golang.org/x/crypto/nacl/box"
 )
-
-// githubOAuthClientID is the OAuth App client ID used for the GitHub Device
-// Flow fallback (see githubDeviceFlow below), when no token is found in the
-// environment or secrets manager.
-const githubOAuthClientID = "Ov23liIJyLpd2Cse5gne"
-
-// detectGitHubToken returns a GitHub token from common environment variables or secrets manager.
-func detectGitHubToken() string {
-	if t, _ := auth.ResolveGithubToken(); t != "" {
-		return t
-	}
-	return ""
-}
-
-// detectGitLabToken returns a GitLab token from the environment or secrets manager.
-func detectGitLabToken() string {
-	if t, _ := auth.ResolveGitlabToken(); t != "" {
-		return t
-	}
-	return ""
-}
 
 // getGitHubUsername fetches the authenticated user's login.
 func getGitHubUsername(token string) (string, error) {
@@ -163,77 +139,6 @@ func createGitLabRepo(token, repoName string) (string, error) {
 	// convention) for the same reason as createGitHubRepo above.
 	cloneURL := strings.Replace(result.HTTPUrlToRepo, "https://", fmt.Sprintf("https://oauth2:%s@", token), 1)
 	return cloneURL, nil
-}
-
-// githubDeviceFlow authenticates via GitHub OAuth Device Flow.
-func githubDeviceFlow() string {
-	reqBody := strings.NewReader(fmt.Sprintf("client_id=%s&scope=repo workflow write:packages read:packages", githubOAuthClientID))
-	req, err := http.NewRequest("POST", "https://github.com/login/device/code", reqBody)
-	if err != nil {
-		return ""
-	}
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return ""
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var deviceResp struct {
-		DeviceCode      string `json:"device_code"`
-		UserCode        string `json:"user_code"`
-		VerificationURI string `json:"verification_uri"`
-		Interval        int    `json:"interval"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&deviceResp); err != nil {
-		return ""
-	}
-
-	fmt.Println()
-	printInfo(fmt.Sprintf("Open your browser to: %s", deviceResp.VerificationURI))
-	printInfo(fmt.Sprintf("Enter the code: %s", deviceResp.UserCode))
-	printInfo("Waiting for authorization...")
-
-	interval := time.Duration(deviceResp.Interval) * time.Second
-	if interval == 0 {
-		interval = 5 * time.Second
-	}
-
-	for {
-		time.Sleep(interval)
-		tokenBody := strings.NewReader(fmt.Sprintf(
-			"client_id=%s&device_code=%s&grant_type=urn:ietf:params:oauth:grant-type:device_code",
-			githubOAuthClientID, deviceResp.DeviceCode,
-		))
-		tokenReq, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", tokenBody)
-		if err != nil {
-			continue
-		}
-		tokenReq.Header.Set("Accept", "application/json")
-
-		tokenResp, err := http.DefaultClient.Do(tokenReq)
-		if err != nil {
-			continue
-		}
-
-		var result struct {
-			AccessToken string `json:"access_token"`
-			Error       string `json:"error"`
-		}
-		_ = json.NewDecoder(tokenResp.Body).Decode(&result)
-		_ = tokenResp.Body.Close()
-
-		if result.AccessToken != "" {
-			printSuccess("GitHub authentication successful!")
-			return result.AccessToken
-		}
-
-		if result.Error != "authorization_pending" && result.Error != "slow_down" {
-			printError(fmt.Sprintf("GitHub OAuth error: %s", result.Error))
-			return ""
-		}
-	}
 }
 
 // ensureGitLabProjectExists checks if the base project exists and creates it if it doesn't.
