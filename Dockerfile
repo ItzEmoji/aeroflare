@@ -5,11 +5,11 @@ ARG TARGETARCH
 ENV TARGETOS=$TARGETOS
 ENV TARGETARCH=$TARGETARCH
 
-RUN apk add --no-cache make git
+RUN apk add --no-cache just git
 
 WORKDIR /src
 COPY . .
-RUN make build
+RUN just build
 
 FROM alpine:latest
 

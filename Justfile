@@ -52,9 +52,9 @@ install-release-ci *args:
 install-release-all *args:
     go run scripts/build.go install-release-all {{args}}
 
-# Build the aeroflare-proxy container image (tag ghcr.io/itzemoji/aeroflare-proxy)
+# Build the aeroflare-proxy container image
 docker:
-    docker build -t ghcr.io/itzemoji/aeroflare-proxy .
+    docker build -t aeroflare-proxy .
 
 # Remove ./out/
 clean:

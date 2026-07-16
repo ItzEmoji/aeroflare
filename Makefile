@@ -49,8 +49,8 @@ install-release-all: ## Fetch both releases from GitHub and install them to PREF
 	go run scripts/build.go install-release-all
 
 .PHONY: docker
-docker: ## Build the aeroflare-proxy container image (tag ghcr.io/itzemoji/aeroflare-proxy)
-	docker build -t ghcr.io/itzemoji/aeroflare-proxy .
+docker: ## Build the aeroflare-proxy container image
+	docker build -t aeroflare-proxy .
 
 .PHONY: clean
 clean: ## Remove ./out/
