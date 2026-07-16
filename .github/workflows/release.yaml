@@ -125,7 +125,12 @@ jobs:
         with:
           subject-name: ghcr.io/itzemoji/aeroflare-proxy
           subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+          # push-to-registry defaults to false: GHCR doesn't support the OCI
+          # 1.1 Referrers API yet, so pushing the attestation there falls
+          # back to a `sha256-<digest>` manifest tag, which shows up as a
+          # second, separate version on the package page. The attestation
+          # is still recorded and verifiable via GitHub's own attestation
+          # store (`gh attestation verify`) without it.
 
   publish-docs:
     needs: release
