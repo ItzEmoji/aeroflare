@@ -121,7 +121,7 @@ jobs:
             ghcr.io/itzemoji/aeroflare-proxy:${{ steps.majorver.outputs.major }}
 
       - name: Attest image provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest@v4
         with:
           subject-name: ghcr.io/itzemoji/aeroflare-proxy
           subject-digest: ${{ steps.push.outputs.digest }}
