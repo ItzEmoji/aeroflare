@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.9.0](https://github.com/ItzEmoji/aeroflare/compare/v1.8.0...v1.9.0) (2026-07-16)
+
+
+### Features
+
+* add a docker target for building the aeroflare-proxy image locally ([4d99af1](https://github.com/ItzEmoji/aeroflare/commit/4d99af15b571cc5a3f22732c7d1155572027ad34))
+* added dockerfile. ([9b4ec75](https://github.com/ItzEmoji/aeroflare/commit/9b4ec7570ce8c5e84cd20a9a68850367d103985f))
+* publish aeroflare-proxy image to ghcr.io on release ([1d7a543](https://github.com/ItzEmoji/aeroflare/commit/1d7a543d37df7b3fbfaf7023da55a86659433ce3))
+* server container ([#33](https://github.com/ItzEmoji/aeroflare/issues/33)) ([5ceb3cf](https://github.com/ItzEmoji/aeroflare/commit/5ceb3cf4d45921443cfcacfe0422214bcd039561))
+
+
+### Bug Fixes
+
+* default proxy container to listen on port 8080 ([cdd66c2](https://github.com/ItzEmoji/aeroflare/commit/cdd66c2d55979906355466dee49b953d1642cdba))
+* don't push the provenance attestation to GHCR as a visible package version ([c39ddac](https://github.com/ItzEmoji/aeroflare/commit/c39ddacd0454212b65ad30f975ae8c26db7f45fa))
+* naming conventions and migrated to Just in Dockerfile. ([e6f32c6](https://github.com/ItzEmoji/aeroflare/commit/e6f32c6ee7701826c2ef01b05145dddfd6bb2a19))
+* permissions in dockerfile. ([8b2e42e](https://github.com/ItzEmoji/aeroflare/commit/8b2e42e2cdb789b8a8de43a9358ebbf809090649))
+
+
+### Performance Improvements
+
+* cross-compile the proxy image instead of building under QEMU, attest provenance ([5a10ef7](https://github.com/ItzEmoji/aeroflare/commit/5a10ef77b413c69fbb15efe47a2ae5d37bd19326))
+
 ## [1.8.0](https://github.com/ItzEmoji/aeroflare/compare/v1.7.0...v1.8.0) (2026-07-13)
 
 
