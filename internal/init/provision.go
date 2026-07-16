@@ -1,15 +1,19 @@
 package setup
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/pkg/oci"
+	"io"
 	"net/http"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"strings"
+
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 )
 
 // RunProvision executes the infrastructure provisioning pipeline.
@@ -133,7 +137,7 @@ func checkRepositoryVisibility(cfg *InitConfig) error {
 
 // createGitRepository creates a remote Git repository on the selected provider.
 func createGitRepository(cfg *InitConfig) error {
-	repoName := fmt.Sprintf("%s-proxy", strings.ReplaceAll(cfg.CacheName, "/", "-"))
+	repoName := proxyRepoName(cfg.CacheName)
 
 	var cloneURL string
 	var err error
@@ -152,7 +156,7 @@ func createGitRepository(cfg *InitConfig) error {
 	}
 
 	cfg.GitCloneURL = cloneURL
-	printInfo(fmt.Sprintf("Repository URL: %s", sanitizeCloneURL(cloneURL)))
+	printInfo(fmt.Sprintf("Repository URL: %s", cloneURL))
 	return nil
 }
 
@@ -195,92 +199,39 @@ func configureWorker(cfg *InitConfig) error {
 	return nil
 }
 
-// pushToGitRepo initializes a local git repository, creates necessary files
-// (worker.js, wrangler.toml, .github/workflows/deploy.yml) and pushes to the remote.
+// proxyRepoBranch is the branch the generated proxy repository is created with,
+// and the one its deploy workflow triggers on.
+const proxyRepoBranch = "main"
+
+// pushToGitRepo fills the freshly created proxy repository with its initial
+// commit (worker.js, wrangler.toml, and for GitHub a deploy workflow).
+//
+// The files are committed through the provider's API rather than by shelling
+// out to `git`. init's whole job is to set a machine up from nothing, so
+// depending on git being installed defeated the point — and the API needs no
+// working tree, no temp directory, and no credentials in a remote URL.
 func pushToGitRepo(cfg *InitConfig) error {
 	if cfg.GitCloneURL == "" {
 		return nil // No git repository created
 	}
 
-	tmpDir, err := os.MkdirTemp("", "aeroflare-push-*")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	files := proxyRepoFiles(cfg)
+	repoName := proxyRepoName(cfg.CacheName)
+	const message = "Initial commit from Aeroflare Setup"
 
-	// Fetch worker script. (pushToGitRepo always fetches the released script
-	// rather than reusing a local override.)
-	scriptPath, err := fetchLatestWorkerScript()
-	if err == nil {
-		scriptContent, _ := os.ReadFile(scriptPath)
-		_ = os.WriteFile(tmpDir+"/worker.js", scriptContent, 0644)
-	}
-
-	// Write wrangler.toml
-	wranglerToml := fmt.Sprintf(`name = "%s"
-main = "worker.js"
-compatibility_date = "2024-12-01"
-
-[vars]
-# Repository path, exactly as it lives in the registry.
-NIXCACHE_REPO = "%s"
-# Registry base URL WITH scheme but WITHOUT /v2 (the worker adds the spec's /v2).
-NIXCACHE_REGISTRY_URL = "%s"
-
-# Optional: a registry bearer token, set as a secret (NOT a plaintext var). The
-# Worker uses it verbatim as the bearer, so for GHCR it must be the BASE64 PAT:
-#   printf '%%s' "github_pat_xxx" | base64 | wrangler secret put NIXCACHE_TOKEN
-# GHCR accepts it directly, skipping the token exchange (faster, private repos).
-`, cfg.WorkerName, cfg.Repository, workerRegistryURL(cfg.Registry))
-
-	_ = os.WriteFile(tmpDir+"/wrangler.toml", []byte(wranglerToml), 0644)
-
-	// Write GitHub Actions workflow
-	if cfg.GitProvider == GitGitHub {
-		_ = os.MkdirAll(tmpDir+"/.github/workflows", 0755)
-		workflow := `name: Deploy Worker
-on:
-  push:
-    branches:
-      - main
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-`
-		_ = os.WriteFile(tmpDir+"/.github/workflows/deploy.yml", []byte(workflow), 0644)
-	}
-
-	// Git init, commit and push
-	cmds := [][]string{
-		{"git", "init"},
-		{"git", "config", "user.name", "Aeroflare Setup"},
-		{"git", "config", "user.email", "setup@aeroflare.dev"},
-		{"git", "add", "."},
-		{"git", "commit", "-m", "Initial commit from Aeroflare Setup"},
-		{"git", "branch", "-M", "main"},
-		{"git", "remote", "add", "origin", cfg.GitCloneURL},
-		{"git", "push", "-u", "origin", "main"},
-	}
-
-	for _, c := range cmds {
-		cmd := exec.Command(c[0], c[1:]...)
-		cmd.Dir = tmpDir
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("git %s failed: %w\nOutput: %s", c[1], err, strings.TrimSpace(string(out)))
+	switch cfg.GitProvider {
+	case GitGitHub:
+		if err := commitFilesToGitHub(cfg.GitToken, cfg.GitUsername, repoName, proxyRepoBranch, message, files); err != nil {
+			return err
+		}
+	case GitGitLab:
+		project := fmt.Sprintf("%s/%s", cfg.GitUsername, repoName)
+		if err := commitFilesToGitLab(cfg.GitToken, project, proxyRepoBranch, message, files); err != nil {
+			return err
 		}
 	}
 
 	if cfg.GitProvider == GitGitHub {
-		repoName := fmt.Sprintf("%s-proxy", strings.ReplaceAll(cfg.CacheName, "/", "-"))
-
 		printInfo("Configuring GitHub Actions secrets...")
 		err1 := setGitHubSecret(cfg.GitToken, cfg.GitUsername, repoName, "CLOUDFLARE_API_TOKEN", cfg.CloudflareToken)
 		err2 := setGitHubSecret(cfg.GitToken, cfg.GitUsername, repoName, "CLOUDFLARE_ACCOUNT_ID", cfg.CloudflareAccountID)
@@ -295,6 +246,77 @@ jobs:
 	}
 
 	return nil
+}
+
+// proxyRepoName is the repository name generated for a cache. Worker and repo
+// names can't contain "/", so a namespaced cache name is flattened.
+func proxyRepoName(cacheName string) string {
+	return fmt.Sprintf("%s-proxy", strings.ReplaceAll(cacheName, "/", "-"))
+}
+
+// proxyRepoFiles builds the contents of the generated proxy repository, keyed
+// by path within it. The worker script is fetched from the latest release
+// (never a local override, so the pushed repo matches a published version); if
+// that fetch fails the remaining files are still worth committing, so the
+// script is simply omitted rather than failing the whole step.
+func proxyRepoFiles(cfg *InitConfig) map[string]string {
+	files := map[string]string{
+		"wrangler.toml": wranglerTOML(cfg),
+	}
+
+	if scriptPath, err := fetchLatestWorkerScript(); err == nil {
+		if script, err := os.ReadFile(scriptPath); err == nil {
+			files["worker.js"] = string(script)
+		}
+	} else {
+		printWarning(fmt.Sprintf("Could not fetch worker.js for the repository: %v", err))
+	}
+
+	if cfg.GitProvider == GitGitHub {
+		files[".github/workflows/deploy.yml"] = deployWorkflow()
+	}
+
+	return files
+}
+
+// wranglerTOML renders the wrangler config for the generated repository.
+func wranglerTOML(cfg *InitConfig) string {
+	return fmt.Sprintf(`name = "%s"
+main = "worker.js"
+compatibility_date = "2024-12-01"
+
+[vars]
+# Repository path, exactly as it lives in the registry.
+NIXCACHE_REPO = "%s"
+# Registry base URL WITH scheme but WITHOUT /v2 (the worker adds the spec's /v2).
+NIXCACHE_REGISTRY_URL = "%s"
+
+# Optional: a registry bearer token, set as a secret (NOT a plaintext var). The
+# Worker uses it verbatim as the bearer, so for GHCR it must be the BASE64 PAT:
+#   printf '%%s' "github_pat_xxx" | base64 | wrangler secret put NIXCACHE_TOKEN
+# GHCR accepts it directly, skipping the token exchange (faster, private repos).
+`, cfg.WorkerName, cfg.Repository, workerRegistryURL(cfg.Registry))
+}
+
+// deployWorkflow renders the GitHub Actions workflow that redeploys the Worker
+// on every push to the default branch.
+func deployWorkflow() string {
+	return fmt.Sprintf(`name: Deploy Worker
+on:
+  push:
+    branches:
+      - %s
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+`, proxyRepoBranch)
 }
 
 // resolveWorkerScript finds a worker.js to deploy.
@@ -316,48 +338,109 @@ func resolveWorkerScript(cfg *InitConfig) (string, error) {
 	return fetchLatestWorkerScript()
 }
 
-// fetchLatestWorkerScript downloads the latest release tarball, extracts the
-// worker script to a temp directory, and returns its path.
-func fetchLatestWorkerScript() (string, error) {
-	resp, err := http.Get("https://api.github.com/repos/ItzEmoji/aeroflare/releases")
+// workerScriptRelPath is where the worker script lives inside the release
+// tarball, below the single top-level directory GitHub wraps an archive in.
+const workerScriptRelPath = "proxy/no-webui-native/worker.js"
+
+// maxWorkerScriptBytes bounds the extracted script. It is a few hundred KB in
+// practice; the limit just stops a malformed archive from exhausting memory.
+const maxWorkerScriptBytes = 16 << 20
+
+// latestReleaseTag returns the tag of the most recent published release.
+func latestReleaseTag() (string, error) {
+	resp, err := http.Get("https://api.github.com/repos/ItzEmoji/aeroflare/releases/latest")
 	if err != nil {
-		return "", fmt.Errorf("fetch releases: %w", err)
+		return "", fmt.Errorf("fetch latest release: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	var releases []struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		return "", fmt.Errorf("decode releases: %w", err)
-	}
-	if len(releases) == 0 {
-		return "", fmt.Errorf("no releases found")
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("fetch latest release: HTTP %d", resp.StatusCode)
 	}
 
-	tag := releases[0].TagName
+	var release struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", fmt.Errorf("decode latest release: %w", err)
+	}
+	if release.TagName == "" {
+		return "", fmt.Errorf("latest release has no tag")
+	}
+	return release.TagName, nil
+}
+
+// fetchLatestWorkerScript downloads the latest release tarball, extracts the
+// worker script to a temp directory, and returns its path. The tarball is read
+// in-process rather than through `wget … | tar`, so init works on a machine
+// that has neither installed.
+func fetchLatestWorkerScript() (string, error) {
+	tag, err := latestReleaseTag()
+	if err != nil {
+		return "", err
+	}
 	printInfo(fmt.Sprintf("Using release %s", tag))
+
+	tarURL := fmt.Sprintf("https://github.com/ItzEmoji/aeroflare/archive/refs/tags/%s.tar.gz", tag)
+	resp, err := http.Get(tarURL)
+	if err != nil {
+		return "", fmt.Errorf("download release %s: %w", tag, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("download release %s: HTTP %d", tag, resp.StatusCode)
+	}
+
+	script, err := workerScriptFromTarball(resp.Body)
+	if err != nil {
+		return "", err
+	}
 
 	tmpDir, err := os.MkdirTemp("", "aeroflare-worker-*")
 	if err != nil {
 		return "", err
 	}
 
-	tarURL := fmt.Sprintf("https://github.com/ItzEmoji/aeroflare/archive/refs/tags/%s.tar.gz", tag)
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("wget -qO- %s | tar -xz -C %s --strip-components=1", tarURL, tmpDir))
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	scriptPath := filepath.Join(tmpDir, "worker.js")
+	if err := os.WriteFile(scriptPath, script, 0644); err != nil {
 		_ = os.RemoveAll(tmpDir)
-		return "", fmt.Errorf("download release: %w", err)
-	}
-
-	scriptPath := fmt.Sprintf("%s/proxy/no-webui-native/worker.js", tmpDir)
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		_ = os.RemoveAll(tmpDir)
-		return "", fmt.Errorf("worker.js not found in release at %s", scriptPath)
+		return "", err
 	}
 
 	return scriptPath, nil
+}
+
+// workerScriptFromTarball reads a gzipped release tarball and returns the
+// contents of the worker script. Entries are matched on their path below the
+// archive's top-level directory (named "<repo>-<tag>"), which is the component
+// `tar --strip-components=1` used to discard. Nothing is written using a path
+// taken from the archive, so a hostile entry name cannot escape anywhere.
+func workerScriptFromTarball(r io.Reader) ([]byte, error) {
+	gz, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("read release tarball: %w", err)
+	}
+	defer func() { _ = gz.Close() }()
+
+	tr := tar.NewReader(gz)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read release tarball: %w", err)
+		}
+		if hdr.Typeflag != tar.TypeReg {
+			continue
+		}
+		if _, rest, ok := strings.Cut(hdr.Name, "/"); ok && rest == workerScriptRelPath {
+			return io.ReadAll(io.LimitReader(tr, maxWorkerScriptBytes))
+		}
+	}
+
+	return nil, fmt.Errorf("%s not found in release tarball", workerScriptRelPath)
 }
 
 // workerEnvVars builds the environment variable map for the worker deployment.
@@ -376,16 +459,4 @@ func workerRegistryURL(registry string) string {
 		return strings.TrimRight(registry, "/")
 	}
 	return "https://" + strings.TrimRight(registry, "/")
-}
-
-// sanitizeCloneURL strips the "user:token@" credentials that
-// createGitHubRepo/createGitLabRepo embed in the clone URL, so the token is
-// never printed to the terminal.
-func sanitizeCloneURL(cloneURL string) string {
-	if idx := strings.Index(cloneURL, "@"); idx != -1 {
-		prefix := cloneURL[:strings.Index(cloneURL, "//")+2]
-		suffix := cloneURL[idx+1:]
-		return prefix + suffix
-	}
-	return cloneURL
 }

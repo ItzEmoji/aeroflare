@@ -7,12 +7,147 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"golang.org/x/crypto/nacl/box"
 )
+
+// githubAPIBase and gitlabAPIBase are the API roots. They are variables so
+// tests can point them at a local server.
+var (
+	githubAPIBase = "https://api.github.com"
+	gitlabAPIBase = "https://gitlab.com/api/v4"
+)
+
+// githubJSON performs a GitHub API request with the standard headers, and
+// decodes a successful response into out. payload and out may each be nil, for
+// a request with no body and a response whose body isn't needed.
+func githubJSON(method, url, token string, payload, out any) error {
+	return apiJSON(method, url, payload, out, func(req *http.Request) {
+		req.Header.Set("Authorization", "token "+token)
+		req.Header.Set("Accept", "application/vnd.github.v3+json")
+	})
+}
+
+// gitlabJSON is gitlabAPIBase's equivalent of githubJSON.
+func gitlabJSON(method, url, token string, payload, out any) error {
+	return apiJSON(method, url, payload, out, func(req *http.Request) {
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("PRIVATE-TOKEN", token)
+	})
+}
+
+// apiJSON sends payload as JSON (when non-nil), applies auth via setAuth, and
+// unmarshals a 2xx response body into out (when non-nil). Non-2xx responses
+// become an error carrying the body, which is where these APIs explain
+// themselves (a missing scope, a name already taken).
+func apiJSON(method, url string, payload, out any, setAuth func(*http.Request)) error {
+	var body io.Reader
+	if payload != nil {
+		b, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewReader(b)
+	}
+
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return err
+	}
+	setAuth(req)
+	req.Header.Set("User-Agent", "aeroflare/1.0")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+	if out != nil {
+		return json.Unmarshal(respBody, out)
+	}
+	return nil
+}
+
+// commitFilesToGitHub creates a single commit containing files (keyed by repo
+// path) on branch of owner/repo, via the Git Data API.
+//
+// init only calls this against the repository it just created, which is empty:
+// the commit therefore has no parents, and the branch ref is created rather
+// than fast-forwarded.
+func commitFilesToGitHub(token, owner, repo, branch, message string, files map[string]string) error {
+	type treeEntry struct {
+		Path string `json:"path"`
+		// 100644 is git's mode for a non-executable file blob.
+		Mode string `json:"mode"`
+		Type string `json:"type"`
+		// Inline content, so the API writes the blob for us and we don't have
+		// to create each one in a separate request first.
+		Content string `json:"content"`
+	}
+
+	entries := make([]treeEntry, 0, len(files))
+	for _, path := range slices.Sorted(maps.Keys(files)) {
+		entries = append(entries, treeEntry{Path: path, Mode: "100644", Type: "blob", Content: files[path]})
+	}
+
+	var tree struct {
+		SHA string `json:"sha"`
+	}
+	if err := githubJSON("POST", fmt.Sprintf("%s/repos/%s/%s/git/trees", githubAPIBase, owner, repo), token,
+		map[string]any{"tree": entries}, &tree); err != nil {
+		return fmt.Errorf("create tree: %w", err)
+	}
+
+	var commit struct {
+		SHA string `json:"sha"`
+	}
+	if err := githubJSON("POST", fmt.Sprintf("%s/repos/%s/%s/git/commits", githubAPIBase, owner, repo), token,
+		map[string]any{"message": message, "tree": tree.SHA, "parents": []string{}}, &commit); err != nil {
+		return fmt.Errorf("create commit: %w", err)
+	}
+
+	if err := githubJSON("POST", fmt.Sprintf("%s/repos/%s/%s/git/refs", githubAPIBase, owner, repo), token,
+		map[string]any{"ref": "refs/heads/" + branch, "sha": commit.SHA}, nil); err != nil {
+		return fmt.Errorf("create branch %q: %w", branch, err)
+	}
+	return nil
+}
+
+// commitFilesToGitLab creates a single commit containing files (keyed by repo
+// path) on branch of project, a "namespace/name" path. The Commits API creates
+// branch when the project is empty, which is the case init uses.
+func commitFilesToGitLab(token, project, branch, message string, files map[string]string) error {
+	type action struct {
+		Action   string `json:"action"`
+		FilePath string `json:"file_path"`
+		Content  string `json:"content"`
+	}
+
+	actions := make([]action, 0, len(files))
+	for _, path := range slices.Sorted(maps.Keys(files)) {
+		actions = append(actions, action{Action: "create", FilePath: path, Content: files[path]})
+	}
+
+	endpoint := fmt.Sprintf("%s/projects/%s/repository/commits", gitlabAPIBase, url.PathEscape(project))
+	payload := map[string]any{"branch": branch, "commit_message": message, "actions": actions}
+	if err := gitlabJSON("POST", endpoint, token, payload, nil); err != nil {
+		return fmt.Errorf("create commit on %s: %w", branch, err)
+	}
+	return nil
+}
 
 // getGitHubUsername fetches the authenticated user's login.
 func getGitHubUsername(token string) (string, error) {
@@ -100,10 +235,7 @@ func createGitHubRepo(token, repoName string) (string, error) {
 	}
 	_ = json.Unmarshal(respBody, &result)
 
-	// Embed the token in the clone URL (as the "x-access-token" user) so the
-	// later `git push` in pushToGitRepo can authenticate without a prompt.
-	cloneURL := strings.Replace(result.CloneURL, "https://", fmt.Sprintf("https://x-access-token:%s@", token), 1)
-	return cloneURL, nil
+	return result.CloneURL, nil
 }
 
 // createGitLabRepo creates a private GitLab repository and returns the clone URL.
@@ -135,10 +267,7 @@ func createGitLabRepo(token, repoName string) (string, error) {
 	}
 	_ = json.Unmarshal(respBody, &result)
 
-	// Embed the token in the clone URL (as the "oauth2" user, GitLab's
-	// convention) for the same reason as createGitHubRepo above.
-	cloneURL := strings.Replace(result.HTTPUrlToRepo, "https://", fmt.Sprintf("https://oauth2:%s@", token), 1)
-	return cloneURL, nil
+	return result.HTTPUrlToRepo, nil
 }
 
 // ensureGitLabProjectExists checks if the base project exists and creates it if it doesn't.

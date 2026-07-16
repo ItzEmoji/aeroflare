@@ -55,7 +55,7 @@ type InitConfig struct {
 	OCIToken    string
 	ScriptTag   string // Worker script tag returned by the Cloudflare deploy API; reserved for a future Workers Builds integration, not yet read elsewhere.
 	CfTokenID   string // Cloudflare API token ID; reserved for a future Workers Builds integration, not yet read elsewhere.
-	GitCloneURL string // Clone URL (with embedded credentials) for pushing to the created git repository.
+	GitCloneURL string // Clone URL of the created git repository; empty until createGitRepository runs.
 }
 
 // DeriveDefaults populates computed fields (Repository, WorkerName) from the
