@@ -1,4 +1,9 @@
-FROM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
+ENV TARGETOS=$TARGETOS
+ENV TARGETARCH=$TARGETARCH
 
 RUN apk add --no-cache make git
 

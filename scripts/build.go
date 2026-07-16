@@ -202,7 +202,24 @@ func buildOne(bin distBinary) error {
 		fmt.Printf("%s: up to date\n", out)
 		return nil
 	}
-	return run("go", "build", "-trimpath", "-ldflags", ldflags(), "-o", out, bin.pkg)
+	return runEnv(crossEnv(), "go", "build", "-trimpath", "-ldflags", ldflags(), "-o", out, bin.pkg)
+}
+
+// crossEnv returns the environment buildOne compiles with: the ambient
+// environment, plus a CGO_ENABLED=0/GOOS/GOARCH override when TARGETOS and
+// TARGETARCH are both set. Those two are deliberately not named GOOS/GOARCH:
+// this same command also builds and runs this file as `go run
+// scripts/build.go`, which would try to cross-execute itself if the ambient
+// GOOS/GOARCH didn't match the host. Docker's buildx sets TARGETOS/TARGETARCH
+// automatically for a multi-platform build, so a builder stage that promotes
+// them to ENV (see Dockerfile) cross-compiles the binary for each requested
+// platform without needing to run under QEMU emulation.
+func crossEnv() []string {
+	goos, goarch := os.Getenv("TARGETOS"), os.Getenv("TARGETARCH")
+	if goos == "" || goarch == "" {
+		return os.Environ()
+	}
+	return append(os.Environ(), "CGO_ENABLED=0", "GOOS="+goos, "GOARCH="+goarch)
 }
 
 func buildAll() error {
