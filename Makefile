@@ -48,6 +48,10 @@ install-release-ci: ## Fetch the aeroflare-ci release from GitHub and install it
 install-release-all: ## Fetch both releases from GitHub and install them to PREFIX/bin
 	go run scripts/build.go install-release-all
 
+.PHONY: docker
+docker: ## Build the aeroflare-proxy container image
+	docker build -t aeroflare-proxy .
+
 .PHONY: clean
 clean: ## Remove ./out/
 	go run scripts/build.go clean

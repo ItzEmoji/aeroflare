@@ -52,6 +52,10 @@ install-release-ci *args:
 install-release-all *args:
     go run scripts/build.go install-release-all {{args}}
 
+# Build the aeroflare-proxy container image
+docker:
+    docker build -t aeroflare-proxy .
+
 # Remove ./out/
 clean:
     go run scripts/build.go clean

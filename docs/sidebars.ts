@@ -18,6 +18,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'how-to/configuring-backends',
         'how-to/running-proxy',
+        'how-to/docker',
         'how-to/cache-population',
         'how-to/authentication',
         'how-to/signing-keys',

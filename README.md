@@ -30,6 +30,19 @@ nix run github:ItzEmoji/aeroflare -- run -- nix build .#default --print-out-path
 ```
 *Note: The `--print-out-paths` flag is necessary for the `run` command to know which store paths were built and need to be cached.*
 
+---
+
+## Docker
+
+Run the proxy as a container — no Nix or Go toolchain required on the host:
+
+```bash
+docker run -e AEROFLARE_CACHE=<org>/<cache> -p 8080:8080 ghcr.io/itzemoji/aeroflare-proxy
+```
+
+Full guide, including private-cache credentials and a persistent
+`docker-compose.yml` setup:
+[Docker](https://aeroflare.pages.dev/docs/how-to/docker).
 
 ---
 

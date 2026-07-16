@@ -66,6 +66,11 @@ tasks:
     cmds:
       - go run scripts/build.go install-release-all {{.CLI_ARGS}}
 
+  docker:
+    desc: Build the aeroflare-proxy container image
+    cmds:
+      - docker build -t aeroflare-proxy .
+
   clean:
     desc: Remove ./out/
     cmds:
