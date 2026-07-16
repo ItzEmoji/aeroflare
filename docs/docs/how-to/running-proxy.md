@@ -55,3 +55,8 @@ This command automatically:
 2. Appends the `--option extra-substituters` flag to the inner Nix command.
 3. Shuts down the proxy when the build finishes.
 4. **Pushes** any newly generated build artifacts to the remote backend automatically.
+
+## Running as a Container
+
+If you'd rather not install Nix or Go just to run the proxy, it's also
+published as a container image — see [Docker](./docker.md).
