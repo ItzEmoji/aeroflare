@@ -32,86 +32,37 @@ func RunWizard(f *cmdutil.Factory) (*InitConfig, error) {
 		return nil, err
 	}
 
-	if err := promptWorkerToken(cfg); err != nil {
-		return nil, err
-	}
+	resolveWorkerToken(cfg)
 
 	return cfg, nil
 }
 
-// promptWorkerToken optionally collects a registry token to embed in the Worker
-// (stored as the NIXCACHE_TOKEN secret). It is entirely optional: a public cache
-// needs no token, but a private cache — or anyone who wants the Worker to skip
-// GHCR's token exchange for lower latency — can supply one. When the common
-// ghcr.io + GitHub path already yielded a PAT, we offer to reuse it instead of
-// asking the user to paste a token again.
-func promptWorkerToken(cfg *InitConfig) error {
-	// A value supplied via flag/config is used as-is, no prompt.
+// resolveWorkerToken decides, without prompting, what registry token to embed in
+// the Worker as the NIXCACHE_TOKEN secret. An explicit worker-token (flag/config)
+// always wins. Otherwise, on the ghcr.io path we silently reuse the registry PAT
+// already collected to push the cache: the Worker then skips GHCR's token
+// exchange (faster) and can reach private repositories, at no extra prompt. For
+// any other registry, or when no PAT is available, the Worker is left to
+// authenticate anonymously, which is all a public cache needs.
+//
+// The direct-bearer reuse (and the base64 encoding deployWorker applies to the
+// secret) is GHCR-specific: other registries don't accept a base64 credential as
+// a bearer, so they always use the cached token exchange.
+func resolveWorkerToken(cfg *InitConfig) {
 	if t := viper.GetString("worker-token"); t != "" {
 		cfg.WorkerToken = t
-		return nil
+		return
 	}
-
-	// The direct-bearer optimization (and the base64 encoding we apply when
-	// storing the secret) is GHCR-specific. Other registries don't accept a
-	// base64 credential as a bearer, so they always use the cached token
-	// exchange and we don't offer this prompt for them.
-	if cfg.Registry != "ghcr.io" {
-		return nil
+	if cfg.Registry == "ghcr.io" {
+		cfg.WorkerToken = cfg.OCIToken
 	}
-
-	// On the common ghcr.io + GitHub path the PAT doubles as the registry
-	// credential, so offer to reuse it instead of asking for another token.
-	reusable := cfg.GitToken
-
-	desc := "Lets the Worker reach private repos and skip GHCR's token exchange (faster). Skip for a public cache."
-	if reusable != "" {
-		desc = "Reuse your existing token so the Worker can reach private repos and skip GHCR's token exchange (faster). Skip for a public cache."
-	}
-
-	var wantToken bool
-	if err := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Store a registry token on the Worker? (optional)").
-				Description(desc).
-				Value(&wantToken),
-		),
-	).WithTheme(AeroflareTheme()).Run(); err != nil {
-		return fmt.Errorf("wizard cancelled")
-	}
-
-	if !wantToken {
-		return nil
-	}
-
-	if reusable != "" {
-		cfg.WorkerToken = reusable
-		return nil
-	}
-
-	if err := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Worker registry token").
-				Description("A PAT with read:packages. Stored as the NIXCACHE_TOKEN Worker secret.").
-				EchoMode(huh.EchoModePassword).
-				Value(&cfg.WorkerToken).
-				Validate(notEmpty("Worker registry token")),
-		),
-	).WithTheme(AeroflareTheme()).Run(); err != nil {
-		return fmt.Errorf("wizard cancelled")
-	}
-	return nil
 }
 
-// promptCoreSettings asks for cache name, registry and git provider. For each
-// setting, a value already supplied via CLI flag / config (read through viper)
-// is used as-is and no prompt is shown for it; only settings left unspecified
-// are added to the interactive form.
+// promptCoreSettings asks for the cache name and registry. For each setting, a
+// value already supplied via CLI flag / config (read through viper) is used
+// as-is and no prompt is shown for it; only settings left unspecified are added
+// to the interactive form.
 func promptCoreSettings(cfg *InitConfig) error {
-	var gitProvider string
-
 	cacheURL := viper.GetString("cache-url")
 	cacheName := viper.GetString("cache")
 	registryVal := viper.GetString("registry")
@@ -144,15 +95,6 @@ func promptCoreSettings(cfg *InitConfig) error {
 		cfg.Registry = registryVal
 	}
 
-	gitProviderVal := viper.GetString("git-provider")
-	if gitProviderVal != "" {
-		if gitProviderVal != "none" && gitProviderVal != "github" && gitProviderVal != "gitlab" {
-			return fmt.Errorf("invalid git provider configured: %s. Must be 'none', 'github', or 'gitlab'", gitProviderVal)
-		}
-		gitProvider = gitProviderVal
-	}
-
-	var groups []*huh.Group
 	var coreFields []huh.Field
 
 	if cfg.CacheName == "" {
@@ -176,38 +118,17 @@ func promptCoreSettings(cfg *InitConfig) error {
 	}
 
 	if len(coreFields) > 0 {
-		groups = append(groups, huh.NewGroup(coreFields...))
-	}
-
-	var secondaryFields []huh.Field
-	if gitProviderVal == "" {
-		secondaryFields = append(secondaryFields, huh.NewSelect[string]().
-			Title("Git integration").
-			Description("Connect a Git repository for automatic CI/CD deployments?").
-			Options(
-				huh.NewOption("None", "none"),
-				huh.NewOption("GitHub", "github"),
-				huh.NewOption("GitLab", "gitlab"),
-			).
-			Value(&gitProvider))
-	}
-
-	if len(secondaryFields) > 0 {
-		groups = append(groups, huh.NewGroup(secondaryFields...))
-	}
-
-	if len(groups) > 0 {
-		err := huh.NewForm(groups...).WithTheme(AeroflareTheme()).Run()
+		err := huh.NewForm(huh.NewGroup(coreFields...)).WithTheme(ui.AeroflareTheme()).Run()
 		if err != nil {
 			return fmt.Errorf("wizard cancelled")
 		}
 	}
 
-	cfg.GitProvider = GitProvider(gitProvider)
 	return nil
 }
 
-// promptCredentials collects the credentials required by the selected options.
+// promptCredentials collects the credentials init needs: Cloudflare (always,
+// to deploy the Worker) and one registry credential for cfg.Registry.
 //
 // Every credential is obtained through the auth module (pkg/cmd/auth/shared),
 // which owns the whole chain: resolve from flag/env/secrets, prompt only for
@@ -215,7 +136,7 @@ func promptCoreSettings(cfg *InitConfig) error {
 // its own prompting or device-flow logic — a second, non-persisting copy is
 // what previously made `init` authenticate twice on a fresh machine.
 func promptCredentials(f *cmdutil.Factory, cfg *InitConfig) error {
-	seedOverridesFromConfig(f, cfg.GitProvider)
+	seedOverridesFromConfig(f, cfg.Registry)
 
 	// Cloudflare credentials are always required (we deploy a Worker).
 	var err error
@@ -224,52 +145,19 @@ func promptCredentials(f *cmdutil.Factory, cfg *InitConfig) error {
 		return err
 	}
 
-	switch cfg.GitProvider {
-	case GitGitHub:
-		cfg.GitToken, err = shared.RequireGithubToken(f)
-	case GitGitLab:
-		cfg.GitToken, err = shared.RequireGitlabToken(f)
+	// The registry credential is keyed off the registry host: the well-known
+	// registries authenticate with their provider's token, everything else with
+	// a username/password pair.
+	switch cfg.Registry {
+	case "ghcr.io":
+		cfg.OCIToken, err = shared.RequireGithubToken(f)
+	case "registry.gitlab.com":
+		cfg.OCIToken, err = shared.RequireGitlabToken(f)
+	default:
+		_, cfg.OCIToken, err = shared.RequireOCIToken(f, cfg.Registry)
 	}
 	if err != nil {
 		return err
-	}
-
-	// A separate OCI credential is only needed when the registry isn't the
-	// git provider's own registry (ghcr.io+GitHub or registry.gitlab.com+GitLab),
-	// since in those cases the git token doubles as the OCI token (see
-	// createOCIRepository's explicitToken handling).
-	needsOCIToken := (cfg.Registry != "ghcr.io" || cfg.GitProvider != GitGitHub) &&
-		(cfg.Registry != "registry.gitlab.com" || cfg.GitProvider != GitGitLab)
-
-	// The well-known registries authenticate with their provider's token rather
-	// than a username/password pair, and reach here only when that provider
-	// wasn't chosen for git (otherwise GitToken above already covers them).
-	if needsOCIToken {
-		switch cfg.Registry {
-		case "ghcr.io":
-			cfg.OCIToken, err = shared.RequireGithubToken(f)
-		case "registry.gitlab.com":
-			cfg.OCIToken, err = shared.RequireGitlabToken(f)
-		default:
-			_, cfg.OCIToken, err = shared.RequireOCIToken(f, cfg.Registry)
-		}
-		if err != nil {
-			return err
-		}
-	}
-
-	// Resolve Git username from token.
-	if cfg.GitProvider != GitNone {
-		var err error
-		switch cfg.GitProvider {
-		case GitGitHub:
-			cfg.GitUsername, err = getGitHubUsername(cfg.GitToken)
-		case GitGitLab:
-			cfg.GitUsername, err = getGitLabUsername(cfg.GitToken)
-		}
-		if err != nil {
-			return fmt.Errorf("could not fetch %s username: %w", cfg.GitProvider, err)
-		}
 	}
 
 	return nil
@@ -280,7 +168,11 @@ func promptCredentials(f *cmdutil.Factory, cfg *InitConfig) error {
 // matching flag was already passed. The auth module resolves overrides ahead of
 // the environment and secrets manager, so this is what gives a configured
 // token the priority a flag has, without the wizard reading credentials itself.
-func seedOverridesFromConfig(f *cmdutil.Factory, provider GitProvider) {
+//
+// The stored `git-token` key doubles as the registry login for the provider's
+// own registry, so it seeds the GitHub or GitLab override based on the registry
+// host rather than any (now removed) git-provider selection.
+func seedOverridesFromConfig(f *cmdutil.Factory, registry string) {
 	if f.Overrides.CfToken == "" {
 		f.Overrides.CfToken = viper.GetString("cloudflare-api-token")
 	}
@@ -288,17 +180,16 @@ func seedOverridesFromConfig(f *cmdutil.Factory, provider GitProvider) {
 		f.Overrides.CfUserID = viper.GetString("cloudflare-account-id")
 	}
 
-	// One `git-token` key serves whichever provider is configured.
 	gitToken := viper.GetString("git-token")
 	if gitToken == "" {
 		return
 	}
-	switch provider {
-	case GitGitHub:
+	switch registry {
+	case "ghcr.io":
 		if f.Overrides.GithubToken == "" {
 			f.Overrides.GithubToken = gitToken
 		}
-	case GitGitLab:
+	case "registry.gitlab.com":
 		if f.Overrides.GitlabToken == "" {
 			f.Overrides.GitlabToken = gitToken
 		}
@@ -310,15 +201,11 @@ func DisplaySummary(cfg *InitConfig) (bool, error) {
 	fields := []ui.BoxField{
 		{Label: "Cache", Value: cfg.CacheName},
 		{Label: "Registry", Value: cfg.Registry},
-		{Label: "Repository", Value: cfg.Repository},
 		{Label: "Worker", Value: cfg.WorkerName},
-	}
-	if cfg.GitProvider != GitNone {
-		fields = append(fields, ui.BoxField{Label: "Git", Value: fmt.Sprintf("%s (%s)", cfg.GitProvider, cfg.GitUsername)})
 	}
 	workerToken := "none (anonymous)"
 	if cfg.WorkerToken != "" {
-		workerToken = "configured (private/faster)"
+		workerToken = "reused (private/faster)"
 	}
 	fields = append(fields, ui.BoxField{Label: "Worker token", Value: workerToken})
 
@@ -333,18 +220,9 @@ func DisplaySummary(cfg *InitConfig) (bool, error) {
 				Negative("Cancel").
 				Value(&confirmed),
 		),
-	).WithTheme(AeroflareTheme()).Run()
+	).WithTheme(ui.AeroflareTheme()).Run()
 	if err != nil {
 		return false, nil
 	}
 	return confirmed, nil
-}
-
-func notEmpty(name string) func(string) error {
-	return func(s string) error {
-		if strings.TrimSpace(s) == "" {
-			return fmt.Errorf("%s is required", name)
-		}
-		return nil
-	}
 }

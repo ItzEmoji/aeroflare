@@ -8,7 +8,6 @@ import (
 	"os"
 
 	setup "github.com/itzemoji/aeroflare/internal/init"
-	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
 
@@ -33,7 +32,6 @@ func NewCmdInit(f *cmdutil.Factory) *cobra.Command {
 
   • OCI repository for storing cache data
   • Cloudflare Worker deployment
-  • Git repository and CI/CD integration (if selected)
 
 The wizard asks all questions up front and shows a summary before making
 any changes. No infrastructure is created until you confirm.`,
@@ -64,16 +62,10 @@ func initRun(f *cmdutil.Factory, opts *Options) error {
 	_ = os.Setenv("CLOUDFLARE_API_TOKEN", cfg.CloudflareToken)
 	_ = os.Setenv("CLOUDFLARE_ACCOUNT_ID", cfg.CloudflareAccountID)
 
-	// ghcr.io authenticates with the GitHub token, which the wizard only
-	// collects when GitHub is also the git provider.
-	if cfg.Registry == "ghcr.io" {
-		ghToken := cfg.GitToken
-		if ghToken == "" {
-			if ghToken, err = shared.RequireGithubToken(f); err != nil {
-				return err
-			}
-		}
-		_ = os.Setenv("GITHUB_TOKEN", ghToken)
+	// ghcr.io authenticates with the GitHub token the wizard already resolved
+	// into cfg.OCIToken; export it for the OCI tooling provisioning shells out to.
+	if cfg.Registry == "ghcr.io" && cfg.OCIToken != "" {
+		_ = os.Setenv("GITHUB_TOKEN", cfg.OCIToken)
 	}
 
 	return setup.RunProvision(cfg)

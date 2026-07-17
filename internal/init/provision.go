@@ -38,14 +38,6 @@ func RunProvision(cfg *InitConfig) error {
 		printWarning(fmt.Sprintf("%v", err))
 	}
 
-	if cfg.GitProvider != GitNone {
-		next("Creating Git repository...")
-		if err := createGitRepository(cfg); err != nil {
-			return fmt.Errorf("create git repository: %w", err)
-		}
-		printSuccess(fmt.Sprintf("%s repository created", cfg.GitProvider))
-	}
-
 	next("Deploying Cloudflare Worker...")
 	if err := deployWorker(cfg); err != nil {
 		return fmt.Errorf("deploy worker: %w", err)
@@ -58,15 +50,6 @@ func RunProvision(cfg *InitConfig) error {
 	}
 	printSuccess("Worker configured")
 
-	if cfg.GitProvider != GitNone {
-		next("Pushing code to Git repository...")
-		if err := pushToGitRepo(cfg); err != nil {
-			printWarning(fmt.Sprintf("Could not push to git repository: %v", err))
-		} else {
-			printSuccess("Code pushed to repository successfully")
-		}
-	}
-
 	fmt.Println()
 	printSuccess("Setup complete! Your Aeroflare cache is ready.")
 
@@ -78,39 +61,20 @@ func RunProvision(cfg *InitConfig) error {
 	return nil
 }
 
-// countSteps returns the total number of provisioning steps for progress display.
+// countSteps returns the total number of provisioning steps for progress
+// display: create OCI repo, check visibility, deploy Worker, configure Worker.
 func countSteps(cfg *InitConfig) int {
-	n := 4 // OCI repo + visibility + deploy + configure
-	if cfg.GitProvider != GitNone {
-		n += 2 // create repo + connect builds
-	}
-	return n
+	return 4
 }
 
 // createOCIRepository pushes an initial config manifest, which auto-creates
-// the package on registries like ghcr.io.
+// the package on registries like ghcr.io. It authenticates with the registry
+// credential promptCredentials already resolved into cfg.OCIToken.
 func createOCIRepository(cfg *InitConfig) error {
-	if cfg.Registry == "registry.gitlab.com" && cfg.GitProvider == GitGitLab {
-		if err := ensureGitLabProjectExists(cfg.GitToken, cfg.CacheName); err != nil {
-			return fmt.Errorf("ensure GitLab project exists: %w", err)
-		}
-	}
-
-	// When the registry is the provider's own container registry (ghcr.io
-	// for GitHub, registry.gitlab.com for GitLab), the git token we already
-	// collected also works as the OCI token, so pass it through explicitly
-	// instead of making cmdutil.RegistryAuth look for a separate credential.
-	var explicitToken string
-	if (cfg.Registry == "ghcr.io" && cfg.GitProvider == GitGitHub) ||
-		(cfg.Registry == "registry.gitlab.com" && cfg.GitProvider == GitGitLab) {
-		explicitToken = cfg.GitToken
-	}
-
-	auth := cmdutil.RegistryAuth(cfg.Registry, explicitToken)
+	auth := cmdutil.RegistryAuth(cfg.Registry, cfg.OCIToken)
 	if auth == nil {
 		return fmt.Errorf("no OCI authentication token found \u2014 configure your environment or secrets manager")
 	}
-	cfg.OCIToken = explicitToken
 
 	return oci.PushConfigManifest(cfg.Registry, cfg.Repository, auth, map[string]string{})
 }
@@ -132,31 +96,6 @@ func checkRepositoryVisibility(cfg *InitConfig) error {
 	}
 
 	printInfo(fmt.Sprintf("Note: GitHub requires package visibility to be set to public manually at https://github.com/%s?tab=packages", owner))
-	return nil
-}
-
-// createGitRepository creates a remote Git repository on the selected provider.
-func createGitRepository(cfg *InitConfig) error {
-	repoName := proxyRepoName(cfg.CacheName)
-
-	var cloneURL string
-	var err error
-
-	switch cfg.GitProvider {
-	case GitGitHub:
-		cloneURL, err = createGitHubRepo(cfg.GitToken, repoName)
-	case GitGitLab:
-		cloneURL, err = createGitLabRepo(cfg.GitToken, repoName)
-	default:
-		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-
-	cfg.GitCloneURL = cloneURL
-	printInfo(fmt.Sprintf("Repository URL: %s", cloneURL))
 	return nil
 }
 
@@ -197,126 +136,6 @@ func configureWorker(cfg *InitConfig) error {
 		printWarning(fmt.Sprintf("Could not enable workers.dev route: %v", err))
 	}
 	return nil
-}
-
-// proxyRepoBranch is the branch the generated proxy repository is created with,
-// and the one its deploy workflow triggers on.
-const proxyRepoBranch = "main"
-
-// pushToGitRepo fills the freshly created proxy repository with its initial
-// commit (worker.js, wrangler.toml, and for GitHub a deploy workflow).
-//
-// The files are committed through the provider's API rather than by shelling
-// out to `git`. init's whole job is to set a machine up from nothing, so
-// depending on git being installed defeated the point — and the API needs no
-// working tree, no temp directory, and no credentials in a remote URL.
-func pushToGitRepo(cfg *InitConfig) error {
-	if cfg.GitCloneURL == "" {
-		return nil // No git repository created
-	}
-
-	files := proxyRepoFiles(cfg)
-	repoName := proxyRepoName(cfg.CacheName)
-	const message = "Initial commit from Aeroflare Setup"
-
-	switch cfg.GitProvider {
-	case GitGitHub:
-		if err := commitFilesToGitHub(cfg.GitToken, cfg.GitUsername, repoName, proxyRepoBranch, message, files); err != nil {
-			return err
-		}
-	case GitGitLab:
-		project := fmt.Sprintf("%s/%s", cfg.GitUsername, repoName)
-		if err := commitFilesToGitLab(cfg.GitToken, project, proxyRepoBranch, message, files); err != nil {
-			return err
-		}
-	}
-
-	if cfg.GitProvider == GitGitHub {
-		printInfo("Configuring GitHub Actions secrets...")
-		err1 := setGitHubSecret(cfg.GitToken, cfg.GitUsername, repoName, "CLOUDFLARE_API_TOKEN", cfg.CloudflareToken)
-		err2 := setGitHubSecret(cfg.GitToken, cfg.GitUsername, repoName, "CLOUDFLARE_ACCOUNT_ID", cfg.CloudflareAccountID)
-
-		if err1 != nil || err2 != nil {
-			printWarning("Failed to set secrets automatically.")
-			printInfo("Please add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository secrets on GitHub")
-			printInfo(fmt.Sprintf("Settings URL: https://github.com/%s/%s/settings/secrets/actions", cfg.GitUsername, repoName))
-		} else {
-			printSuccess("GitHub Actions secrets configured successfully")
-		}
-	}
-
-	return nil
-}
-
-// proxyRepoName is the repository name generated for a cache. Worker and repo
-// names can't contain "/", so a namespaced cache name is flattened.
-func proxyRepoName(cacheName string) string {
-	return fmt.Sprintf("%s-proxy", strings.ReplaceAll(cacheName, "/", "-"))
-}
-
-// proxyRepoFiles builds the contents of the generated proxy repository, keyed
-// by path within it. The worker script is fetched from the latest release
-// (never a local override, so the pushed repo matches a published version); if
-// that fetch fails the remaining files are still worth committing, so the
-// script is simply omitted rather than failing the whole step.
-func proxyRepoFiles(cfg *InitConfig) map[string]string {
-	files := map[string]string{
-		"wrangler.toml": wranglerTOML(cfg),
-	}
-
-	if scriptPath, err := fetchLatestWorkerScript(); err == nil {
-		if script, err := os.ReadFile(scriptPath); err == nil {
-			files["worker.js"] = string(script)
-		}
-	} else {
-		printWarning(fmt.Sprintf("Could not fetch worker.js for the repository: %v", err))
-	}
-
-	if cfg.GitProvider == GitGitHub {
-		files[".github/workflows/deploy.yml"] = deployWorkflow()
-	}
-
-	return files
-}
-
-// wranglerTOML renders the wrangler config for the generated repository.
-func wranglerTOML(cfg *InitConfig) string {
-	return fmt.Sprintf(`name = "%s"
-main = "worker.js"
-compatibility_date = "2024-12-01"
-
-[vars]
-# Repository path, exactly as it lives in the registry.
-NIXCACHE_REPO = "%s"
-# Registry base URL WITH scheme but WITHOUT /v2 (the worker adds the spec's /v2).
-NIXCACHE_REGISTRY_URL = "%s"
-
-# Optional: a registry bearer token, set as a secret (NOT a plaintext var). The
-# Worker uses it verbatim as the bearer, so for GHCR it must be the BASE64 PAT:
-#   printf '%%s' "github_pat_xxx" | base64 | wrangler secret put NIXCACHE_TOKEN
-# GHCR accepts it directly, skipping the token exchange (faster, private repos).
-`, cfg.WorkerName, cfg.Repository, workerRegistryURL(cfg.Registry))
-}
-
-// deployWorkflow renders the GitHub Actions workflow that redeploys the Worker
-// on every push to the default branch.
-func deployWorkflow() string {
-	return fmt.Sprintf(`name: Deploy Worker
-on:
-  push:
-    branches:
-      - %s
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-`, proxyRepoBranch)
 }
 
 // resolveWorkerScript finds a worker.js to deploy.

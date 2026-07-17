@@ -8,7 +8,6 @@ Run the Aeroflare setup wizard to provision all required infrastructure:
 
   • OCI repository for storing cache data
   • Cloudflare Worker deployment
-  • Git repository and CI/CD integration (if selected)
 
 The wizard asks all questions up front and shows a summary before making
 any changes. No infrastructure is created until you confirm.

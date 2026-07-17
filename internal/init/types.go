@@ -5,42 +5,14 @@ import (
 	"strings"
 )
 
-// GitProvider represents the Git hosting provider for CI/CD integration.
-type GitProvider string
-
-const (
-	GitNone   GitProvider = "none"
-	GitGitHub GitProvider = "github"
-	GitGitLab GitProvider = "gitlab"
-)
-
-// String returns a human-readable label.
-func (g GitProvider) String() string {
-	switch g {
-	case GitNone:
-		return "None"
-	case GitGitHub:
-		return "GitHub"
-	case GitGitLab:
-		return "GitLab"
-	default:
-		return string(g)
-	}
-}
-
 // InitConfig holds all parameters collected by the setup wizard.
 type InitConfig struct {
 	CacheName  string
 	Registry   string
 	Repository string
 
-	GitProvider GitProvider
-
 	CloudflareAccountID string
 	CloudflareToken     string
-
-	GitToken    string
-	GitUsername string
 
 	WorkerName string
 
@@ -48,14 +20,17 @@ type InitConfig struct {
 	// NIXCACHE_TOKEN secret. When set, the Worker uses it directly as the GHCR
 	// bearer token (skipping the token exchange: faster, fewer requests) and can
 	// reach private repositories. Empty means the Worker authenticates
-	// anonymously, which only works for public caches.
+	// anonymously, which only works for public caches. On the ghcr.io path it is
+	// reused from the registry PAT automatically (see resolveWorkerToken).
 	WorkerToken string
 
-	// Internal fields populated during provisioning.
-	OCIToken    string
-	ScriptTag   string // Worker script tag returned by the Cloudflare deploy API; reserved for a future Workers Builds integration, not yet read elsewhere.
-	CfTokenID   string // Cloudflare API token ID; reserved for a future Workers Builds integration, not yet read elsewhere.
-	GitCloneURL string // Clone URL of the created git repository; empty until createGitRepository runs.
+	// OCIToken is the registry credential resolved for Registry, used to push
+	// the cache's config manifest and — on ghcr.io — reused as the WorkerToken.
+	OCIToken string
+
+	// ScriptTag is the Worker script tag returned by the Cloudflare deploy API;
+	// reserved for a future Workers Builds integration, not yet read elsewhere.
+	ScriptTag string
 }
 
 // DeriveDefaults populates computed fields (Repository, WorkerName) from the
