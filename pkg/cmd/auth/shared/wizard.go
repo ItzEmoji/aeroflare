@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/itzemoji/aeroflare/internal/auth"
+	"github.com/itzemoji/aeroflare/internal/ui"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 
 	"github.com/charmbracelet/huh"
@@ -26,6 +27,7 @@ func RunInteractiveGithubAuth(f *cmdutil.Factory) (string, error) {
 			huh.NewOption("Enter Token Manually", "manual"),
 		).
 		Value(&ghMethod).
+		WithTheme(ui.AeroflareTheme()).
 		Run()
 	if err != nil {
 		return "", cmdutil.ErrCancel
@@ -46,7 +48,7 @@ func RunInteractiveGithubAuth(f *cmdutil.Factory) (string, error) {
 			return "", fmt.Errorf("authorization failed: %v", err)
 		}
 	} else {
-		err = huh.NewInput().Title("GitHub Token").EchoMode(huh.EchoModePassword).Value(&token).Run()
+		err = huh.NewInput().Title("GitHub Token").EchoMode(huh.EchoModePassword).Value(&token).WithTheme(ui.AeroflareTheme()).Run()
 		if err != nil {
 			return "", cmdutil.ErrCancel
 		}
@@ -66,7 +68,7 @@ func RunInteractiveGithubAuth(f *cmdutil.Factory) (string, error) {
 func RunInteractiveGitlabAuth(f *cmdutil.Factory) (string, error) {
 	manager := f.Secrets()
 	var token string
-	err := huh.NewInput().Title("GitLab Personal Access Token").EchoMode(huh.EchoModePassword).Value(&token).Run()
+	err := huh.NewInput().Title("GitLab Personal Access Token").EchoMode(huh.EchoModePassword).Value(&token).WithTheme(ui.AeroflareTheme()).Run()
 	if err != nil {
 		return "", cmdutil.ErrCancel
 	}
@@ -89,7 +91,7 @@ func RunInteractiveCloudflareAuth(f *cmdutil.Factory) (string, string, error) {
 			huh.NewInput().Title("Cloudflare API Token").EchoMode(huh.EchoModePassword).Value(&apiToken),
 			huh.NewInput().Title("Cloudflare Account ID").Value(&userID),
 		),
-	).Run()
+	).WithTheme(ui.AeroflareTheme()).Run()
 	if err != nil {
 		return "", "", cmdutil.ErrCancel
 	}
@@ -118,7 +120,7 @@ func RunInteractiveOCIAuth(f *cmdutil.Factory, registry string) (string, string,
 	var user, pass string
 
 	if registry == "" {
-		err := huh.NewInput().Title("Registry URL (e.g. registry.gitlab.com)").Value(&registry).Run()
+		err := huh.NewInput().Title("Registry URL (e.g. registry.gitlab.com)").Value(&registry).WithTheme(ui.AeroflareTheme()).Run()
 		if err != nil || registry == "" {
 			return "", "", cmdutil.ErrCancel
 		}
@@ -129,7 +131,7 @@ func RunInteractiveOCIAuth(f *cmdutil.Factory, registry string) (string, string,
 			huh.NewInput().Title("Username for "+registry).Value(&user),
 			huh.NewInput().Title("Token / Password").EchoMode(huh.EchoModePassword).Value(&pass),
 		),
-	).Run()
+	).WithTheme(ui.AeroflareTheme()).Run()
 	if err != nil {
 		return "", "", cmdutil.ErrCancel
 	}
@@ -158,7 +160,7 @@ func PromptServiceFields(svc auth.Service) map[string]string {
 		if field.Secret {
 			input = input.EchoMode(huh.EchoModePassword)
 		}
-		if err := input.Run(); err != nil {
+		if err := input.WithTheme(ui.AeroflareTheme()).Run(); err != nil {
 			return vals
 		}
 		if val != "" {
@@ -182,6 +184,7 @@ func RunInteractiveAuth(f *cmdutil.Factory) error {
 			huh.NewOption("Custom OCI Registry", "oci"),
 		).
 		Value(&service).
+		WithTheme(ui.AeroflareTheme()).
 		Run()
 
 	if err != nil {
