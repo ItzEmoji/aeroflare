@@ -108,7 +108,7 @@ func ParseConfig(args []string, storePath string, inputFile string, stdin io.Rea
 	}
 
 	if len(targetPaths) == 0 && len(args) == 0 {
-		return nil, errors.New("no store paths found: provide --store-path, --input, or pipe paths via stdin")
+		return nil, errors.New("no store paths found: pass an installable (store path, result symlink, or flake ref), or provide --store-path, --input, or pipe paths via stdin")
 	}
 	targetPaths = append(targetPaths, args...)
 
