@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 	"github.com/spf13/viper"
 )
 
@@ -74,7 +75,7 @@ func TestSeedOverridesFromConfig(t *testing.T) {
 	}
 }
 
-func TestResolveWorkerToken(t *testing.T) {
+func TestPromptWorkerToken(t *testing.T) {
 	tests := []struct {
 		name        string
 		workerToken string // viper "worker-token"
@@ -83,10 +84,12 @@ func TestResolveWorkerToken(t *testing.T) {
 		want        string
 	}{
 		{
-			name:     "ghcr.io reuses the collected registry PAT",
+			// Non-interactive: the ghcr.io push PAT is never reused as the Worker
+			// token, so with no worker-token flag the Worker stays anonymous.
+			name:     "ghcr.io non-interactive does not reuse the push PAT",
 			registry: "ghcr.io",
 			ociToken: "gh-pat",
-			want:     "gh-pat",
+			want:     "",
 		},
 		{
 			name:     "non-ghcr registry stays anonymous",
@@ -95,8 +98,8 @@ func TestResolveWorkerToken(t *testing.T) {
 			want:     "",
 		},
 		{
-			// An explicit worker-token wins regardless of registry, and is not
-			// overwritten by the ghcr.io reuse path.
+			// An explicit worker-token wins regardless of registry, without any
+			// prompt, and is never the reused push PAT.
 			name:        "explicit worker-token wins",
 			workerToken: "explicit",
 			registry:    "ghcr.io",
@@ -113,11 +116,15 @@ func TestResolveWorkerToken(t *testing.T) {
 				viper.Set("worker-token", tt.workerToken)
 			}
 
+			// Non-interactive stdin: the ghcr.io prompt branch is skipped, so the
+			// resolution is exercised without driving the huh form.
+			f, _, _ := cmdutiltest.NewTestFactory(t, nil)
+
 			cfg := &InitConfig{Registry: tt.registry, OCIToken: tt.ociToken}
-			resolveWorkerToken(cfg)
+			promptWorkerToken(f, cfg)
 
 			if cfg.WorkerToken != tt.want {
-				t.Errorf("resolveWorkerToken() WorkerToken = %q, want %q", cfg.WorkerToken, tt.want)
+				t.Errorf("promptWorkerToken() WorkerToken = %q, want %q", cfg.WorkerToken, tt.want)
 			}
 		})
 	}

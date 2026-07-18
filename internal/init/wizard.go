@@ -32,30 +32,47 @@ func RunWizard(f *cmdutil.Factory) (*InitConfig, error) {
 		return nil, err
 	}
 
-	resolveWorkerToken(cfg)
+	promptWorkerToken(f, cfg)
 
 	return cfg, nil
 }
 
-// resolveWorkerToken decides, without prompting, what registry token to embed in
-// the Worker as the NIXCACHE_TOKEN secret. An explicit worker-token (flag/config)
-// always wins. Otherwise, on the ghcr.io path we silently reuse the registry PAT
-// already collected to push the cache: the Worker then skips GHCR's token
-// exchange (faster) and can reach private repositories, at no extra prompt. For
-// any other registry, or when no PAT is available, the Worker is left to
-// authenticate anonymously, which is all a public cache needs.
+// promptWorkerToken decides what registry token to embed in the Worker as the
+// NIXCACHE_TOKEN secret. An explicit worker-token (flag/config) always wins.
+// Otherwise, on the ghcr.io path and only when stdin is a terminal, we prompt
+// for a dedicated PAT scoped to reading the cache: keeping it separate from the
+// broad token collected to push (which may be a device-flow OAuth token) means
+// that account-wide credential is never embedded in a Cloudflare Worker secret.
+// A blank answer — or any non-ghcr.io registry, or a non-interactive run —
+// leaves the Worker authenticating anonymously, which is all a public cache
+// needs. The PAT is used only for this deploy; it is not stored locally.
 //
-// The direct-bearer reuse (and the base64 encoding deployWorker applies to the
-// secret) is GHCR-specific: other registries don't accept a base64 credential as
-// a bearer, so they always use the cached token exchange.
-func resolveWorkerToken(cfg *InitConfig) {
+// The base64 encoding deployWorker applies to the secret is GHCR-specific: the
+// Worker uses NIXCACHE_TOKEN verbatim as a bearer there, so the raw PAT is the
+// value it expects.
+func promptWorkerToken(f *cmdutil.Factory, cfg *InitConfig) {
 	if t := viper.GetString("worker-token"); t != "" {
 		cfg.WorkerToken = t
 		return
 	}
-	if cfg.Registry == "ghcr.io" {
-		cfg.WorkerToken = cfg.OCIToken
+	if cfg.Registry != "ghcr.io" || !f.IOStreams.IsStdinTTY() {
+		return
 	}
+
+	var token string
+	// Optional field: a cancel/error leaves the Worker anonymous rather than
+	// aborting the wizard after every other credential was already collected.
+	err := huh.NewInput().
+		Title("Worker registry token (optional)").
+		Description("A dedicated ghcr.io PAT for the Worker, separate from your push token. Required only for private caches; leave blank for a public cache.").
+		EchoMode(huh.EchoModePassword).
+		Value(&token).
+		WithTheme(ui.AeroflareTheme()).
+		Run()
+	if err != nil {
+		return
+	}
+	cfg.WorkerToken = token
 }
 
 // promptCoreSettings asks for the cache name and registry. For each setting, a
@@ -205,7 +222,7 @@ func DisplaySummary(cfg *InitConfig) (bool, error) {
 	}
 	workerToken := "none (anonymous)"
 	if cfg.WorkerToken != "" {
-		workerToken = "reused (private/faster)"
+		workerToken = "set (private/faster)"
 	}
 	fields = append(fields, ui.BoxField{Label: "Worker token", Value: workerToken})
 

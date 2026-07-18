@@ -21,11 +21,13 @@ type InitConfig struct {
 	// bearer token (skipping the token exchange: faster, fewer requests) and can
 	// reach private repositories. Empty means the Worker authenticates
 	// anonymously, which only works for public caches. On the ghcr.io path it is
-	// reused from the registry PAT automatically (see resolveWorkerToken).
+	// collected from a dedicated prompt (see promptWorkerToken), kept separate
+	// from OCIToken so the broad push credential is never embedded in the Worker.
 	WorkerToken string
 
 	// OCIToken is the registry credential resolved for Registry, used to push
-	// the cache's config manifest and — on ghcr.io — reused as the WorkerToken.
+	// the cache's config manifest. It is deliberately not reused as the
+	// WorkerToken (see promptWorkerToken).
 	OCIToken string
 
 	// ScriptTag is the Worker script tag returned by the Cloudflare deploy API;
