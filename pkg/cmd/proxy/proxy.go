@@ -22,6 +22,10 @@ import (
 // Options holds the dependencies proxyRun needs.
 type Options struct {
 	IO *iostreams.IOStreams
+
+	// Token is an explicit registry token from the --token flag. When set it
+	// takes precedence over every other source (see resolveProxyToken).
+	Token string
 }
 
 // NewCmdProxy builds the `aeroflare proxy` command.
@@ -38,7 +42,28 @@ func NewCmdProxy(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVar(&opts.Token, "token", "", "Registry token to authenticate with (overrides NIXCACHE_TOKEN and the saved credential)")
+
 	return cmd
+}
+
+// resolveProxyToken returns the registry token the proxy authenticates with,
+// checking in priority order: the --token flag, the NIXCACHE_TOKEN environment
+// variable (the same NIXCACHE_* convention proxySettingsFromEnv uses, so the
+// proxy is configured identically whether run directly, as a service, or in a
+// container), then the saved registry credential via OptionalTokenForRegistry.
+//
+// Unlike the Worker's base64-encoded NIXCACHE_TOKEN secret, the value here is a
+// raw registry token/PAT: it becomes the Basic-auth password / token-exchange
+// credential against the registry.
+func resolveProxyToken(f *cmdutil.Factory, opts *Options, registry string) string {
+	if opts.Token != "" {
+		return opts.Token
+	}
+	if t := os.Getenv("NIXCACHE_TOKEN"); t != "" {
+		return t
+	}
+	return shared.OptionalTokenForRegistry(f, registry)
 }
 
 // proxySettingsFromEnv reads the proxy's listen settings from NIXCACHE_* env
@@ -87,7 +112,7 @@ func proxyRun(f *cmdutil.Factory, opts *Options) error {
 		cancel()
 	}()
 
-	actualPort, err := proxysrv.StartProxy(ctx, port, listenAddr, registry, repository, upstreams, cmdutil.RegistryAuth(registry, shared.OptionalTokenForRegistry(f, registry)))
+	actualPort, err := proxysrv.StartProxy(ctx, port, listenAddr, registry, repository, upstreams, cmdutil.RegistryAuth(registry, resolveProxyToken(f, opts, registry)))
 	if err != nil {
 		return fmt.Errorf("proxy server failed: %w", err)
 	}

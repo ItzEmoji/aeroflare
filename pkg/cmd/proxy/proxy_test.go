@@ -71,6 +71,65 @@ func TestProxySettingsFromEnv(t *testing.T) {
 	}
 }
 
+func TestResolveProxyToken(t *testing.T) {
+	tests := []struct {
+		name     string
+		flag     string // --token
+		env      string // NIXCACHE_TOKEN
+		stored   map[string]string
+		registry string
+		want     string
+	}{
+		{
+			name:     "the --token flag wins over env and the saved credential",
+			flag:     "flag-tok",
+			env:      "env-tok",
+			stored:   map[string]string{"github-token": "saved-tok"},
+			registry: "ghcr.io",
+			want:     "flag-tok",
+		},
+		{
+			name:     "NIXCACHE_TOKEN is used when no flag is given",
+			env:      "env-tok",
+			stored:   map[string]string{"github-token": "saved-tok"},
+			registry: "ghcr.io",
+			want:     "env-tok",
+		},
+		{
+			name:     "falls back to the saved registry credential",
+			stored:   map[string]string{"github-token": "saved-tok"},
+			registry: "ghcr.io",
+			want:     "saved-tok",
+		},
+		{
+			name:     "empty when nothing is specified or saved",
+			registry: "ghcr.io",
+			want:     "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			// Isolate from the ambient environment so the saved-credential and
+			// empty cases don't pick up a real GITHUB_TOKEN/oci_token.
+			t.Setenv("NIXCACHE_TOKEN", tt.env)
+			t.Setenv("GITHUB_TOKEN", "")
+			t.Setenv("GH_TOKEN", "")
+			t.Setenv("oci_token", "")
+
+			f, _, _ := cmdutiltest.NewTestFactory(t, tt.stored)
+			opts := &Options{IO: f.IOStreams, Token: tt.flag}
+
+			got := resolveProxyToken(f, opts, tt.registry)
+			if got != tt.want {
+				t.Errorf("resolveProxyToken() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // proxy resolves its target before it binds a port, so a missing cache config
 // must surface as an actionable error rather than a listener on a bogus target.
 func TestProxyErrorsWithoutCacheConfig(t *testing.T) {
