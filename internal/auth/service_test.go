@@ -1,9 +1,32 @@
 package auth_test
 
 import (
-	"github.com/itzemoji/aeroflare/internal/auth"
+	"fmt"
 	"testing"
+
+	"github.com/itzemoji/aeroflare/internal/auth"
+	"github.com/itzemoji/aeroflare/internal/secrets"
 )
+
+// A wrapped "not found" from the secrets manager must be treated as an absent
+// field (skipped), not surfaced as a hard error from Service.Resolve.
+func TestServiceResolve_WrappedNotFoundSkipsField(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "")
+	t.Setenv("GH_TOKEN", "")
+	mock := &mockSecretsManager{
+		data:   map[string]string{},
+		getErr: fmt.Errorf("keychain read failed: %w", secrets.ErrNotFound),
+	}
+	svc, _ := auth.ServiceByID("github")
+
+	vals, err := svc.Resolve(mock)
+	if err != nil {
+		t.Fatalf("wrapped not-found should be treated as absent, got error: %v", err)
+	}
+	if len(vals) != 0 {
+		t.Errorf("expected no resolved fields, got %v", vals)
+	}
+}
 
 func TestServiceByID_Known(t *testing.T) {
 	for _, id := range []string{"github", "gitlab", "cloudflare"} {

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -90,7 +91,7 @@ func (s Service) Resolve(m secrets.Manager) (map[string]string, error) {
 	vals := make(map[string]string)
 	for _, f := range s.Fields {
 		val, err := f.Resolve(m)
-		if err == ErrTokenNotFound {
+		if errors.Is(err, ErrTokenNotFound) {
 			continue
 		}
 		if err != nil {
