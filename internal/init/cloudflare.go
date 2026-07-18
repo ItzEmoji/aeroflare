@@ -89,12 +89,21 @@ func deployWorkerViaAPI(cfAccountID, cfApiToken, workerName, scriptPath, compatD
 		return "", fmt.Errorf("cloudflare API HTTP %d: %s", resp.StatusCode, string(respBody))
 	}
 
+	return parseWorkerDeployTag(respBody)
+}
+
+// parseWorkerDeployTag extracts the deployed script's tag from a successful
+// Cloudflare deploy response. A body that doesn't parse is surfaced as an
+// error rather than silently yielding an empty tag that reads as success.
+func parseWorkerDeployTag(respBody []byte) (string, error) {
 	var result struct {
 		Result struct {
 			Tag string `json:"tag"`
 		} `json:"result"`
 	}
-	_ = json.Unmarshal(respBody, &result)
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("parse worker deploy response: %w", err)
+	}
 	return result.Result.Tag, nil
 }
 
