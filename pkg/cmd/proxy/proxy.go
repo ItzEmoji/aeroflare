@@ -92,6 +92,17 @@ func proxySettingsFromEnv() (port int, listenAddr string, upstreams []string) {
 	return port, listenAddr, upstreams
 }
 
+// proxyDisplayHost maps the bind address to a host usable in a clickable URL.
+// A wildcard bind (0.0.0.0 / ::) or an empty address is not reachable as-is, so
+// the printed link points at loopback, which does reach the local listener.
+func proxyDisplayHost(listenAddr string) string {
+	switch listenAddr {
+	case "", "0.0.0.0", "::", "[::]":
+		return "127.0.0.1"
+	}
+	return listenAddr
+}
+
 func proxyRun(f *cmdutil.Factory, opts *Options) error {
 	registry, repository, err := cmdutil.RegistryAndRepository()
 	if err != nil {
@@ -116,7 +127,10 @@ func proxyRun(f *cmdutil.Factory, opts *Options) error {
 	if err != nil {
 		return fmt.Errorf("proxy server failed: %w", err)
 	}
-	opts.IO.Info(fmt.Sprintf("Started proxy on %s:%d...", listenAddr, actualPort))
+	// Print a clean http:// URL so terminals render it as a clickable link
+	// straight to the proxy (no trailing punctuation, which some terminals
+	// would swallow into the link).
+	opts.IO.Info(fmt.Sprintf("Started proxy on http://%s:%d", proxyDisplayHost(listenAddr), actualPort))
 
 	<-ctx.Done()
 

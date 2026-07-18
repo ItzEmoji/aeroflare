@@ -71,6 +71,28 @@ func TestProxySettingsFromEnv(t *testing.T) {
 	}
 }
 
+func TestProxyDisplayHost(t *testing.T) {
+	tests := []struct {
+		listenAddr string
+		want       string
+	}{
+		{"127.0.0.1", "127.0.0.1"},
+		{"192.168.1.10", "192.168.1.10"},
+		{"", "127.0.0.1"},
+		{"0.0.0.0", "127.0.0.1"},
+		{"::", "127.0.0.1"},
+		{"[::]", "127.0.0.1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.listenAddr, func(t *testing.T) {
+			if got := proxyDisplayHost(tt.listenAddr); got != tt.want {
+				t.Errorf("proxyDisplayHost(%q) = %q, want %q", tt.listenAddr, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestResolveProxyToken(t *testing.T) {
 	tests := []struct {
 		name     string
