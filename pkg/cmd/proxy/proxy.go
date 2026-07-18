@@ -71,7 +71,7 @@ func resolveProxyToken(f *cmdutil.Factory, opts *Options, registry string) strin
 // it's run directly or deployed as a systemd service / container. An
 // unparseable NIXCACHE_PORT falls back to the default rather than failing.
 func proxySettingsFromEnv() (port int, listenAddr string, upstreams []string) {
-	port = 37515
+	port = 8080
 	if pStr := os.Getenv("NIXCACHE_PORT"); pStr != "" {
 		if p, err := strconv.Atoi(pStr); err == nil {
 			port = p

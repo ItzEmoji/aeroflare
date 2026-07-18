@@ -21,7 +21,7 @@ func TestProxySettingsFromEnv(t *testing.T) {
 	}{
 		{
 			name:          "unset falls back to the defaults",
-			wantPort:      37515,
+			wantPort:      8080,
 			wantListen:    "127.0.0.1",
 			wantUpstreams: []string{"https://cache.nixos.org"},
 		},
@@ -37,14 +37,14 @@ func TestProxySettingsFromEnv(t *testing.T) {
 		{
 			name:          "upstreams are whitespace-split into a list",
 			upstream:      "https://a.example.com  https://b.example.com",
-			wantPort:      37515,
+			wantPort:      8080,
 			wantListen:    "127.0.0.1",
 			wantUpstreams: []string{"https://a.example.com", "https://b.example.com"},
 		},
 		{
 			name:          "a malformed port falls back to the default rather than crashing",
 			port:          "not-a-number",
-			wantPort:      37515,
+			wantPort:      8080,
 			wantListen:    "127.0.0.1",
 			wantUpstreams: []string{"https://cache.nixos.org"},
 		},
