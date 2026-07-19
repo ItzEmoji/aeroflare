@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -17,6 +19,11 @@ import (
 	"github.com/itzemoji/aeroflare/internal/ui"
 	"github.com/itzemoji/aeroflare/pkg/proxy"
 )
+
+// proxyHost is the loopback address the ephemeral run proxy binds to and is
+// advertised as the substituter. Formatted through net.JoinHostPort at every
+// use so the address stays valid if it ever becomes an IPv6 literal.
+const proxyHost = "127.0.0.1"
 
 // RunConfig holds the command line to be executed via the Nix proxy.
 type RunConfig struct {
@@ -41,7 +48,7 @@ func buildNixConfig(existing string, port int) string {
 	if cfg != "" {
 		cfg += "\n"
 	}
-	return cfg + fmt.Sprintf("extra-substituters = http://127.0.0.1:%d", port)
+	return cfg + "extra-substituters = http://" + net.JoinHostPort(proxyHost, strconv.Itoa(port))
 }
 
 // ExecuteCommand starts a proxy server, runs cfg.Command with the proxy
@@ -61,12 +68,12 @@ func ExecuteCommand(cfg *RunConfig, registry, repository string, auth authn.Auth
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	slog.SetDefault(logger)
 
-	port, err := proxy.StartProxy(ctx, 0, "127.0.0.1", registry, repository, []string{"https://cache.nixos.org"}, auth)
+	port, err := proxy.StartProxy(ctx, 0, proxyHost, registry, repository, []string{"https://cache.nixos.org"}, auth)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start proxy: %w", err)
 	}
 
-	fmt.Printf("Started background proxy on 127.0.0.1:%d\n", port)
+	fmt.Printf("Started background proxy on %s\n", net.JoinHostPort(proxyHost, strconv.Itoa(port)))
 
 	var stdoutBuf bytes.Buffer
 	cmdToRun := exec.Command(cfg.Command[0], cfg.Command[1:]...)
