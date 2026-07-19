@@ -7,7 +7,7 @@
 buildGoModule (finalAttrs: {
   pname = "aeroflare";
   version = (lib.importJSON ./version.json).".";
-  doCheck = false;
+  doCheck = true;
 
   src = ./.;
 
@@ -37,7 +37,7 @@ buildGoModule (finalAttrs: {
     homepage = "https://github.com/itzemoji/aeroflare";
     changelog = "https://github.com/itzemoji/aeroflare/blob/v${finalAttrs.version}/CHANGELOG.md";
     license = lib.licenses.gpl3Only;
-    maintainers = with lib.maintainers; [ ];
+    maintainers = with lib.maintainers; [ itzemoji ];
     mainProgram = "aeroflare";
   };
 })

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,7 +18,18 @@ import (
 	"github.com/itzemoji/aeroflare/pkg/prepare/store"
 )
 
+// requireNixStore skips the test when the nix-store binary is unavailable, such
+// as inside the sandboxed Nix build (doCheck = true), where these tests would
+// otherwise fail because they shell out to `nix-store --dump`.
+func requireNixStore(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("nix-store"); err != nil {
+		t.Skip("nix-store not found in $PATH; skipping test that requires it")
+	}
+}
+
 func TestWriteNarAndNarinfo(t *testing.T) {
+	requireNixStore(t)
 	// Create a fake nix store path (a directory with files)
 	storePath := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(storePath, "bin"), 0o755); err != nil {
@@ -97,6 +109,7 @@ func TestWriteNarAndNarinfo(t *testing.T) {
 }
 
 func TestWriteNarAndNarinfoWithReferences(t *testing.T) {
+	requireNixStore(t)
 	storePath := t.TempDir()
 	if err := os.WriteFile(filepath.Join(storePath, "lib.so"), []byte("fake lib"), 0o644); err != nil {
 		t.Fatal(err)
@@ -265,6 +278,7 @@ func TestPrepareWithMockCache(t *testing.T) {
 }
 
 func TestPrepareAllCompressionTypes(t *testing.T) {
+	requireNixStore(t)
 	storePath := t.TempDir()
 	if err := os.WriteFile(filepath.Join(storePath, "file.txt"), []byte("test content"), 0o644); err != nil {
 		t.Fatal(err)
@@ -344,6 +358,7 @@ func TestParseInputFile(t *testing.T) {
 }
 
 func TestPrepareRefsOnly(t *testing.T) {
+	requireNixStore(t)
 	// Create fake store paths for the missing refs
 	ref1 := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ref1, "lib.so"), []byte("lib1 content"), 0o644); err != nil {
@@ -396,6 +411,7 @@ func TestPrepareRefsOnly(t *testing.T) {
 }
 
 func TestPrepareRefsOnlyDedup(t *testing.T) {
+	requireNixStore(t)
 	ref := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ref, "file"), []byte("content"), 0o644); err != nil {
 		t.Fatal(err)
@@ -424,6 +440,7 @@ func TestPrepareRefsOnlyDedup(t *testing.T) {
 }
 
 func TestPrepareWithMissingRefsPrepared(t *testing.T) {
+	requireNixStore(t)
 	// Create a real ref path that will be "missing" from cache.
 	// Use a nix-store-formatted name so store.ParsePath can extract the hash.
 	fakeStoreRoot := t.TempDir()
@@ -509,6 +526,7 @@ func generateTestSigningKey(t *testing.T, name string) *signing.PrivateKey {
 }
 
 func TestWriteNarAndNarinfoWithSigning(t *testing.T) {
+	requireNixStore(t)
 	storePath := t.TempDir()
 	if err := os.WriteFile(filepath.Join(storePath, "file.txt"), []byte("signed content"), 0o644); err != nil {
 		t.Fatal(err)
@@ -562,6 +580,7 @@ func TestWriteNarAndNarinfoWithSigning(t *testing.T) {
 }
 
 func TestWriteNarAndNarinfoWithoutSigning(t *testing.T) {
+	requireNixStore(t)
 	storePath := t.TempDir()
 	if err := os.WriteFile(filepath.Join(storePath, "file.txt"), []byte("unsigned content"), 0o644); err != nil {
 		t.Fatal(err)
@@ -601,6 +620,7 @@ func TestWriteNarAndNarinfoWithoutSigning(t *testing.T) {
 }
 
 func TestWriteNarsFromInfosWithSigning(t *testing.T) {
+	requireNixStore(t)
 	ref1 := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ref1, "lib.so"), []byte("lib1"), 0o644); err != nil {
 		t.Fatal(err)
