@@ -5,18 +5,25 @@ title: Cache Population
 
 # Cache Population
 
-Populating the cache involves uploading `.nar` files and `.narinfo` metadata to your OCI registry. For most users the `aeroflare push` command is the way to do this: you point it at store paths you already have, and it prepares, compresses, and uploads them directly to the registry.
+Populating the cache involves uploading `.nar` files and `.narinfo` metadata to your OCI registry. For most users the `aeroflare push` command is the way to do this: you point it at a Nix installable, and it prepares, compresses, and uploads the resulting store paths directly to the registry.
 
 ## Push via CLI (recommended)
 
-`aeroflare push` takes existing Nix store paths and uploads them. This is the most predictable way to populate the cache — you decide exactly what gets pushed, and no proxy needs to be running.
+`aeroflare push` takes one or more Nix installables and uploads them. This is the most predictable way to populate the cache — you decide exactly what gets pushed, and no proxy needs to be running.
 
-### Pushing a Specific Path
+### Pushing an Installable
 
-Build your package, then push its output path:
+A push target can be a `./result` symlink, a flake reference, or a store path. Anything not built yet is built first:
 
 ```bash
-nix build .#default --print-out-paths
+nix run github:ItzEmoji/aeroflare -- push ./result
+nix run github:ItzEmoji/aeroflare -- push nixpkgs#hello
+nix run github:ItzEmoji/aeroflare -- push github:owner/repo#default
+```
+
+To push an exact store path instead, use `--store-path`:
+
+```bash
 nix run github:ItzEmoji/aeroflare -- push --store-path /nix/store/13x...-my-package
 ```
 
