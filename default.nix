@@ -1,41 +1,28 @@
 {
   lib,
   buildGoModule,
-  nix,
+  fetchFromGitHub,
 }:
 
 buildGoModule (finalAttrs: {
   pname = "aeroflare";
-  version = (lib.importJSON ./version.json).".";
-  doCheck = false;
+  version = "1.10.0";
 
-  src = ./.;
+  src = fetchFromGitHub {
+    owner = "itzemoji";
+    repo = "aeroflare";
+    tag = "v${finalAttrs.version}";
+    hash = "sha256-4l0QVJAgKqS/tnMD6GncQdbefWPncmS4QDIz7QEiPrk=";
+  };
 
-  vendorHash = "sha256-H4jgc08mklolpHQNlcQx5JzpCDBYpujgoKFR2Ct8xR8=";
-  # No runtime PATH wrapping: the only tools aeroflare shells out to are `nix`
-  # and `nix-store`, and those must come from the user's own installation
-  # rather than a version pinned by this package.
+  vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
-  # internal/prepare shells out to `nix-store --dump` to serialize NARs, so the
-  # checkPhase needs the binary on PATH. Dumping a path reads no store state,
-  # which is why this works inside the build sandbox.
-  nativeCheckInputs = [ nix ];
-
-  ldflags = [
-    "-s"
-    "-w"
-    "-X github.com/itzemoji/aeroflare/internal/build.Version=${finalAttrs.version}"
-  ];
-
-  subPackages = [
-    "cmd/aeroflare"
-    "cmd/aeroflare-ci"
-  ];
+  ldflags = [ "-s" ];
 
   meta = {
     description = "The OCI-based Nix-Binary-Cache written in Go";
     homepage = "https://github.com/itzemoji/aeroflare";
-    changelog = "https://github.com/itzemoji/aeroflare/blob/v${finalAttrs.version}/CHANGELOG.md";
+    changelog = "https://github.com/itzemoji/aeroflare/blob/${finalAttrs.src.rev}/CHANGELOG.md";
     license = lib.licenses.gpl3Only;
     maintainers = with lib.maintainers; [ ];
     mainProgram = "aeroflare";
