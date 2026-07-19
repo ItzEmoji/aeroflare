@@ -44,9 +44,21 @@ This starts the local proxy server, ready to route requests and handle caching.
 
 ## 3. Push to the Cache
 
-With your infrastructure initialized and proxy running, you can execute a cached build. The most efficient way is to use the `run` execution wrapper.
+With your infrastructure initialized, it's time to populate the cache. For most workflows the clearest way is the `push` command: build your package, then hand the resulting store path to Aeroflare, which prepares, compresses, and uploads it directly to your registry.
 
-This command configures your Nix daemon to use the proxy as an official substituter, executes your target command, and automatically pushes any resulting output paths back to the cache.
+```bash
+# Build your package and print its output path
+nix build .#default --print-out-paths
+
+# Push that store path to your cache
+nix run github:ItzEmoji/aeroflare -- push --store-path /nix/store/xxxx-default
+```
+
+`push` uploads straight to the registry, so the proxy does not need to be running for this step. To push many paths at once, hand it a file of store paths with `--input` — see [Cache Population](../how-to/cache-population.md) for the details.
+
+### Alternative: build and push in one step with `run`
+
+If you'd rather build and upload together, the `run` wrapper executes your Nix command through the proxy and automatically pushes any output paths it produces.
 
 > **Important:** Currently, if you want Aeroflare to successfully push the resulting artifacts, you must pass the `--print-out-paths` flag to your Nix build command so Aeroflare knows what to upload.
 
@@ -54,11 +66,9 @@ This command configures your Nix daemon to use the proxy as an official substitu
 nix run github:ItzEmoji/aeroflare -- run -- nix build .#default --print-out-paths
 ```
 
-
-
-### The Cache Lifecycle:
-1. **Pulling**: If the required build outputs already exist in your remote cache, they are pulled immediately, bypassing the local compilation process entirely.
-2. **Execution**: If the artifacts are missing, the standard `nix build` command executes locally.
-3. **Pushing**: Upon successful build completion, Aeroflare automatically isolates the new Nix store paths and uploads them as compressed blobs directly to your configured backend.
+Its lifecycle:
+1. **Pulling**: if the required build outputs already exist in your remote cache, they are pulled immediately, bypassing local compilation entirely.
+2. **Execution**: if the artifacts are missing, the standard `nix build` command executes locally.
+3. **Pushing**: upon successful build completion, Aeroflare isolates the new Nix store paths and uploads them as compressed blobs to your configured backend.
 
 Congratulations! You've successfully configured and used Aeroflare to accelerate your Nix builds.

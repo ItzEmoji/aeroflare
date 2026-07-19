@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -33,7 +35,7 @@ func proxyNixConfig(existing string, port int) string {
 	if cfg != "" {
 		cfg += "\n"
 	}
-	return cfg + fmt.Sprintf("extra-substituters = http://127.0.0.1:%d", port)
+	return cfg + "extra-substituters = http://" + net.JoinHostPort(proxyHost, strconv.Itoa(port))
 }
 
 // dedupPaths returns in with duplicate store paths removed, preserving order.

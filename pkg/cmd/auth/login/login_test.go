@@ -14,7 +14,7 @@ func TestLoginSavesProvidedTokens(t *testing.T) {
 	f.Overrides.GithubToken = "test-gh"
 	f.Overrides.GitlabToken = "test-gl"
 	f.Overrides.CfToken = "test-cf"
-	f.Overrides.CfUserID = "test-id"
+	f.Overrides.CfAccountID = "test-id"
 
 	cmd := NewCmdLogin(f)
 	if err := cmd.Execute(); err != nil {
@@ -23,10 +23,10 @@ func TestLoginSavesProvidedTokens(t *testing.T) {
 
 	mgr := f.Secrets()
 	for key, want := range map[string]string{
-		"github-token": "test-gh",
-		"gitlab-token": "test-gl",
-		"cf-token":     "test-cf",
-		"cf-user-id":   "test-id",
+		"github-token":  "test-gh",
+		"gitlab-token":  "test-gl",
+		"cf-token":      "test-cf",
+		"cf-account-id": "test-id",
 	} {
 		got, err := mgr.Get(key)
 		if err != nil || got != want {

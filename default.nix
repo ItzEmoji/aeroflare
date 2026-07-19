@@ -11,7 +11,10 @@ buildGoModule (finalAttrs: {
 
   src = ./.;
 
-  vendorHash = "sha256-zAqJnCrNgMWPEMQkvXotLuIceap00KuXx/2F6HxYGPk=";
+  vendorHash = "sha256-H4jgc08mklolpHQNlcQx5JzpCDBYpujgoKFR2Ct8xR8=";
+  # No runtime PATH wrapping: the only tools aeroflare shells out to are `nix`
+  # and `nix-store`, and those must come from the user's own installation
+  # rather than a version pinned by this package.
 
   # internal/prepare shells out to `nix-store --dump` to serialize NARs, so the
   # checkPhase needs the binary on PATH. Dumping a path reads no store state,

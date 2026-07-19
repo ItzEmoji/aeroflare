@@ -115,7 +115,7 @@ func TestRequireGitlabTokenErrorsWhenNotATerminal(t *testing.T) {
 func TestRequireCloudflareTokenGlobalOverride(t *testing.T) {
 	f, _, _ := cmdutiltest.NewTestFactory(t, nil)
 	f.Overrides.CfToken = "global-cf-token"
-	f.Overrides.CfUserID = "global-cf-user"
+	f.Overrides.CfAccountID = "global-cf-user"
 
 	token, user, err := RequireCloudflareToken(f)
 	if err != nil {
@@ -128,8 +128,8 @@ func TestRequireCloudflareTokenGlobalOverride(t *testing.T) {
 
 func TestRequireCloudflareTokenFallsBackToSecretsManager(t *testing.T) {
 	f, _, _ := cmdutiltest.NewTestFactory(t, map[string]string{
-		"cf-token":   "secret-cf-token",
-		"cf-user-id": "secret-cf-user",
+		"cf-token":      "secret-cf-token",
+		"cf-account-id": "secret-cf-user",
 	})
 
 	token, user, err := RequireCloudflareToken(f)

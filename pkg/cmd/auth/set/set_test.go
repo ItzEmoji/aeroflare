@@ -43,8 +43,8 @@ func TestSet_MultiFieldAndOCI(t *testing.T) {
 	if v, _ := mgr.Get("cf-token"); v != "cf-tok" {
 		t.Errorf("cf-token = %q, want %q", v, "cf-tok")
 	}
-	if v, _ := mgr.Get("cf-user-id"); v != "acct-1" {
-		t.Errorf("cf-user-id = %q, want %q", v, "acct-1")
+	if v, _ := mgr.Get("cf-account-id"); v != "acct-1" {
+		t.Errorf("cf-account-id = %q, want %q", v, "acct-1")
 	}
 
 	cmd2 := NewCmdSet(f)

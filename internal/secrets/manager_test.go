@@ -34,3 +34,21 @@ func TestFallbackManager(t *testing.T) {
 		t.Errorf("Expected 'test-value', got '%s'", val)
 	}
 }
+
+// A missing fallback file means "this secret was never stored", not a failure.
+// Callers distinguish the two by matching ErrNotFound, so leaking the raw
+// os.ReadFile error made them report a spurious warning on a fresh machine.
+func TestGetMissingFallbackFileReturnsErrNotFound(t *testing.T) {
+	keyring.MockInitWithError(errors.New("simulated error"))
+
+	tmpDir := t.TempDir()
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
+
+	manager := secrets.NewManager()
+
+	_, err := manager.Get("never-stored")
+	if !errors.Is(err, secrets.ErrNotFound) {
+		t.Errorf("Get() on a machine with no secrets file = %v, want ErrNotFound", err)
+	}
+}

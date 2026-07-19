@@ -73,7 +73,7 @@ func (r *Resolver) Resolve() (string, error) {
 		manager = secrets.NewManager()
 	}
 	val, err := manager.Get(r.secretKey)
-	if err != nil && err != secrets.ErrNotFound {
+	if err != nil && !errors.Is(err, secrets.ErrNotFound) {
 		return "", err
 	}
 	if err == nil && val != "" {

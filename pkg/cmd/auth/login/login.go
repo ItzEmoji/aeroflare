@@ -39,7 +39,7 @@ func loginRun(opts *Options) error {
 		{"github-token", f.Overrides.GithubToken},
 		{"gitlab-token", f.Overrides.GitlabToken},
 		{"cf-token", f.Overrides.CfToken},
-		{"cf-user-id", f.Overrides.CfUserID},
+		{"cf-account-id", f.Overrides.CfAccountID},
 	}
 
 	savedAny := false

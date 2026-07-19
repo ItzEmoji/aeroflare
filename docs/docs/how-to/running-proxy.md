@@ -39,6 +39,20 @@ extra-substituters = http://127.0.0.1:8080
 
 *Note: You must ensure the Aeroflare proxy is running in the background whenever Nix attempts to build or fetch packages, otherwise substitution will fail.*
 
+## Authenticating to a Private Cache
+
+A public cache needs no credentials. For a private OCI cache, the proxy resolves
+the registry token from, in priority order:
+
+1. The `--token` flag: `aeroflare proxy --token <PAT>`.
+2. The `NIXCACHE_TOKEN` environment variable — convenient for systemd units and
+   containers, matching the other `NIXCACHE_*` settings. This is the raw
+   registry token/PAT.
+3. The token saved in your credential manager (via `aeroflare auth login`).
+
+If none is found, the proxy runs unauthenticated, which only works for a public
+cache.
+
 ## Using the `run` Wrapper (Recommended)
 
 Managing the proxy daemon manually can be tedious. The recommended approach for local development is to use the `aeroflare run` wrapper.

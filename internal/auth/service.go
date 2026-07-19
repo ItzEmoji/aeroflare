@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -20,7 +21,7 @@ type Field struct {
 	// ("Cloudflare Account ID").
 	Label string
 	// SecretKey is the key this field is stored under in the secrets manager
-	// ("github-token", "cf-user-id", "oci-docker.io-token").
+	// ("github-token", "cf-account-id", "oci-docker.io-token").
 	SecretKey string
 	// EnvVars lists environment variables checked before the secrets manager,
 	// highest priority first.
@@ -90,7 +91,7 @@ func (s Service) Resolve(m secrets.Manager) (map[string]string, error) {
 	vals := make(map[string]string)
 	for _, f := range s.Fields {
 		val, err := f.Resolve(m)
-		if err == ErrTokenNotFound {
+		if errors.Is(err, ErrTokenNotFound) {
 			continue
 		}
 		if err != nil {
@@ -149,7 +150,7 @@ var cloudflareService = Service{
 		{
 			Name:      "account_id",
 			Label:     "Cloudflare Account ID",
-			SecretKey: "cf-user-id",
+			SecretKey: "cf-account-id",
 			EnvVars:   []string{"CLOUDFLARE_ACCOUNT_ID"},
 		},
 	},

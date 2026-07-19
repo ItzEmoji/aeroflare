@@ -38,7 +38,7 @@ The following keys are stored in the secrets manager:
 * `github-token`
 * `gitlab-token`
 * `cf-token`
-* `cf-user-id`
+* `cf-account-id`
 
 ## Environment Variables
 

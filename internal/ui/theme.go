@@ -1,4 +1,4 @@
-package setup
+package ui
 
 import (
 	"github.com/charmbracelet/huh"
@@ -7,11 +7,12 @@ import (
 )
 
 // AeroflareTheme returns a huh form theme with brand colors and rounded
-// borders, applied consistently across the init wizard and settings command.
+// borders, applied consistently across the init wizard, the settings command,
+// and every interactive credential prompt.
 func AeroflareTheme() *huh.Theme {
 	t := huh.ThemeBase()
 	// "theme" is read from viper so it picks up both the --theme flag and
-	// the persisted config value (see cmd/settings.go).
+	// the persisted config value (see pkg/cmd/settings).
 	themeName := viper.GetString("theme")
 
 	var primaryColor lipgloss.Color

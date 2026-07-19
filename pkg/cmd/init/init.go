@@ -8,7 +8,6 @@ import (
 	"os"
 
 	setup "github.com/itzemoji/aeroflare/internal/init"
-	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
 
@@ -33,7 +32,6 @@ func NewCmdInit(f *cmdutil.Factory) *cobra.Command {
 
   • OCI repository for storing cache data
   • Cloudflare Worker deployment
-  • Git repository and CI/CD integration (if selected)
 
 The wizard asks all questions up front and shows a summary before making
 any changes. No infrastructure is created until you confirm.`,
@@ -46,7 +44,10 @@ any changes. No infrastructure is created until you confirm.`,
 }
 
 func initRun(f *cmdutil.Factory, opts *Options) error {
-	cfg, err := setup.RunWizard()
+	// The wizard authenticates every service it needs through the auth module,
+	// so by the time it returns, cfg holds the credentials and they are already
+	// saved. Re-resolving them here is what used to trigger a second login.
+	cfg, err := setup.RunWizard(f)
 	if err != nil {
 		return err
 	}
@@ -57,26 +58,15 @@ func initRun(f *cmdutil.Factory, opts *Options) error {
 		return nil
 	}
 
-	// Cloudflare tokens are always needed to deploy the Worker.
-	cfToken, cfID, err := shared.RequireCloudflareToken(f)
-	if err != nil {
-		return err
-	}
-	_ = os.Setenv("CLOUDFLARE_API_TOKEN", cfToken)
-	_ = os.Setenv("CLOUDFLARE_ACCOUNT_ID", cfID)
+	// Export for the tooling provisioning shells out to.
+	_ = os.Setenv("CLOUDFLARE_API_TOKEN", cfg.CloudflareToken)
+	_ = os.Setenv("CLOUDFLARE_ACCOUNT_ID", cfg.CloudflareAccountID)
 
-	// Ensure Github token exists if they need GitHub Actions / Registry
-	if cfg.Registry == "ghcr.io" || cfg.GitProvider == setup.GitGitHub {
-		ghToken, err := shared.RequireGithubToken(f)
-		if err != nil {
-			return err
-		}
-		_ = os.Setenv("GITHUB_TOKEN", ghToken)
+	// ghcr.io authenticates with the GitHub token the wizard already resolved
+	// into cfg.OCIToken; export it for the OCI tooling provisioning shells out to.
+	if cfg.Registry == "ghcr.io" && cfg.OCIToken != "" {
+		_ = os.Setenv("GITHUB_TOKEN", cfg.OCIToken)
 	}
 
-	if err := setup.RunProvision(cfg); err != nil {
-		return err
-	}
-
-	return nil
+	return setup.RunProvision(cfg)
 }

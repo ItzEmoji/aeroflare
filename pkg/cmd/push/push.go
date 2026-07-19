@@ -51,8 +51,24 @@ func NewCmdPush(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "push",
+		Use:   "push [installable...]",
 		Short: "Push a build to the cache",
+		Long: `Push builds to the OCI cache.
+
+Each positional argument is a Nix installable, resolved to store paths before
+uploading:
+
+  - a store path       (/nix/store/xxx-yyy)
+  - a result symlink   (./result)
+  - a flake reference  (github:owner/repo, nixpkgs#hello, .#default)
+
+Installables that are not yet built are built first. Store paths given via
+--store-path, --input, or piped stdin are taken literally.
+
+Examples:
+  aeroflare push ./result
+  aeroflare push nixpkgs#hello
+  aeroflare push github:owner/repo#default`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return pushRun(f, opts, args)
 		},
@@ -76,7 +92,15 @@ func pushRun(f *cmdutil.Factory, opts *Options, args []string) error {
 		return err
 	}
 
-	cfg, err := internalpush.ParseConfig(args, opts.StorePath, opts.InputFile, os.Stdin)
+	// Positional args are Nix installables (store paths, result symlinks, or
+	// flake refs like github:owner/repo or nixpkgs#hello); resolve them to
+	// realized store paths, building any that are not yet in the store.
+	storePaths, err := newInstallableResolver().resolve(args)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := internalpush.ParseConfig(storePaths, opts.StorePath, opts.InputFile, os.Stdin)
 	if err != nil {
 		return err
 	}

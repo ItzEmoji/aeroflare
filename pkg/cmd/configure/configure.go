@@ -4,9 +4,10 @@ package configure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	setup "github.com/itzemoji/aeroflare/internal/init"
+	"github.com/itzemoji/aeroflare/internal/ui"
 	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
@@ -30,7 +31,13 @@ func NewCmdConfigure(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "configure",
-		Short: "Interactively configure cache settings",
+		Short: "Configure the remote cache (writes to the OCI manifest)",
+		Long: `Configure the remote cache by writing settings (such as the Nix
+signing public key) into the cache-config manifest stored in the OCI registry.
+
+These settings live with the cache and are shared by everyone who uses it. To
+change local, per-machine preferences (theme, registry logins, cache URL)
+instead, use "aeroflare settings".`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return configureRun(f, opts)
 		},
@@ -74,13 +81,13 @@ func configureRun(f *cmdutil.Factory, opts *Options) error {
 				Description("Enter your nix cache public key (optional)").
 				Value(&publicKey),
 		),
-	).WithTheme(setup.AeroflareTheme())
+	).WithTheme(ui.AeroflareTheme())
 
 	if err := form.Run(); err != nil {
-		if err.Error() != "user aborted" {
-			return fmt.Errorf("form error: %v", err)
+		if errors.Is(err, huh.ErrUserAborted) {
+			return cmdutil.ErrCancel
 		}
-		return cmdutil.ErrCancel
+		return fmt.Errorf("form error: %w", err)
 	}
 
 	annotations := map[string]string{

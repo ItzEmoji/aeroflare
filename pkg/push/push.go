@@ -108,7 +108,7 @@ func ParseConfig(args []string, storePath string, inputFile string, stdin io.Rea
 	}
 
 	if len(targetPaths) == 0 && len(args) == 0 {
-		return nil, errors.New("no store paths found: provide --store-path, --input, or pipe paths via stdin")
+		return nil, errors.New("no store paths found: pass an installable (store path, result symlink, or flake ref), or provide --store-path, --input, or pipe paths via stdin")
 	}
 	targetPaths = append(targetPaths, args...)
 
@@ -180,14 +180,14 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 	if plan.Config.SigningKey != "" {
 		signKey, err = signing.LoadPrivateKey(plan.Config.SigningKey)
 		if err != nil {
-			return nil, fmt.Errorf("error loading key: %v", err)
+			return nil, fmt.Errorf("error loading key: %w", err)
 		}
 	}
 
 	// Create a temporary directory if files should not be kept
 	outputDir, err := os.MkdirTemp("", "aeroflare-push-*")
 	if err != nil {
-		return nil, fmt.Errorf("error creating temporary directory: %v", err)
+		return nil, fmt.Errorf("error creating temporary directory: %w", err)
 	}
 
 	if !plan.Config.KeepFiles {
@@ -333,7 +333,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 		// outlives a token no longer has to re-resolve one per chunk.
 		pusher, repo, err := oci.NewLayerPusher(registry, repository, target.Auth)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create registry pusher: %v", err)
+			return nil, fmt.Errorf("failed to create registry pusher: %w", err)
 		}
 
 		var mu sync.Mutex
@@ -436,7 +436,7 @@ func RunPushTo(plan *PushPlan, target Target, reporter Reporter) (*PushResult, e
 				Workers:           plan.Config.Workers,
 			})
 			if err := backend.PushReceipts(ctx, chunkReceipts); err != nil {
-				return nil, fmt.Errorf("backend push failed: %v", err)
+				return nil, fmt.Errorf("backend push failed: %w", err)
 			}
 			totalReceipts = append(totalReceipts, chunkReceipts...)
 		}

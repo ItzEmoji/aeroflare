@@ -80,13 +80,13 @@ func Prepare(paths []string, cfg PrepareConfig) (*PreparedSet, error) {
 	if cfg.SigningKey != "" {
 		signKey, err = signing.LoadPrivateKey(cfg.SigningKey)
 		if err != nil {
-			return nil, fmt.Errorf("error loading key: %v", err)
+			return nil, fmt.Errorf("error loading key: %w", err)
 		}
 	}
 
 	outputDir, err := os.MkdirTemp("", "aeroflare-push-*")
 	if err != nil {
-		return nil, fmt.Errorf("error creating temporary directory: %v", err)
+		return nil, fmt.Errorf("error creating temporary directory: %w", err)
 	}
 
 	pcfg := &prepare.Config{
@@ -149,7 +149,7 @@ type uploadOutcome struct {
 func uploadTaskSet(ctx context.Context, tasks []preparedTask, registry, repository string, auth authn.Authenticator, reporter Reporter, workers int) (uploadOutcome, error) {
 	pusher, repo, err := oci.NewLayerPusher(registry, repository, auth)
 	if err != nil {
-		return uploadOutcome{}, fmt.Errorf("failed to create registry pusher: %v", err)
+		return uploadOutcome{}, fmt.Errorf("failed to create registry pusher: %w", err)
 	}
 
 	var mu sync.Mutex
@@ -253,7 +253,7 @@ func (ps *PreparedSet) PushTo(target Target, reporter Reporter) (*PushResult, er
 			Workers:           ps.workers,
 		})
 		if err := b.PushReceipts(ctx, receipts); err != nil {
-			return nil, fmt.Errorf("backend push failed: %v", err)
+			return nil, fmt.Errorf("backend push failed: %w", err)
 		}
 	}
 	reporter.Step(2, 2, "Cache backend updated")

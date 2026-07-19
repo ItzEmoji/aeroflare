@@ -138,7 +138,7 @@ Use it as a proxy cache, or push/pull blobs directly to/from the registry.`,
 	cmd.PersistentFlags().StringVar(&f.Overrides.GithubToken, "github-token", "", "GitHub Token")
 	cmd.PersistentFlags().StringVar(&f.Overrides.GitlabToken, "gitlab-token", "", "GitLab Token")
 	cmd.PersistentFlags().StringVar(&f.Overrides.CfToken, "cf-token", "", "Cloudflare API Token")
-	cmd.PersistentFlags().StringVar(&f.Overrides.CfUserID, "cf-user-id", "", "Cloudflare Account ID")
+	cmd.PersistentFlags().StringVar(&f.Overrides.CfAccountID, "cf-account-id", "", "Cloudflare Account ID")
 
 	cmd.AddCommand(version.NewCmdVersion(f, buildVersion, buildDate))
 	cmd.AddCommand(auth.NewCmdAuth(f))

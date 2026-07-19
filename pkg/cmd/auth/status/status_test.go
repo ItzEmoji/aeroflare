@@ -83,9 +83,9 @@ func TestStatusJSON_IncludesGithubAndCloudflare(t *testing.T) {
 
 func TestStatusTable_Columns(t *testing.T) {
 	f, out, _ := cmdutiltest.NewTestFactory(t, map[string]string{
-		"github-token": "ghtokenvalue",
-		"cf-token":     "cfval",
-		"cf-user-id":   "acct-1",
+		"github-token":  "ghtokenvalue",
+		"cf-token":      "cfval",
+		"cf-account-id": "acct-1",
 	})
 
 	cmd := NewCmdStatus(f)

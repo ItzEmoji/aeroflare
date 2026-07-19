@@ -5,20 +5,20 @@ sidebar_position: 1
 ---
 # Core Commands
 
-This document covers the internal implementation mechanics of the core commands and global state management for the Aeroflare CLI, implemented across `cmd/root.go`, `cmd/init.go`, `cmd/configure.go`, and `cmd/settings.go`.
+This document covers the internal implementation mechanics of the core commands and global state management for the Aeroflare CLI, implemented across `pkg/cmd/root/root.go`, `pkg/cmd/init/init.go`, `pkg/cmd/configure/configure.go`, and `pkg/cmd/settings/settings.go`.
 
-## Global Flags and Environment State (`cmd/root.go`)
+## Global Flags and Environment State (`pkg/cmd/root/root.go`)
 
 The `aeroflare` root command uses Viper to manage global state and flag bindings:
 
 - `--verbose` (`-v`, `-vv`): Controls the `network.DebugLogger` boolean. `-vv` triggers request-level logging (`VerboseCount >= 2`).
-- `--cache-url`, `--github-token`, `--gitlab-token`, `--cf-token`, `--cf-user-id`: Core configuration flags.
+- `--cache-url`, `--github-token`, `--gitlab-token`, `--cf-token`, `--cf-account-id`: Core configuration flags.
 
 Viper automatically maps all flags to environment variables by applying the `AEROFLARE_` prefix and replacing dashes with underscores (e.g., `--cache-url` maps to `AEROFLARE_CACHE_URL`).
 
-Additionally, `cmd/root.go` binds a specific alias, `AEROFLARE_CACHE`. When this environment variable is used instead of `AEROFLARE_CACHE_URL`, the `GetCacheURL()` function automatically prefixes the provided cache name with `ghcr.io/` (e.g., `AEROFLARE_CACHE=my-org/my-cache` becomes `ghcr.io/my-org/my-cache`).
+Additionally, `pkg/cmd/root/root.go` binds a specific alias, `AEROFLARE_CACHE`. When this environment variable is used instead of `AEROFLARE_CACHE_URL`, the `GetCacheURL()` function automatically prefixes the provided cache name with `ghcr.io/` (e.g., `AEROFLARE_CACHE=my-org/my-cache` becomes `ghcr.io/my-org/my-cache`).
 
-## aeroflare init (`cmd/init.go`)
+## aeroflare init (`pkg/cmd/init/init.go`)
 
 The `init` command orchestrates the `setup.RunWizard()` and `setup.RunProvision(cfg)` flow. 
 
@@ -26,14 +26,14 @@ Crucially, before invoking the provisioner, `init.go` dynamically mutates the pr
 - It always exports `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (needed to deploy the Worker).
 - If GitHub Registry (`ghcr.io`) or GitHub Git Provider is selected, it exports `GITHUB_TOKEN`.
 
-## aeroflare configure (`cmd/configure.go`)
+## aeroflare configure (`pkg/cmd/configure/configure.go`)
 
 The `configure` command reads and writes cache configuration directly to OCI manifest annotations using `network.PushConfigManifest`.
 
 It manipulates the following specific OCI annotation key:
 - `aeroflare.public-key`: The nix cache public key.
 
-## aeroflare settings (`cmd/settings.go`)
+## aeroflare settings (`pkg/cmd/settings/settings.go`)
 
 The `settings` command provides an interactive UI, but under the hood, it directly manipulates the Viper configuration store and flushes the changes to disk (`viper.WriteConfig()`).
 

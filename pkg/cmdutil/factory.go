@@ -30,7 +30,7 @@ type Overrides struct {
 	GithubToken string
 	GitlabToken string
 	CfToken     string
-	CfUserID    string
+	CfAccountID string
 
 	// Verbose is the -v count: 1 enables package-level logging, 2 enables
 	// request logging.

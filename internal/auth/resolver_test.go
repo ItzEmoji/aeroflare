@@ -1,6 +1,8 @@
 package auth_test
 
 import (
+	"errors"
+	"fmt"
 	"github.com/itzemoji/aeroflare/internal/auth"
 	"github.com/itzemoji/aeroflare/internal/secrets"
 	"testing"
@@ -70,6 +72,9 @@ func TestResolver_NotFound(t *testing.T) {
 
 type mockSecretsManager struct {
 	data map[string]string
+	// getErr, when set, is returned by Get for a key that isn't in data,
+	// standing in for a manager that wraps ErrNotFound (or fails outright).
+	getErr error
 }
 
 func (m *mockSecretsManager) Set(key, value string) error {
@@ -84,7 +89,43 @@ func (m *mockSecretsManager) Get(key string) (string, error) {
 	if val, ok := m.data[key]; ok {
 		return val, nil
 	}
+	if m.getErr != nil {
+		return "", m.getErr
+	}
 	return "", secrets.ErrNotFound
+}
+
+// The secrets layer now wraps some errors, so a "not found" may arrive wrapped.
+// Resolve must still recognize it as not-found (via errors.Is) and return
+// ErrTokenNotFound rather than leaking the wrapped error to callers.
+func TestResolver_WrappedNotFoundTreatedAsNotFound(t *testing.T) {
+	mock := &mockSecretsManager{
+		data:   map[string]string{},
+		getErr: fmt.Errorf("keychain read failed for %q: %w", "test-secret", secrets.ErrNotFound),
+	}
+
+	_, err := auth.NewResolver("test-secret").
+		WithSecretsManager(mock).
+		Resolve()
+
+	if !errors.Is(err, auth.ErrTokenNotFound) {
+		t.Fatalf("expected ErrTokenNotFound for a wrapped not-found, got %v", err)
+	}
+}
+
+// A genuine (non-not-found) manager error must be surfaced, not turned into
+// ErrTokenNotFound, so a locked keychain can't masquerade as a missing token.
+func TestResolver_SurfacesNonNotFoundError(t *testing.T) {
+	sentinel := errors.New("keychain is locked")
+	mock := &mockSecretsManager{data: map[string]string{}, getErr: sentinel}
+
+	_, err := auth.NewResolver("test-secret").
+		WithSecretsManager(mock).
+		Resolve()
+
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("expected the underlying keychain error, got %v", err)
+	}
 }
 
 func (m *mockSecretsManager) List() ([]string, error) {

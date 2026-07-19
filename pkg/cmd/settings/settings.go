@@ -6,7 +6,7 @@ package settings
 import (
 	"fmt"
 
-	setup "github.com/itzemoji/aeroflare/internal/init"
+	"github.com/itzemoji/aeroflare/internal/ui"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/iostreams"
 
@@ -27,7 +27,12 @@ func NewCmdSettings(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "settings",
-		Short: "Configure Aeroflare interactively",
+		Short: "Configure local preferences (theme, logins, cache URL)",
+		Long: `Configure local, per-machine preferences -- appearance theme,
+registry logins, and the default cache URL -- and save them to aeroflare.yaml.
+
+These settings are local to this machine. To configure the remote cache itself
+(such as its signing public key), use "aeroflare configure".`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return settingsRun(f, opts)
 		},
@@ -109,7 +114,7 @@ func settingsRun(f *cmdutil.Factory, opts *Options) error {
 				).
 				Value(&registryAction),
 		),
-	).WithTheme(setup.AeroflareTheme()).Run()
+	).WithTheme(ui.AeroflareTheme()).Run()
 
 	// If the user aborts the form (e.g. by pressing Ctrl+C), cancel gracefully.
 	if err != nil {
@@ -151,7 +156,7 @@ func settingsRun(f *cmdutil.Factory, opts *Options) error {
 
 	// If an authentication method was selected, run the secondary form.
 	if len(authGroups) > 0 {
-		err = huh.NewForm(authGroups...).WithTheme(setup.AeroflareTheme()).Run()
+		err = huh.NewForm(authGroups...).WithTheme(ui.AeroflareTheme()).Run()
 		if err != nil {
 			return cmdutil.ErrCancel
 		}

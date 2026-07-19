@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/itzemoji/aeroflare/internal/auth"
+	"github.com/itzemoji/aeroflare/internal/ui"
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 
 	"github.com/charmbracelet/huh"
@@ -26,6 +27,7 @@ func RunInteractiveGithubAuth(f *cmdutil.Factory) (string, error) {
 			huh.NewOption("Enter Token Manually", "manual"),
 		).
 		Value(&ghMethod).
+		WithTheme(ui.AeroflareTheme()).
 		Run()
 	if err != nil {
 		return "", cmdutil.ErrCancel
@@ -36,17 +38,17 @@ func RunInteractiveGithubAuth(f *cmdutil.Factory) (string, error) {
 		_, _ = fmt.Fprintln(f.IOStreams.Out, "Requesting device code...")
 		res, err := auth.RequestDeviceCode(githubClientID)
 		if err != nil {
-			return "", fmt.Errorf("failed to request code: %v", err)
+			return "", fmt.Errorf("failed to request code: %w", err)
 		}
 		_, _ = fmt.Fprintf(f.IOStreams.Out, "Please go to %s and enter the code: %s\n", res.VerificationURI, res.UserCode)
 		_, _ = fmt.Fprintln(f.IOStreams.Out, "Waiting for authorization...")
 
 		token, err = auth.PollAccessToken(githubClientID, res.DeviceCode, res.Interval)
 		if err != nil {
-			return "", fmt.Errorf("authorization failed: %v", err)
+			return "", fmt.Errorf("authorization failed: %w", err)
 		}
 	} else {
-		err = huh.NewInput().Title("GitHub Token").EchoMode(huh.EchoModePassword).Value(&token).Run()
+		err = huh.NewInput().Title("GitHub Token").EchoMode(huh.EchoModePassword).Value(&token).WithTheme(ui.AeroflareTheme()).Run()
 		if err != nil {
 			return "", cmdutil.ErrCancel
 		}
@@ -54,7 +56,7 @@ func RunInteractiveGithubAuth(f *cmdutil.Factory) (string, error) {
 
 	if token != "" {
 		if err := manager.Set("github-token", token); err != nil {
-			return "", fmt.Errorf("failed to save token: %v", err)
+			return "", fmt.Errorf("failed to save token: %w", err)
 		}
 		_, _ = fmt.Fprintln(f.IOStreams.Out, "Success! GitHub token saved. This will automatically be used for GitHub APIs and the ghcr.io container registry.")
 	}
@@ -66,13 +68,13 @@ func RunInteractiveGithubAuth(f *cmdutil.Factory) (string, error) {
 func RunInteractiveGitlabAuth(f *cmdutil.Factory) (string, error) {
 	manager := f.Secrets()
 	var token string
-	err := huh.NewInput().Title("GitLab Personal Access Token").EchoMode(huh.EchoModePassword).Value(&token).Run()
+	err := huh.NewInput().Title("GitLab Personal Access Token").EchoMode(huh.EchoModePassword).Value(&token).WithTheme(ui.AeroflareTheme()).Run()
 	if err != nil {
 		return "", cmdutil.ErrCancel
 	}
 	if token != "" {
 		if err := manager.Set("gitlab-token", token); err != nil {
-			return "", fmt.Errorf("failed to save token: %v", err)
+			return "", fmt.Errorf("failed to save token: %w", err)
 		}
 		_, _ = fmt.Fprintln(f.IOStreams.Out, "Success! GitLab token saved.")
 	}
@@ -83,31 +85,31 @@ func RunInteractiveGitlabAuth(f *cmdutil.Factory) (string, error) {
 // account ID and saves whichever of the two the user entered.
 func RunInteractiveCloudflareAuth(f *cmdutil.Factory) (string, string, error) {
 	manager := f.Secrets()
-	var apiToken, userID string
+	var apiToken, accountID string
 	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Title("Cloudflare API Token").EchoMode(huh.EchoModePassword).Value(&apiToken),
-			huh.NewInput().Title("Cloudflare Account ID").Value(&userID),
+			huh.NewInput().Title("Cloudflare Account ID").Value(&accountID),
 		),
-	).Run()
+	).WithTheme(ui.AeroflareTheme()).Run()
 	if err != nil {
 		return "", "", cmdutil.ErrCancel
 	}
 
 	if apiToken != "" {
 		if err := manager.Set("cf-token", apiToken); err != nil {
-			return "", "", fmt.Errorf("failed to save Cloudflare API token: %v", err)
+			return "", "", fmt.Errorf("failed to save Cloudflare API token: %w", err)
 		}
 	}
-	if userID != "" {
-		if err := manager.Set("cf-user-id", userID); err != nil {
-			return "", "", fmt.Errorf("failed to save Cloudflare user ID: %v", err)
+	if accountID != "" {
+		if err := manager.Set("cf-account-id", accountID); err != nil {
+			return "", "", fmt.Errorf("failed to save Cloudflare account ID: %w", err)
 		}
 	}
-	if apiToken != "" || userID != "" {
+	if apiToken != "" || accountID != "" {
 		_, _ = fmt.Fprintln(f.IOStreams.Out, "Cloudflare credentials saved.")
 	}
-	return apiToken, userID, nil
+	return apiToken, accountID, nil
 }
 
 // RunInteractiveOCIAuth prompts for a registry hostname (if not already
@@ -118,7 +120,7 @@ func RunInteractiveOCIAuth(f *cmdutil.Factory, registry string) (string, string,
 	var user, pass string
 
 	if registry == "" {
-		err := huh.NewInput().Title("Registry URL (e.g. registry.gitlab.com)").Value(&registry).Run()
+		err := huh.NewInput().Title("Registry URL (e.g. registry.gitlab.com)").Value(&registry).WithTheme(ui.AeroflareTheme()).Run()
 		if err != nil || registry == "" {
 			return "", "", cmdutil.ErrCancel
 		}
@@ -129,17 +131,17 @@ func RunInteractiveOCIAuth(f *cmdutil.Factory, registry string) (string, string,
 			huh.NewInput().Title("Username for "+registry).Value(&user),
 			huh.NewInput().Title("Token / Password").EchoMode(huh.EchoModePassword).Value(&pass),
 		),
-	).Run()
+	).WithTheme(ui.AeroflareTheme()).Run()
 	if err != nil {
 		return "", "", cmdutil.ErrCancel
 	}
 
 	if registry != "" {
 		if err := manager.Set(fmt.Sprintf("oci-%s-username", registry), user); err != nil {
-			return "", "", fmt.Errorf("failed to save OCI username: %v", err)
+			return "", "", fmt.Errorf("failed to save OCI username: %w", err)
 		}
 		if err := manager.Set(fmt.Sprintf("oci-%s-token", registry), pass); err != nil {
-			return "", "", fmt.Errorf("failed to save OCI token: %v", err)
+			return "", "", fmt.Errorf("failed to save OCI token: %w", err)
 		}
 		_, _ = fmt.Fprintln(f.IOStreams.Out, "OCI credentials saved.")
 	}
@@ -158,7 +160,7 @@ func PromptServiceFields(svc auth.Service) map[string]string {
 		if field.Secret {
 			input = input.EchoMode(huh.EchoModePassword)
 		}
-		if err := input.Run(); err != nil {
+		if err := input.WithTheme(ui.AeroflareTheme()).Run(); err != nil {
 			return vals
 		}
 		if val != "" {
@@ -182,6 +184,7 @@ func RunInteractiveAuth(f *cmdutil.Factory) error {
 			huh.NewOption("Custom OCI Registry", "oci"),
 		).
 		Value(&service).
+		WithTheme(ui.AeroflareTheme()).
 		Run()
 
 	if err != nil {
