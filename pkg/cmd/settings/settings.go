@@ -27,7 +27,12 @@ func NewCmdSettings(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "settings",
-		Short: "Configure Aeroflare interactively",
+		Short: "Configure local preferences (theme, logins, cache URL)",
+		Long: `Configure local, per-machine preferences -- appearance theme,
+registry logins, and the default cache URL -- and save them to aeroflare.yaml.
+
+These settings are local to this machine. To configure the remote cache itself
+(such as its signing public key), use "aeroflare configure".`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return settingsRun(f, opts)
 		},
