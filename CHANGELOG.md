@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/ItzEmoji/aeroflare/compare/v1.10.0...v1.11.0) (2026-07-19)
+
+
+### Features
+
+* **ui:** add Dracula theme ([#40](https://github.com/ItzEmoji/aeroflare/issues/40)) ([c1bedc1](https://github.com/ItzEmoji/aeroflare/commit/c1bedc1f56d9261ea35fd7287be40e72351de075))
+
 ## [1.10.0](https://github.com/ItzEmoji/aeroflare/compare/v1.9.0...v1.10.0) (2026-07-19)
 
 
