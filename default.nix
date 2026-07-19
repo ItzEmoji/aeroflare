@@ -12,7 +12,7 @@ buildGoModule (finalAttrs: {
     owner = "itzemoji";
     repo = "aeroflare";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-4l0QVJAgKqS/tnMD6GncQdbefWPncmS4QDIz7QEiPrk=";
+    hash = "sha256-H4jgc08mklolpHQNlcQx5JzpCDBYpujgoKFR2Ct8xR8";
   };
 
   vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
