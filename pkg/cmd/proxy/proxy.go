@@ -5,6 +5,7 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -129,8 +130,10 @@ func proxyRun(f *cmdutil.Factory, opts *Options) error {
 	}
 	// Print a clean http:// URL so terminals render it as a clickable link
 	// straight to the proxy (no trailing punctuation, which some terminals
-	// would swallow into the link).
-	opts.IO.Info(fmt.Sprintf("Started proxy on http://%s:%d", proxyDisplayHost(listenAddr), actualPort))
+	// would swallow into the link). JoinHostPort brackets IPv6 hosts so the
+	// URL stays valid (e.g. http://[::1]:8080).
+	hostPort := net.JoinHostPort(proxyDisplayHost(listenAddr), strconv.Itoa(actualPort))
+	opts.IO.Info(fmt.Sprintf("Started proxy on http://%s", hostPort))
 
 	<-ctx.Done()
 
