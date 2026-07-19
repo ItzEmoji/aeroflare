@@ -193,8 +193,8 @@ func seedOverridesFromConfig(f *cmdutil.Factory, registry string) {
 	if f.Overrides.CfToken == "" {
 		f.Overrides.CfToken = viper.GetString("cloudflare-api-token")
 	}
-	if f.Overrides.CfUserID == "" {
-		f.Overrides.CfUserID = viper.GetString("cloudflare-account-id")
+	if f.Overrides.CfAccountID == "" {
+		f.Overrides.CfAccountID = viper.GetString("cloudflare-account-id")
 	}
 
 	gitToken := viper.GetString("git-token")

@@ -78,7 +78,7 @@ func TestCloudflareServiceShape(t *testing.T) {
 	if keys["token"].SecretKey != "cf-token" || !keys["token"].Secret {
 		t.Errorf("unexpected cloudflare token field: %+v", keys["token"])
 	}
-	if keys["account_id"].SecretKey != "cf-user-id" || keys["account_id"].Secret {
+	if keys["account_id"].SecretKey != "cf-account-id" || keys["account_id"].Secret {
 		t.Errorf("unexpected cloudflare account_id field: %+v", keys["account_id"])
 	}
 }
@@ -114,7 +114,7 @@ func TestServiceForSecretKey(t *testing.T) {
 		"github-token":                   "github",
 		"gitlab-token":                   "gitlab",
 		"cf-token":                       "cloudflare",
-		"cf-user-id":                     "cloudflare",
+		"cf-account-id":                  "cloudflare",
 		"oci-docker.io-username":         "oci:docker.io",
 		"oci-registry.example.com-token": "oci:registry.example.com",
 	}

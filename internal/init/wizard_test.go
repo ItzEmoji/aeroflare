@@ -26,7 +26,7 @@ func TestSeedOverridesFromConfig(t *testing.T) {
 			name:     "cloudflare credentials come from config",
 			config:   map[string]string{"cloudflare-api-token": "cf-tok", "cloudflare-account-id": "cf-acct"},
 			registry: "ghcr.io",
-			want:     cmdutil.Overrides{CfToken: "cf-tok", CfUserID: "cf-acct"},
+			want:     cmdutil.Overrides{CfToken: "cf-tok", CfAccountID: "cf-acct"},
 		},
 		{
 			name:     "git-token seeds the GitHub override for ghcr.io",

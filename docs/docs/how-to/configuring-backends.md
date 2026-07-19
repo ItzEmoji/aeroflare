@@ -43,7 +43,7 @@ nix run github:ItzEmoji/aeroflare -- auth login
 This wizard securely stores tokens (GitHub, GitLab, or Cloudflare API tokens) in your local credential store.
 
 You can also manage credentials manually:
-- **Set a token**: `nix run github:ItzEmoji/aeroflare -- auth set [key] [value]` (e.g. `cf-token`, `github-token`, `gitlab-token`, `cf-user-id`)
+- **Set a token**: `nix run github:ItzEmoji/aeroflare -- auth set [key] [value]` (e.g. `cf-token`, `github-token`, `gitlab-token`, `cf-account-id`)
 - **List stored keys**: `nix run github:ItzEmoji/aeroflare -- auth list`
 - **Remove a credential**: `nix run github:ItzEmoji/aeroflare -- auth remove [key]`
 - **Import credentials from other CLIs**: `nix run github:ItzEmoji/aeroflare -- auth import` (automatically detects and imports active credentials from Docker, the GitHub CLI `gh`, or the GitLab CLI `glab`).

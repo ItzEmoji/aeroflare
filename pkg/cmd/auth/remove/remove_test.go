@@ -7,7 +7,7 @@ import (
 )
 
 func TestRemove_DeletesServiceFields(t *testing.T) {
-	f, _, _ := cmdutiltest.NewTestFactory(t, map[string]string{"cf-token": "a", "cf-user-id": "b"})
+	f, _, _ := cmdutiltest.NewTestFactory(t, map[string]string{"cf-token": "a", "cf-account-id": "b"})
 
 	cmd := NewCmdRemove(f)
 	cmd.SetArgs([]string{"cloudflare"})
@@ -19,7 +19,7 @@ func TestRemove_DeletesServiceFields(t *testing.T) {
 	if _, err := mgr.Get("cf-token"); err == nil {
 		t.Errorf("cf-token should have been removed")
 	}
-	if _, err := mgr.Get("cf-user-id"); err == nil {
-		t.Errorf("cf-user-id should have been removed")
+	if _, err := mgr.Get("cf-account-id"); err == nil {
+		t.Errorf("cf-account-id should have been removed")
 	}
 }

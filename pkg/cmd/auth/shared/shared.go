@@ -124,13 +124,13 @@ func RequireCloudflareToken(f *cmdutil.Factory) (string, string, error) {
 		apiToken = ResolveField(f, cf, "token")
 	}
 
-	userID := f.Overrides.CfUserID
-	if userID == "" {
-		userID = ResolveField(f, cf, "account_id")
+	accountID := f.Overrides.CfAccountID
+	if accountID == "" {
+		accountID = ResolveField(f, cf, "account_id")
 	}
 
-	if apiToken != "" && userID != "" {
-		return apiToken, userID, nil
+	if apiToken != "" && accountID != "" {
+		return apiToken, accountID, nil
 	}
 
 	if f.IOStreams.IsStdinTTY() {
