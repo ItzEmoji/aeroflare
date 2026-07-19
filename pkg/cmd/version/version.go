@@ -5,7 +5,7 @@ package version
 import (
 	"fmt"
 
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 

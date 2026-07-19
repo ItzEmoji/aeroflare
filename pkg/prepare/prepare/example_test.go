@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
-	"github.com/itzemoji/aeroflare/pkg/prepare/prepare"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/compress"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/prepare"
 )
 
 // Turning a store path into the two artifacts a binary cache serves: a

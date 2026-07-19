@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/pkg/oci"
-	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
+	"github.com/itzemoji/aeroflare/v2/pkg/oci"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/narinfo"
 
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"golang.org/x/sync/errgroup"

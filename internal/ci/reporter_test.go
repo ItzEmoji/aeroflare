@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/pkg/push"
+	"github.com/itzemoji/aeroflare/v2/pkg/push"
 )
 
 var _ push.Reporter = (*PlainReporter)(nil)

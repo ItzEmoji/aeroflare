@@ -13,9 +13,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/itzemoji/aeroflare/internal/auth"
-	"github.com/itzemoji/aeroflare/internal/secrets"
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/v2/internal/auth"
+	"github.com/itzemoji/aeroflare/v2/internal/secrets"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
 )
 
 // ServiceFromArgs maps positional CLI args to a catalog service. The first arg

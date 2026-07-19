@@ -17,7 +17,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 
-	"github.com/itzemoji/aeroflare/pkg/oci"
+	"github.com/itzemoji/aeroflare/v2/pkg/oci"
 )
 
 // ProxyServer bridges the Nix binary cache protocol to an OCI registry and

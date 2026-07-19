@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/itzemoji/aeroflare/internal/ui"
-	internalpush "github.com/itzemoji/aeroflare/pkg/push"
+	"github.com/itzemoji/aeroflare/v2/internal/ui"
+	internalpush "github.com/itzemoji/aeroflare/v2/pkg/push"
 
 	"github.com/charmbracelet/lipgloss"
 )

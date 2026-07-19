@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/internal/aerocmd"
-	"github.com/itzemoji/aeroflare/pkg/cmd/root"
+	"github.com/itzemoji/aeroflare/v2/internal/aerocmd"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmd/root"
 	"github.com/spf13/cobra/doc"
 )
 

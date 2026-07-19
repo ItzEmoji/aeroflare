@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/v2/pkg/iostreams"
 )
 
 func TestVersionRun(t *testing.T) {

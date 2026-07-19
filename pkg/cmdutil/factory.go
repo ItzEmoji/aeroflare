@@ -4,7 +4,7 @@
 package cmdutil
 
 import (
-	"github.com/itzemoji/aeroflare/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/v2/pkg/iostreams"
 	"github.com/spf13/viper"
 )
 

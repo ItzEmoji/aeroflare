@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 
-	"github.com/itzemoji/aeroflare/pkg/oci"
-	"github.com/itzemoji/aeroflare/pkg/push"
+	"github.com/itzemoji/aeroflare/v2/pkg/oci"
+	"github.com/itzemoji/aeroflare/v2/pkg/push"
 )
 
 // silentReporter discards every progress event. Because push never writes to

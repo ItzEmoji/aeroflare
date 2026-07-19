@@ -6,10 +6,10 @@ package push
 import (
 	"os"
 
-	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/pkg/iostreams"
-	internalpush "github.com/itzemoji/aeroflare/pkg/push"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmd/auth/shared"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/v2/pkg/iostreams"
+	internalpush "github.com/itzemoji/aeroflare/v2/pkg/push"
 
 	"github.com/spf13/cobra"
 )

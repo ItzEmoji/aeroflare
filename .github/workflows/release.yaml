@@ -147,4 +147,4 @@ jobs:
         env:
           TAG: ${{ needs.release.outputs.tag_name }}
           GOPROXY: https://proxy.golang.org
-        run: go list -m "github.com/itzemoji/aeroflare@${TAG}"
+        run: go list -m "github.com/itzemoji/aeroflare/v2@${TAG}"

@@ -3,7 +3,7 @@ package push
 import (
 	"testing"
 
-	"github.com/itzemoji/aeroflare/pkg/prepare/prepare"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/prepare"
 )
 
 func TestFlattenTasks_DedupsClosure(t *testing.T) {

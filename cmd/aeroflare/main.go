@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/itzemoji/aeroflare/internal/aerocmd"
+	"github.com/itzemoji/aeroflare/v2/internal/aerocmd"
 )
 
 func main() {

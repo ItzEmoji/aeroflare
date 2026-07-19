@@ -10,12 +10,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/itzemoji/aeroflare/pkg/prepare/cache"
-	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
-	narhash "github.com/itzemoji/aeroflare/pkg/prepare/hash"
-	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
-	"github.com/itzemoji/aeroflare/pkg/prepare/signing"
-	"github.com/itzemoji/aeroflare/pkg/prepare/store"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/cache"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/compress"
+	narhash "github.com/itzemoji/aeroflare/v2/pkg/prepare/hash"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/narinfo"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/signing"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/store"
 )
 
 // Config holds configuration for the prepare operation.

@@ -12,14 +12,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/itzemoji/aeroflare/internal/backend"
-	"github.com/itzemoji/aeroflare/pkg/oci"
-	"github.com/itzemoji/aeroflare/pkg/prepare/cache"
-	"github.com/itzemoji/aeroflare/pkg/prepare/compress"
-	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
-	"github.com/itzemoji/aeroflare/pkg/prepare/prepare"
-	"github.com/itzemoji/aeroflare/pkg/prepare/signing"
-	"github.com/itzemoji/aeroflare/pkg/proxy"
+	"github.com/itzemoji/aeroflare/v2/internal/backend"
+	"github.com/itzemoji/aeroflare/v2/pkg/oci"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/cache"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/compress"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/narinfo"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/prepare"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/signing"
+	"github.com/itzemoji/aeroflare/v2/pkg/proxy"
 
 	"strconv"
 

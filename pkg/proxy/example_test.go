@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/itzemoji/aeroflare/pkg/oci"
-	"github.com/itzemoji/aeroflare/pkg/proxy"
+	"github.com/itzemoji/aeroflare/v2/pkg/oci"
+	"github.com/itzemoji/aeroflare/v2/pkg/proxy"
 )
 
 // Running the substituter in-process. StartProxy returns as soon as the server

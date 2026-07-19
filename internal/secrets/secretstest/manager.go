@@ -1,7 +1,7 @@
 // Package secretstest provides an in-memory secrets.Manager for tests.
 package secretstest
 
-import "github.com/itzemoji/aeroflare/internal/secrets"
+import "github.com/itzemoji/aeroflare/v2/internal/secrets"
 
 // MockManager is an in-memory secrets.Manager. Set Err to make every write fail.
 type MockManager struct {

@@ -11,8 +11,8 @@ import (
 	"os"
 	"sync/atomic"
 
-	narhash "github.com/itzemoji/aeroflare/pkg/prepare/hash"
-	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
+	narhash "github.com/itzemoji/aeroflare/v2/pkg/prepare/hash"
+	"github.com/itzemoji/aeroflare/v2/pkg/prepare/narinfo"
 	"strconv"
 	"strings"
 

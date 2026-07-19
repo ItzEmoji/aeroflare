@@ -6,9 +6,9 @@ package settings
 import (
 	"fmt"
 
-	"github.com/itzemoji/aeroflare/internal/ui"
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/v2/internal/ui"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/v2/pkg/iostreams"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"

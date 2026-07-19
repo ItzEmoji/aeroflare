@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/pkg/push"
+	"github.com/itzemoji/aeroflare/v2/pkg/push"
 )
 
 // recordingReporter captures events instead of printing them. A library caller

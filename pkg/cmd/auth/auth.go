@@ -2,13 +2,13 @@
 package auth
 
 import (
-	"github.com/itzemoji/aeroflare/pkg/cmd/auth/get"
-	"github.com/itzemoji/aeroflare/pkg/cmd/auth/importcmd"
-	"github.com/itzemoji/aeroflare/pkg/cmd/auth/login"
-	"github.com/itzemoji/aeroflare/pkg/cmd/auth/remove"
-	"github.com/itzemoji/aeroflare/pkg/cmd/auth/set"
-	"github.com/itzemoji/aeroflare/pkg/cmd/auth/status"
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmd/auth/get"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmd/auth/importcmd"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmd/auth/login"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmd/auth/remove"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmd/auth/set"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmd/auth/status"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
 
 	"github.com/spf13/cobra"
 )

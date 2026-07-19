@@ -16,8 +16,8 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 
-	"github.com/itzemoji/aeroflare/internal/ui"
-	"github.com/itzemoji/aeroflare/pkg/proxy"
+	"github.com/itzemoji/aeroflare/v2/internal/ui"
+	"github.com/itzemoji/aeroflare/v2/pkg/proxy"
 )
 
 // proxyHost is the loopback address the ephemeral run proxy binds to and is

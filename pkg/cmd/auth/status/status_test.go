@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil/cmdutiltest"
 )
 
 // Mirrors statusEntryJSON in status.go. Kept separate on purpose: if the

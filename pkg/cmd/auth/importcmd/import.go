@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/itzemoji/aeroflare/internal/auth"
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/v2/internal/auth"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
 
 	"github.com/spf13/cobra"
 )

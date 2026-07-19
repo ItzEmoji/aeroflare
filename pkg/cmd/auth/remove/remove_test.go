@@ -3,7 +3,7 @@ package remove
 import (
 	"testing"
 
-	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil/cmdutiltest"
 )
 
 func TestRemove_DeletesServiceFields(t *testing.T) {

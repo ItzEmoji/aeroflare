@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/pkg/iostreams"
-	"github.com/itzemoji/aeroflare/pkg/oci"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/v2/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/v2/pkg/oci"
 
 	"github.com/spf13/cobra"
 )

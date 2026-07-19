@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/internal/auth"
-	"github.com/itzemoji/aeroflare/internal/secrets"
+	"github.com/itzemoji/aeroflare/v2/internal/auth"
+	"github.com/itzemoji/aeroflare/v2/internal/secrets"
 )
 
 // A wrapped "not found" from the secrets manager must be treated as an absent

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/internal/secrets/secretstest"
-	"github.com/itzemoji/aeroflare/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
+	"github.com/itzemoji/aeroflare/v2/internal/secrets/secretstest"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil/cmdutiltest"
 )
 
 func TestLoginSavesProvidedTokens(t *testing.T) {
