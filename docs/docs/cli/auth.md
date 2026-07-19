@@ -16,14 +16,14 @@ Initiates the interactive authentication wizard. Behind the scenes, it utilizes 
 *   `github-token`: Stored for GitHub operations and `ghcr.io` OCI registry interactions.
 *   `gitlab-token`: Stored for GitLab operations.
 *   `cf-token`: Cloudflare API Token.
-*   `cf-user-id`: Cloudflare Account ID.
+*   `cf-account-id`: Cloudflare Account ID.
 *   `oci-{registry}-username` / `oci-{registry}-token`: Custom OCI registry credentials.
 
 **GitHub Device Flow Details:**
 If the "Device Auth Flow" is selected for GitHub, the CLI invokes `auth.RequestDeviceCode` and `auth.PollAccessToken` using the hardcoded GitHub Client ID `Ov23liIJyLpd2Cse5gne`.
 
 **Non-Interactive Execution:**
-If specific CLI flags or environment variables are provided (mapped internally to `globalGithubToken`, `globalGitlabToken`, `globalCfToken`, `globalCfUserID`), the command bypasses the interactive wizard, sets the provided keys directly in the `SecretsManager`, and exits.
+If specific CLI flags or environment variables are provided (mapped internally to `globalGithubToken`, `globalGitlabToken`, `globalCfToken`, `globalCfAccountID`), the command bypasses the interactive wizard, sets the provided keys directly in the `SecretsManager`, and exits.
 
 ## `aeroflare auth list`
 
@@ -53,13 +53,13 @@ Low-level utilities for direct manipulation of the `SecretsManager`.
 
 ## Credential Resolution & Environment Injection
 
-Commands across the Aeroflare CLI that require authentication rely on the `cmd/auth_resolve.go` mechanisms. These functions handle fallback chains and environment injection for subprocesses.
+Commands across the Aeroflare CLI that require authentication rely on the `pkg/cmd/auth/shared/shared.go` mechanisms. These functions handle fallback chains and environment injection for subprocesses.
 
 **Resolution Chain (`RequireGithubToken`, `RequireCloudflareToken`, etc.):**
 1.  **Global Flags**: Checks variables set by command-line flags (e.g., `globalGithubToken`).
 2.  **Keychain**: Uses `auth.NewResolver().WithSecretsManager()` to retrieve the secret from the internal store.
 3.  **Environment Variables**: As a fallback, resolvers inspect standard environment variables (e.g., `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `GITHUB_TOKEN`, `GITLAB_TOKEN`).
-4.  **Interactive Prompt**: If all the above fail and `os.Stdin` is a TTY (`isTerminal() == true`), the respective interactive wizard (from `auth_wizard.go`) is launched dynamically.
+4.  **Interactive Prompt**: If all the above fail and `os.Stdin` is a TTY (`isTerminal() == true`), the respective interactive wizard (from `pkg/cmd/auth/shared/wizard.go`) is launched dynamically.
 5.  **Fatal Exit**: If not in a TTY, the CLI prints an error and exits with code 1.
 
 **Environment Injection (`getTokenForRegistry`, `getOptionalTokenForRegistry`):**

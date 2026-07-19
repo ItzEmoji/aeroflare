@@ -10,7 +10,7 @@ The Aeroflare CLI provides three core cache-related commands that interface with
 
 ## `push`
 
-The `push` command (`cmd/push.go`) handles the serialization and uploading of Nix store paths into the configured OCI registry.
+The `push` command (`pkg/cmd/push/push.go`) handles the serialization and uploading of Nix store paths into the configured OCI registry.
 
 ### Mechanics & State Changes
 
@@ -35,7 +35,7 @@ The `push` command (`cmd/push.go`) handles the serialization and uploading of Ni
 
 ## `run`
 
-The `run` command (`cmd/run.go`) wraps arbitrary shell commands to transparently push Nix store paths generated or referenced during the execution.
+The `run` command (`pkg/cmd/run/run.go`) wraps arbitrary shell commands to transparently push Nix store paths generated or referenced during the execution.
 
 ### Mechanics & State Changes
 
@@ -51,7 +51,7 @@ The `run` command re-uses the flags from `push` to define cache upload behavior:
 
 ## `proxy`
 
-The `proxy` command (`cmd/proxy.go`) initializes a local HTTP proxy server designed to intercept and serve Nix binary cache requests, querying the OCI registry or falling back to upstream caches.
+The `proxy` command (`pkg/cmd/proxy/proxy.go`) initializes a local HTTP proxy server designed to intercept and serve Nix binary cache requests, querying the OCI registry or falling back to upstream caches.
 
 ### Mechanics & State Changes
 
