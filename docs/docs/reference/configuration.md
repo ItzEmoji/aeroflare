@@ -20,7 +20,7 @@ aeroflare settings
 
 | Key | Description | Default |
 |-----|-------------|---------|
-| `theme` | UI appearance theme (`catppuccin`, `gruvbox-dark`, `gruvbox-light`, `default`). | `default` |
+| `theme` | UI appearance theme (`dracula`, `catppuccin`, `gruvbox-dark`, `gruvbox-light`, `default`). | `default` |
 | `git-provider` | The primary Git provider backend (`github`, `gitlab`, `none`). | `none` |
 | `git-token` | The authentication token for the selected Git provider. | |
 | `cloudflare-api-token` | API token for interacting with Cloudflare Workers. | |

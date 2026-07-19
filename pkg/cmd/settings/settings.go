@@ -94,6 +94,7 @@ func settingsRun(f *cmdutil.Factory, opts *Options) error {
 			huh.NewSelect[string]().
 				Title("Appearance Theme").
 				Options(
+					huh.NewOption("Dracula", "dracula"),
 					huh.NewOption("Catppuccin", "catppuccin"),
 					huh.NewOption("Gruvbox Dark", "gruvbox-dark"),
 					huh.NewOption("Gruvbox Light", "gruvbox-light"),

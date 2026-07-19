@@ -38,7 +38,7 @@ It manipulates the following specific OCI annotation key:
 The `settings` command provides an interactive UI, but under the hood, it directly manipulates the Viper configuration store and flushes the changes to disk (`viper.WriteConfig()`).
 
 Depending on the user's choices in the `huh` forms, it mutates the following internal Viper configuration keys:
-- `theme`: UI color scheme (e.g., `catppuccin`, `gruvbox-dark`).
+- `theme`: UI color scheme (e.g., `dracula`, `catppuccin`, `gruvbox-dark`).
 - `git-provider`: Set to `github`, `gitlab`, or `none`.
 - `git-token`: Stores the corresponding GitHub or GitLab token.
 - `cloudflare-api-token`: Stores the Cloudflare token used to deploy the Worker.

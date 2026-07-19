@@ -19,6 +19,9 @@ func AeroflareTheme() *huh.Theme {
 	var secondaryColor lipgloss.Color
 
 	switch themeName {
+	case "dracula":
+		primaryColor = lipgloss.Color("#bd93f9")   // Purple
+		secondaryColor = lipgloss.Color("#6272a4") // Comment
 	case "catppuccin":
 		primaryColor = lipgloss.Color("#cba6f7")   // Mauve
 		secondaryColor = lipgloss.Color("#585b70") // Surface2
