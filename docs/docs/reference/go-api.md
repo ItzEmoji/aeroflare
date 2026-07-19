@@ -9,10 +9,10 @@ Aeroflare is a Go module as well as a CLI. The engines that push to and serve
 from an OCI registry live under `pkg/` and can be imported.
 
 ```
-github.com/itzemoji/aeroflare/v2
+github.com/itzemoji/aeroflare
 ```
 
-📦 **[pkg.go.dev/github.com/itzemoji/aeroflare/v2](https://pkg.go.dev/github.com/itzemoji/aeroflare/v2)**
+📦 **[pkg.go.dev/github.com/itzemoji/aeroflare](https://pkg.go.dev/github.com/itzemoji/aeroflare)**
 
 ## Stability
 
@@ -31,10 +31,10 @@ shell out to the CLI instead.
 
 | Package | Purpose |
 |---|---|
-| [`pkg/oci`](https://pkg.go.dev/github.com/itzemoji/aeroflare/v2/pkg/oci) | Registry client. Pushes NARs as layers, maps narinfo onto manifest annotations, reads and writes the `cache-config` manifest, and builds credentials. |
-| [`pkg/push`](https://pkg.go.dev/github.com/itzemoji/aeroflare/v2/pkg/push) | The push pipeline: store paths → NAR + narinfo → registry, with upstream filtering, chunked uploads, and resumable receipts. |
-| [`pkg/proxy`](https://pkg.go.dev/github.com/itzemoji/aeroflare/v2/pkg/proxy) | An embeddable Nix substituter. Serves `/nix-cache-info`, `/<hash>.narinfo`, and `/nar/<…>` straight from a registry, holding no local state. |
-| [`pkg/prepare`](https://pkg.go.dev/github.com/itzemoji/aeroflare/v2/pkg/prepare) | NAR serialisation, hashing, compression, narinfo generation, and signing. |
+| [`pkg/oci`](https://pkg.go.dev/github.com/itzemoji/aeroflare/pkg/oci) | Registry client. Pushes NARs as layers, maps narinfo onto manifest annotations, reads and writes the `cache-config` manifest, and builds credentials. |
+| [`pkg/push`](https://pkg.go.dev/github.com/itzemoji/aeroflare/pkg/push) | The push pipeline: store paths → NAR + narinfo → registry, with upstream filtering, chunked uploads, and resumable receipts. |
+| [`pkg/proxy`](https://pkg.go.dev/github.com/itzemoji/aeroflare/pkg/proxy) | An embeddable Nix substituter. Serves `/nix-cache-info`, `/<hash>.narinfo`, and `/nar/<…>` straight from a registry, holding no local state. |
+| [`pkg/prepare`](https://pkg.go.dev/github.com/itzemoji/aeroflare/pkg/prepare) | NAR serialisation, hashing, compression, narinfo generation, and signing. |
 
 Three design rules hold across all four, and are worth knowing before you import
 any of them:
@@ -58,8 +58,8 @@ Pushing a store path, with output suppressed:
 import (
     "github.com/google/go-containerregistry/pkg/authn"
 
-    "github.com/itzemoji/aeroflare/v2/pkg/oci"
-    "github.com/itzemoji/aeroflare/v2/pkg/push"
+    "github.com/itzemoji/aeroflare/pkg/oci"
+    "github.com/itzemoji/aeroflare/pkg/push"
 )
 
 plan, err := push.Preflight(&push.PushConfig{

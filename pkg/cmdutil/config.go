@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 
-	"github.com/itzemoji/aeroflare/v2/internal/auth"
-	"github.com/itzemoji/aeroflare/v2/pkg/oci"
+	"github.com/itzemoji/aeroflare/internal/auth"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 
 	"github.com/spf13/viper"
 )

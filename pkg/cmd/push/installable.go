@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/v2/internal/ci"
+	"github.com/itzemoji/aeroflare/internal/ci"
 )
 
 // nixStoreDir is the default Nix store location. Installables and result

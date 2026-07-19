@@ -3,10 +3,10 @@ package aerocmd
 import (
 	"sync"
 
-	"github.com/itzemoji/aeroflare/v2/internal/secrets"
-	"github.com/itzemoji/aeroflare/v2/pkg/cmd/root"
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/v2/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/internal/secrets"
+	"github.com/itzemoji/aeroflare/pkg/cmd/root"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/pkg/iostreams"
 	"github.com/spf13/viper"
 )
 

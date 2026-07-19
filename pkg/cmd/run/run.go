@@ -4,11 +4,11 @@ package run
 import (
 	"fmt"
 
-	nixrun "github.com/itzemoji/aeroflare/v2/internal/run"
-	"github.com/itzemoji/aeroflare/v2/pkg/cmd/auth/shared"
-	"github.com/itzemoji/aeroflare/v2/pkg/cmd/push"
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
-	internalpush "github.com/itzemoji/aeroflare/v2/pkg/push"
+	nixrun "github.com/itzemoji/aeroflare/internal/run"
+	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
+	"github.com/itzemoji/aeroflare/pkg/cmd/push"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	internalpush "github.com/itzemoji/aeroflare/pkg/push"
 
 	"github.com/spf13/cobra"
 )

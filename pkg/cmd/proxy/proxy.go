@@ -12,10 +12,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/cmd/auth/shared"
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/v2/pkg/iostreams"
-	proxysrv "github.com/itzemoji/aeroflare/v2/pkg/proxy"
+	"github.com/itzemoji/aeroflare/pkg/cmd/auth/shared"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/pkg/iostreams"
+	proxysrv "github.com/itzemoji/aeroflare/pkg/proxy"
 
 	"github.com/spf13/cobra"
 )

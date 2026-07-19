@@ -3,7 +3,7 @@ package set
 import (
 	"testing"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil/cmdutiltest"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 )
 
 func TestSet_SavesSingleFieldService(t *testing.T) {

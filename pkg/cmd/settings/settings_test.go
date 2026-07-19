@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/pkg/iostreams"
 )
 
 // The wording differs for a first-time save and an update, and it is driven by

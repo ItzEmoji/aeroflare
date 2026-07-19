@@ -16,9 +16,9 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/static"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/oci"
-	"github.com/itzemoji/aeroflare/v2/pkg/prepare/narinfo"
-	"github.com/itzemoji/aeroflare/v2/pkg/proxy"
+	"github.com/itzemoji/aeroflare/pkg/oci"
+	"github.com/itzemoji/aeroflare/pkg/prepare/narinfo"
+	"github.com/itzemoji/aeroflare/pkg/proxy"
 )
 
 // authGatedRegistry is go-containerregistry's real registry implementation

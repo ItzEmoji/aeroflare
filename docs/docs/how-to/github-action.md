@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: DeterminateSystems/nix-installer-action@v20
-      - uses: ItzEmoji/aeroflare@v2
+      - uses: ItzEmoji/aeroflare@v1
         with:
           cache: ghcr.io;${{ github.repository_owner }}/nix-cache
           builds: |
@@ -94,7 +94,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: DeterminateSystems/nix-installer-action@v20
-      - uses: ItzEmoji/aeroflare@v2
+      - uses: ItzEmoji/aeroflare@v1
         with:
           config: .aeroflare-ci.yaml
         env:

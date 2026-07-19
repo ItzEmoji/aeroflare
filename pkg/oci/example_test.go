@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 )
 
 // Resolving a Nix store path's metadata takes a single manifest fetch: the

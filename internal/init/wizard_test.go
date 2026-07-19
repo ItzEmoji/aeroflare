@@ -3,8 +3,8 @@ package setup
 import (
 	"testing"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil/cmdutiltest"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 	"github.com/spf13/viper"
 )
 

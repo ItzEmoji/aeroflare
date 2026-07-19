@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/prepare/cache"
-	"github.com/itzemoji/aeroflare/v2/pkg/proxy"
-	"github.com/itzemoji/aeroflare/v2/pkg/push"
+	"github.com/itzemoji/aeroflare/pkg/prepare/cache"
+	"github.com/itzemoji/aeroflare/pkg/proxy"
+	"github.com/itzemoji/aeroflare/pkg/push"
 )
 
 // proxyHost is the loopback address the CI proxy binds to and advertises as the

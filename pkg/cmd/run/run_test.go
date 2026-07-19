@@ -3,8 +3,8 @@ package run
 import (
 	"testing"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
-	"github.com/itzemoji/aeroflare/v2/pkg/iostreams"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/pkg/iostreams"
 )
 
 // The invariant that used to be enforced by run.go and push.go binding to the

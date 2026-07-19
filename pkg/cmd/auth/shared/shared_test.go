@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil/cmdutiltest"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 )
 
 func TestRequireGithubTokenPrefersFlagOverride(t *testing.T) {

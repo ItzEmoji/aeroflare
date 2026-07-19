@@ -3,8 +3,8 @@ package auth_test
 import (
 	"errors"
 	"fmt"
-	"github.com/itzemoji/aeroflare/v2/internal/auth"
-	"github.com/itzemoji/aeroflare/v2/internal/secrets"
+	"github.com/itzemoji/aeroflare/internal/auth"
+	"github.com/itzemoji/aeroflare/internal/secrets"
 	"testing"
 )
 

@@ -3,7 +3,7 @@ package prepare
 import (
 	"testing"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil/cmdutiltest"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil/cmdutiltest"
 )
 
 // prepare needs something to prepare: with neither --store-path nor --input it

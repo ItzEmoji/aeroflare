@@ -3,9 +3,9 @@ package shared
 import (
 	"fmt"
 
-	"github.com/itzemoji/aeroflare/v2/internal/auth"
-	"github.com/itzemoji/aeroflare/v2/internal/ui"
-	"github.com/itzemoji/aeroflare/v2/pkg/cmdutil"
+	"github.com/itzemoji/aeroflare/internal/auth"
+	"github.com/itzemoji/aeroflare/internal/ui"
+	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 
 	"github.com/charmbracelet/huh"
 )

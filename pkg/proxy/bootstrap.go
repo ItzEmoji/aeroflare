@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 )
 
 // BootstrapConfig fetches the dynamic RemoteConfig (worker URL, public key,

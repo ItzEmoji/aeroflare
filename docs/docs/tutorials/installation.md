@@ -67,12 +67,12 @@ from source.
 
 ## Option 3: Go Toolchain
 
-Aeroflare is a Go module — [`github.com/itzemoji/aeroflare/v2`](https://pkg.go.dev/github.com/itzemoji/aeroflare/v2) —
+Aeroflare is a Go module — [`github.com/itzemoji/aeroflare`](https://pkg.go.dev/github.com/itzemoji/aeroflare) —
 so the Go toolchain can install it directly, with no clone:
 
 ```bash
-go install github.com/itzemoji/aeroflare/v2/cmd/aeroflare@latest
-go install github.com/itzemoji/aeroflare/v2/cmd/aeroflare-ci@latest
+go install github.com/itzemoji/aeroflare/cmd/aeroflare@latest
+go install github.com/itzemoji/aeroflare/cmd/aeroflare-ci@latest
 ```
 
 This puts the binaries in `$(go env GOPATH)/bin`. Version metadata is recovered

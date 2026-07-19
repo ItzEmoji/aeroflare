@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/itzemoji/aeroflare/v2/pkg/oci"
+	"github.com/itzemoji/aeroflare/pkg/oci"
 )
 
 func TestNativeBackend_PushReceipts(t *testing.T) {

@@ -85,7 +85,7 @@ import (
 	"time"
 )
 
-const modulePath = "github.com/itzemoji/aeroflare/v2"
+const modulePath = "github.com/itzemoji/aeroflare"
 
 // archTarget cross-compiles for a GOARCH, labelled the way release.yaml's
 // asset filenames expect (e.g. "x86_64" for amd64).

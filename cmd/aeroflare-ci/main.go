@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/itzemoji/aeroflare/v2/internal/ci"
+	"github.com/itzemoji/aeroflare/internal/ci"
 )
 
 // stringList is a repeatable string flag.
