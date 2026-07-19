@@ -15,7 +15,7 @@ Aeroflare bridges the Nix ecosystem and standard container registries (such as G
 - **Stateless Proxying**: Retains zero local binary state. Streams `.nar` blobs directly from OCI.
 - **O(1) Manifest Lookups**: Tags artifacts directly with the 32-character Nix store path hash, enabling instantaneous lookups.
 - **Interactive Provisioning**: A built-in setup wizard for GitHub, GitLab, and Cloudflare Worker deployment.
-- **Flexible Publishing**: Push store paths straight to the cache with `aeroflare push`, or wrap a build end-to-end with the `aeroflare run -- nix build` execution wrapper.
+- **Flexible Publishing**: Push a flake output, a `./result`, or a store path straight to the cache with `aeroflare push`, or wrap a build end-to-end with the `aeroflare run` execution wrapper.
 - **Native OCI Storage**: Each package is one OCI image tagged with its store hash — NAR blobs as layers, `narinfo` as manifest annotations. No separate metadata store.
 
 ---
@@ -29,12 +29,12 @@ nix run github:ItzEmoji/aeroflare -- init
 ```
 
 ### 2. Build & Push
-For most workflows, build your package and push the resulting store path straight to the cache:
+Hand `push` a Nix installable — a `./result` symlink, a flake reference, or a store path — and Aeroflare builds it if needed, then uploads it straight to the cache:
 ```bash
-nix build .#default --print-out-paths
-nix run github:ItzEmoji/aeroflare -- push --store-path /nix/store/xxxx-default
+nix run github:ItzEmoji/aeroflare -- push ./result
+nix run github:ItzEmoji/aeroflare -- push nixpkgs#hello
 ```
-`push` uploads directly to the registry, so no proxy needs to be running. Push many paths at once with `--input`.
+You can also target an exact store path with `--store-path`, or push many at once with `--input`. `push` uploads directly to the registry, so no proxy needs to be running.
 
 <details>
 <summary>Alternative: build and push in one step with <code>run</code></summary>

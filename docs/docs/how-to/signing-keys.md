@@ -33,7 +33,7 @@ machines will install without question.
 Pass the private key to whichever command uploads:
 
 ```bash
-aeroflare push --store-path /nix/store/... --signing-key /path/to/cache-priv-key.pem
+aeroflare push ./result --signing-key /path/to/cache-priv-key.pem
 aeroflare run --signing-key /path/to/cache-priv-key.pem -- nix build .#default --print-out-paths
 ```
 

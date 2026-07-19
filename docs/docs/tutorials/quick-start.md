@@ -44,17 +44,17 @@ This starts the local proxy server, ready to route requests and handle caching.
 
 ## 3. Push to the Cache
 
-With your infrastructure initialized, it's time to populate the cache. For most workflows the clearest way is the `push` command: build your package, then hand the resulting store path to Aeroflare, which prepares, compresses, and uploads it directly to your registry.
+With your infrastructure initialized, it's time to populate the cache. For most workflows the clearest way is the `push` command: hand it a Nix installable — a `./result` symlink, a flake reference, or a store path — and Aeroflare builds it if needed, then prepares, compresses, and uploads it directly to your registry.
 
 ```bash
-# Build your package and print its output path
-nix build .#default --print-out-paths
+# Push a build result
+nix run github:ItzEmoji/aeroflare -- push ./result
 
-# Push that store path to your cache
-nix run github:ItzEmoji/aeroflare -- push --store-path /nix/store/xxxx-default
+# ...or a flake reference (built first if it isn't already)
+nix run github:ItzEmoji/aeroflare -- push nixpkgs#hello
 ```
 
-`push` uploads straight to the registry, so the proxy does not need to be running for this step. To push many paths at once, hand it a file of store paths with `--input` — see [Cache Population](../how-to/cache-population.md) for the details.
+You can also point it at an explicit store path with `--store-path`, or push many at once from a file with `--input` — see [Cache Population](../how-to/cache-population.md) for the details. `push` uploads straight to the registry, so the proxy does not need to be running for this step.
 
 ### Alternative: build and push in one step with `run`
 
