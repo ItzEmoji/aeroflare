@@ -81,7 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: DeterminateSystems/nix-installer-action@v20
-      - uses: ItzEmoji/aeroflare@v1
+      - uses: ItzEmoji/aeroflare@v2
         with:
           cache: ghcr.io;${{ github.repository_owner }}/nix-cache
           builds: |
@@ -140,8 +140,8 @@ Aeroflare's engines are importable, not just runnable. The packages under `pkg/`
 | [`pkg/proxy`](pkg/proxy) | The Nix substituter HTTP server |
 
 ```console
-$ go doc github.com/itzemoji/aeroflare/pkg/push
-$ go doc github.com/itzemoji/aeroflare/pkg/oci ExchangeToken
+$ go doc github.com/itzemoji/aeroflare/v2/pkg/push
+$ go doc github.com/itzemoji/aeroflare/v2/pkg/oci ExchangeToken
 ```
 
 These packages take their configuration as explicit parameters. They do not read Viper, the environment, or the OS keyring, and they never write to stdout — resolving credentials and rendering progress are the caller's job. `pkg/cmdutil` holds the CLI's own answers to those questions and is a worked example. Each package's `doc.go` carries a runnable example.

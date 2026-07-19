@@ -77,7 +77,7 @@ CLI category in `docs/sidebars.ts` — the sidebar list is not generated.
 `internal/build` holds `Version` and `Date`, injected at link time:
 
 ```
--ldflags "-X github.com/itzemoji/aeroflare/internal/build.Version=v1.8.0 ..."
+-ldflags "-X github.com/itzemoji/aeroflare/v2/internal/build.Version=v2.0.0 ..."
 ```
 
 computed by `scripts/build.go` and applied by the Makefile, the release workflow,
