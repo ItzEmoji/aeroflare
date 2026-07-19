@@ -78,7 +78,7 @@ func deployWorkerViaAPI(cfAccountID, cfApiToken, workerName, scriptPath, compatD
 	req.Header.Set("Authorization", "Bearer "+cfApiToken)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("API request failed: %w", err)
 	}
@@ -126,7 +126,7 @@ func enableWorkerRoute(cfAccountID, cfApiToken, workerName string) error {
 	req.Header.Set("Authorization", "Bearer "+cfApiToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func getWorkersSubdomain(cfAccountID, cfApiToken string) string {
 	}
 	req.Header.Set("Authorization", "Bearer "+cfApiToken)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return ""
 	}

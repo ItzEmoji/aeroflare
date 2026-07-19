@@ -11,10 +11,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/itzemoji/aeroflare/pkg/cmdutil"
 	"github.com/itzemoji/aeroflare/pkg/oci"
 )
+
+// httpClient is the shared client for init's outbound HTTP: the GitHub release
+// lookup, the release-tarball download, and the Cloudflare deploy API. Its
+// Timeout bounds the whole exchange (connect, redirects, and body read) so a
+// stalled connection fails the wizard instead of hanging it forever. 30s is
+// generous for the small JSON responses and the few-hundred-KB tarball.
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 // RunProvision executes the infrastructure provisioning pipeline.
 // Each step is idempotent where possible.
@@ -167,7 +175,7 @@ const maxWorkerScriptBytes = 16 << 20
 
 // latestReleaseTag returns the tag of the most recent published release.
 func latestReleaseTag() (string, error) {
-	resp, err := http.Get("https://api.github.com/repos/ItzEmoji/aeroflare/releases/latest")
+	resp, err := httpClient.Get("https://api.github.com/repos/ItzEmoji/aeroflare/releases/latest")
 	if err != nil {
 		return "", fmt.Errorf("fetch latest release: %w", err)
 	}
@@ -201,7 +209,7 @@ func fetchLatestWorkerScript() (string, error) {
 	printInfo(fmt.Sprintf("Using release %s", tag))
 
 	tarURL := fmt.Sprintf("https://github.com/ItzEmoji/aeroflare/archive/refs/tags/%s.tar.gz", tag)
-	resp, err := http.Get(tarURL)
+	resp, err := httpClient.Get(tarURL)
 	if err != nil {
 		return "", fmt.Errorf("download release %s: %w", tag, err)
 	}
