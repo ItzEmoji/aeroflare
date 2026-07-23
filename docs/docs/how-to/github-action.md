@@ -49,6 +49,25 @@ jobs:
             .#packages.x86_64-linux.foo
 ```
 
+### Build everything the flake exposes
+
+Replace the list with the single entry `all` to build and cache every
+`packages.<system>.*`, `devShells.<system>.*` and `nixosConfigurations.<host>`
+in the checked-out flake — useful for a package repository, where the list
+would otherwise need updating with every new package.
+
+```yaml
+      - uses: ItzEmoji/aeroflare@v1
+        with:
+          cache: ghcr.io;${{ github.repository_owner }}/nix-cache
+          builds: all
+```
+
+Only outputs for the runner's system are discovered, so a build matrix across
+runners caches each platform. Note that no `meta` filtering happens — a package
+marked `broken` or unfree is attempted and fails the job. See
+[`builds`](../reference/ci-configuration.md#builds) for the full semantics.
+
 `cache` accepts **exactly one** target. `cache-token` supplies its push
 token; for `ghcr.io` you can omit it, because the Action passes the
 workflow's `github.token` through as `GITHUB_TOKEN` and `ghcr.io` falls back

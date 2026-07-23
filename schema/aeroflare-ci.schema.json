@@ -10,8 +10,8 @@
     "builds": {
       "type": "array",
       "minItems": 1,
-      "description": "Nix flake installables to build.",
-      "items": { "type": "string", "minLength": 1, "examples": [".#default"] }
+      "description": "Nix flake installables to build. The entry 'all' expands to every packages.<system>.*, devShells.<system>.* and nixosConfigurations.<host> the flake in the working directory exposes for the running system, and may be mixed with explicit installables.",
+      "items": { "type": "string", "minLength": 1, "examples": [".#default", "all"] }
     },
     "caches": {
       "type": "array",

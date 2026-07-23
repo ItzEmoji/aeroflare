@@ -27,7 +27,7 @@ is reported rather than silently ignored.
 
 | Key | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `builds` | array of strings | **yes** | — | Nix flake installables to build. At least one. |
+| `builds` | array of strings | **yes** | — | Nix flake installables to build. At least one. The entry `all` discovers them. |
 | `caches` | array of strings | **yes** | — | Push targets, each `<registry>;<repository>`. At least one. |
 | `compression` | `zstd` \| `xz` \| `gzip` \| `none` | no | `zstd` | NAR compression algorithm. |
 | `signing-key` | string | no | unsigned | Path to a signing key, **or** the name of an environment variable holding the key material. |
@@ -59,6 +59,50 @@ upstream-cache:
 ```
 
 ## Key semantics
+
+### `builds`
+
+Each entry is a Nix flake installable, built with `nix build <installable>`.
+
+The single entry `all` is a **sentinel**: instead of naming one installable, it
+expands at run time into everything the flake in the working directory exposes
+for the runner's system.
+
+```yaml title=".aeroflare-ci.yaml"
+builds:
+  - all
+caches:
+  - ghcr.io;itzemoji/nix-cache
+```
+
+Three output classes are discovered:
+
+| Class | Built as |
+|---|---|
+| `packages.<system>.<name>` | `.#packages.<system>.<name>` |
+| `devShells.<system>.<name>` | `.#devShells.<system>.<name>` |
+| `nixosConfigurations.<host>` | `.#nixosConfigurations.<host>.config.system.build.toplevel` |
+
+A class the flake does not expose contributes nothing; it is not an error. NixOS
+configurations built for another platform are skipped, since the runner cannot
+build them. Discovery only ever looks at the current checkout — there is no
+syntax for discovering a remote flake.
+
+`all` may be mixed with explicit installables, and duplicates are dropped:
+
+```yaml
+builds:
+  - all
+  - github:some/other#tool
+```
+
+:::note
+Discovery reads the flake's outputs directly and applies no `meta` filtering.
+Unlike the NUR template's `ci.nix`, a package marked `meta.broken` or unfree is
+still attempted, and fails the run when it fails to build. Only the derivation's
+default output is built, not `dev`/`man`, and attribute sets marked
+`recurseForDerivations` are not descended into.
+:::
 
 ### `caches`
 

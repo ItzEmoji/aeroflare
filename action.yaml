@@ -9,6 +9,9 @@ inputs:
   builds:
     description: |
       Newline- or comma-separated Nix flake installables to build, e.g. `.#default`.
+      The entry `all` expands to every `packages.<system>.*`, `devShells.<system>.*`
+      and `nixosConfigurations.<host>` the checked-out flake exposes for the runner's
+      system, and can be mixed with explicit installables.
       Configless mode. Mutually exclusive with `config`.
     required: false
   cache:

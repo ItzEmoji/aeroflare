@@ -46,7 +46,7 @@ func envOr(key, def string) string {
 func main() {
 	var builds, caches, upstreams stringList
 	fs := flag.NewFlagSet("aeroflare-ci", flag.ContinueOnError)
-	fs.Var(&builds, "build", "flake installable to build (repeatable)")
+	fs.Var(&builds, "build", "flake installable to build, or 'all' to discover them (repeatable)")
 	fs.Var(&caches, "cache", "<registry>;<repository> push target (repeatable)")
 	configPath := fs.String("config", envOr("AEROFLARE_CI_CONFIG", ".aeroflare-ci.yaml"), "config file path")
 	compression := fs.String("compression", os.Getenv("AEROFLARE_CI_COMPRESSION"), "compression: zstd, xz, gzip, none")
