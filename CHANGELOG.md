@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.12.0](https://github.com/ItzEmoji/aeroflare/compare/v1.11.0...v1.12.0) (2026-07-24)
+
+
+### Features
+
+* **action:** make the aeroflare-ci release source configurable ([f5351ae](https://github.com/ItzEmoji/aeroflare/commit/f5351ae7896054e73329840f3b56fd845c88d33d))
+* build all ([4b2fc38](https://github.com/ItzEmoji/aeroflare/commit/4b2fc3844f50022a8fff670f510c5608379458a6))
+* **ci:** add `builds: all` to discover and build every flake output ([6d91724](https://github.com/ItzEmoji/aeroflare/commit/6d9172427291fb4cf547bf9dfad0dd963f10cdad))
+
 ## [1.11.0](https://github.com/ItzEmoji/aeroflare/compare/v1.10.0...v1.11.0) (2026-07-19)
 
 
