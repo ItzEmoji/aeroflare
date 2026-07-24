@@ -194,6 +194,23 @@ jobs:
           set -euo pipefail
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
+      # Rebase-merging re-commits, stamping whoever performs the merge as the
+      # committer while preserving the original author. That is this app's bot,
+      # so the commit has to be authored by it too; any other identity leaves
+      # the merged commit attributed to two different people.
+      - name: Resolve the app's bot identity
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+
+          user_id="$(gh api "/users/${SLUG}[bot]" --jq .id)"
+
+          echo "name=${SLUG}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=${user_id}+${SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
       # nix-update rewrites version, the fetchFromGitHub hash and vendorHash,
       # then commits. --version is passed explicitly: left to itself nix-update
       # picks the newest tag off releases.atom, which is not necessarily the
@@ -206,8 +223,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "${{ steps.bot.outputs.name }}"
+          git config user.email "${{ steps.bot.outputs.email }}"
 
           nix run nixpkgs#nix-update -- \
             --commit aeroflare \
@@ -223,6 +240,11 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
           path: nix-packages
+          # Defaults here are github-actions[bot] and github.actor. Neither is
+          # this job's identity, and they would reintroduce the split
+          # attribution should the action ever create a commit of its own.
+          committer: ${{ steps.bot.outputs.name }} <${{ steps.bot.outputs.email }}>
+          author: ${{ steps.bot.outputs.name }} <${{ steps.bot.outputs.email }}>
           base: main
           branch: aeroflare/v${{ steps.version.outputs.version }}
           delete-branch: true
