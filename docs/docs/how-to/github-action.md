@@ -68,6 +68,45 @@ runners caches each platform. Note that no `meta` filtering happens — a packag
 marked `broken` or unfree is attempted and fails the job. See
 [`builds`](../reference/ci-configuration.md#builds) for the full semantics.
 
+### Build only what a commit changed
+
+In a repository with more than a handful of packages, `all` rebuilds everything
+on every push, including one that bumped a single version. The sentinel
+`changed` narrows the run to the outputs whose derivation actually differs from
+the base commit's:
+
+```yaml
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ItzEmoji/aeroflare@v1
+        with:
+          cache: ghcr.io;${{ github.repository_owner }}/nix-cache
+          builds: changed
+```
+
+A commit like `aeroflare: 1.10.13 -> 1.10.15` then builds `aeroflare` and
+nothing else, and a documentation-only commit builds nothing and succeeds.
+
+**`fetch-depth: 0` is required.** `actions/checkout` clones one commit by
+default, which is not enough to reach the base; without the full history the run
+reports why and falls back to building everything.
+
+Two optional inputs tune it. `base` overrides the ref to diff against — it is
+otherwise inferred from the event, being the pushed-over commit for a push and
+the target branch's tip for a pull request. `on-missing-base` decides what
+happens when no base is reachable at all: `all` (default) builds everything,
+`error` fails the job, `none` builds nothing.
+
+```yaml
+      - uses: ItzEmoji/aeroflare@v1
+        with:
+          cache: ghcr.io;${{ github.repository_owner }}/nix-cache
+          builds: changed
+          base: origin/main
+          on-missing-base: error
+```
+
 `cache` accepts **exactly one** target. `cache-token` supplies its push
 token; for `ghcr.io` you can omit it, because the Action passes the
 workflow's `github.token` through as `GITHUB_TOKEN` and `ghcr.io` falls back

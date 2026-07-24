@@ -99,6 +99,21 @@ list to keep up to date as the repository grows:
           builds: all
 ```
 
+Or `builds: changed` to build only the outputs whose derivation differs from the
+base commit's — a commit like `aeroflare: 1.10.13 -> 1.10.15` then builds that
+one package instead of the whole repository. It needs the full history, so pair
+it with `fetch-depth: 0`:
+
+```yaml
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ItzEmoji/aeroflare@v1
+        with:
+          cache: ghcr.io;${{ github.repository_owner }}/nix-cache
+          builds: changed
+```
+
 `ghcr.io` authenticates with the workflow's `github.token` automatically; any
 other registry takes a `cache-token`. By default only store paths missing from
 `https://cache.nixos.org` are uploaded, so your cache holds your artifacts

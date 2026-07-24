@@ -77,6 +77,8 @@ type FileConfig struct {
 	SigningKey     string     `yaml:"signing-key"`
 	Workers        int        `yaml:"workers"`
 	UpstreamCaches StringList `yaml:"upstream-cache"`
+	Base           string     `yaml:"base"`
+	OnMissingBase  string     `yaml:"on-missing-base"`
 }
 
 // Inputs are inline overrides (flags/env). Empty/zero fields mean "not set".
@@ -87,6 +89,8 @@ type Inputs struct {
 	SigningKey     string
 	Workers        int
 	UpstreamCaches []string
+	Base           string
+	OnMissingBase  string
 }
 
 // RunSpec is the fully resolved configuration for one aeroflare-ci run.
@@ -97,6 +101,8 @@ type RunSpec struct {
 	SigningKey     string
 	Workers        int
 	UpstreamCaches []string // empty disables upstream filtering
+	Base           string   // ref `changed` diffs against; empty means infer
+	OnMissingBase  MissingBasePolicy
 }
 
 // LoadFile reads and parses a config file. A missing file is only an error when
@@ -121,9 +127,9 @@ func LoadFile(path string, required bool) (FileConfig, bool, error) {
 // with one of these followed by a colon is almost certainly a YAML indentation
 // mistake rather than a flake installable.
 var actionInputNames = []string{
-	"builds", "cache", "cache-token", "compression", "config",
-	"release-repo", "release-version", "signing-key", "skip-attestation",
-	"token", "upstream-cache", "workers",
+	"base", "builds", "cache", "cache-token", "compression", "config",
+	"on-missing-base", "release-repo", "release-version", "signing-key",
+	"skip-attestation", "token", "upstream-cache", "workers",
 }
 
 // validateBuilds rejects build entries that are really a mis-indented action
@@ -149,6 +155,26 @@ func validateBuilds(builds []string) error {
 	return nil
 }
 
+// validateChangedSettings rejects `base` and `on-missing-base` when no build
+// entry asks for `changed`.
+//
+// Nothing else reads either key, so accepting them there would leave a config
+// that looks like it narrows the build set and does not. Only an explicitly set
+// value trips this: both default to empty, which is how every run that does not
+// use `changed` is written.
+func validateChangedSettings(builds []string, base, onMissingBase string) error {
+	if hasSentinel(builds, changedSentinel) {
+		return nil
+	}
+	for key, value := range map[string]string{"base": base, "on-missing-base": onMissingBase} {
+		if strings.TrimSpace(value) != "" {
+			return fmt.Errorf("%s is set but no build entry is %q: "+
+				"only the %q sentinel reads it", key, changedSentinel, changedSentinel)
+		}
+	}
+	return nil
+}
+
 // Resolve merges a file config with inline inputs (inputs override; list fields
 // replace rather than append), applies defaults, validates, and parses caches.
 func Resolve(fc FileConfig, in Inputs) (RunSpec, error) {
@@ -157,9 +183,11 @@ func Resolve(fc FileConfig, in Inputs) (RunSpec, error) {
 		Compression: fc.Compression,
 		SigningKey:  fc.SigningKey,
 		Workers:     fc.Workers,
+		Base:        fc.Base,
 	}
 	rawCaches := fc.Caches
 	rawUpstreams := []string(fc.UpstreamCaches)
+	rawOnMissingBase := fc.OnMissingBase
 
 	if len(in.Builds) > 0 {
 		spec.Builds = in.Builds
@@ -179,6 +207,12 @@ func Resolve(fc FileConfig, in Inputs) (RunSpec, error) {
 	if len(in.UpstreamCaches) > 0 {
 		rawUpstreams = in.UpstreamCaches
 	}
+	if in.Base != "" {
+		spec.Base = in.Base
+	}
+	if in.OnMissingBase != "" {
+		rawOnMissingBase = in.OnMissingBase
+	}
 
 	if spec.Compression == "" {
 		spec.Compression = "zstd"
@@ -193,6 +227,14 @@ func Resolve(fc FileConfig, in Inputs) (RunSpec, error) {
 	if err := validateBuilds(spec.Builds); err != nil {
 		return RunSpec{}, err
 	}
+	if err := validateChangedSettings(spec.Builds, spec.Base, rawOnMissingBase); err != nil {
+		return RunSpec{}, err
+	}
+	policy, err := ParseMissingBasePolicy(rawOnMissingBase)
+	if err != nil {
+		return RunSpec{}, err
+	}
+	spec.OnMissingBase = policy
 	if len(rawCaches) == 0 {
 		return RunSpec{}, fmt.Errorf("no caches configured: set 'caches' in the config file or pass --cache")
 	}

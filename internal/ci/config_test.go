@@ -240,3 +240,109 @@ func TestResolve_RejectsMisindentedBuild(t *testing.T) {
 		t.Fatal("Resolve should reject a build entry that is a mis-indented action input")
 	}
 }
+
+func TestResolve_ChangedSettings(t *testing.T) {
+	base := FileConfig{Caches: []string{"ghcr.io;me/cache"}}
+
+	t.Run("file config", func(t *testing.T) {
+		fc := base
+		fc.Builds = []string{"changed"}
+		fc.Base = "origin/main"
+		fc.OnMissingBase = "error"
+		spec, err := Resolve(fc, Inputs{})
+		if err != nil {
+			t.Fatalf("Resolve: %v", err)
+		}
+		if spec.Base != "origin/main" {
+			t.Errorf("Base = %q", spec.Base)
+		}
+		if spec.OnMissingBase != MissingBaseError {
+			t.Errorf("OnMissingBase = %q", spec.OnMissingBase)
+		}
+	})
+
+	t.Run("inputs override the file", func(t *testing.T) {
+		fc := base
+		fc.Builds = []string{"changed"}
+		fc.Base = "origin/main"
+		fc.OnMissingBase = "error"
+		spec, err := Resolve(fc, Inputs{Base: "HEAD~3", OnMissingBase: "none"})
+		if err != nil {
+			t.Fatalf("Resolve: %v", err)
+		}
+		if spec.Base != "HEAD~3" {
+			t.Errorf("Base = %q", spec.Base)
+		}
+		if spec.OnMissingBase != MissingBaseNone {
+			t.Errorf("OnMissingBase = %q", spec.OnMissingBase)
+		}
+	})
+
+	// Unset means infer the base and fall back to `all`.
+	t.Run("defaults", func(t *testing.T) {
+		fc := base
+		fc.Builds = []string{"changed"}
+		spec, err := Resolve(fc, Inputs{})
+		if err != nil {
+			t.Fatalf("Resolve: %v", err)
+		}
+		if spec.Base != "" {
+			t.Errorf("Base = %q, want empty (inferred)", spec.Base)
+		}
+		if spec.OnMissingBase != MissingBaseAll {
+			t.Errorf("OnMissingBase = %q, want %q", spec.OnMissingBase, MissingBaseAll)
+		}
+	})
+
+	t.Run("unknown on-missing-base", func(t *testing.T) {
+		fc := base
+		fc.Builds = []string{"changed"}
+		fc.OnMissingBase = "fallback"
+		if _, err := Resolve(fc, Inputs{}); err == nil {
+			t.Fatal("expected an error for an unknown on-missing-base")
+		}
+	})
+}
+
+// A knob that only `changed` reads is a mistake worth naming when nothing asks
+// for `changed`, rather than a setting that silently does nothing.
+func TestResolve_ChangedSettingsWithoutSentinel(t *testing.T) {
+	cases := []struct {
+		name string
+		fc   FileConfig
+		in   Inputs
+	}{
+		{"base in the file", FileConfig{Base: "origin/main"}, Inputs{}},
+		{"base as an input", FileConfig{}, Inputs{Base: "origin/main"}},
+		{"on-missing-base in the file", FileConfig{OnMissingBase: "none"}, Inputs{}},
+		{"on-missing-base as an input", FileConfig{}, Inputs{OnMissingBase: "none"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fc := tc.fc
+			fc.Builds = []string{".#default"}
+			fc.Caches = []string{"ghcr.io;me/cache"}
+			_, err := Resolve(fc, tc.in)
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			if !strings.Contains(err.Error(), "changed") {
+				t.Errorf("the error should name the sentinel that reads it: %v", err)
+			}
+		})
+	}
+}
+
+// Setting them alongside `changed` is the whole point, and must not trip the
+// check above.
+func TestResolve_ChangedSettingsWithSentinelAreFine(t *testing.T) {
+	fc := FileConfig{
+		Builds:        []string{".#extra", "changed"},
+		Caches:        []string{"ghcr.io;me/cache"},
+		Base:          "origin/main",
+		OnMissingBase: "error",
+	}
+	if _, err := Resolve(fc, Inputs{}); err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+}

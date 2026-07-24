@@ -27,8 +27,10 @@ is reported rather than silently ignored.
 
 | Key | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `builds` | array of strings | **yes** | — | Nix flake installables to build. At least one. The entry `all` discovers them. |
+| `builds` | array of strings | **yes** | — | Nix flake installables to build. At least one. The entry `all` discovers them; `changed` narrows them to what a commit changed. |
 | `caches` | array of strings | **yes** | — | Push targets, each `<registry>;<repository>`. At least one. |
+| `base` | string | no | inferred | Ref that `changed` diffs against. Only valid alongside `changed`. |
+| `on-missing-base` | `all` \| `error` \| `none` | no | `all` | What `changed` does with no reachable base. Only valid alongside `changed`. |
 | `compression` | `zstd` \| `xz` \| `gzip` \| `none` | no | `zstd` | NAR compression algorithm. |
 | `signing-key` | string | no | unsigned | Path to a signing key, **or** the name of an environment variable holding the key material. |
 | `workers` | integer ≥ 1 | no | `50` | Concurrent upload workers. |
@@ -109,6 +111,76 @@ still attempted, and fails the run when it fails to build. Only the derivation's
 default output is built, not `dev`/`man`, and attribute sets marked
 `recurseForDerivations` are not descended into.
 :::
+
+The entry `changed` is the second sentinel. It discovers the same outputs, then
+keeps only those whose **derivation differs from the base commit's**:
+
+```yaml title=".aeroflare-ci.yaml"
+builds:
+  - changed
+caches:
+  - ghcr.io;itzemoji/nix-cache
+```
+
+A commit bumping one package in a repository of twenty therefore builds one
+package. A commit touching only documentation builds nothing, and the run
+succeeds.
+
+The comparison is on `drvPath`, not on file paths or commit messages. Because a
+derivation's hash covers its inputs transitively, a version bump, an edit to a
+shared helper and a `flake.lock` update are all caught by the same mechanism.
+
+Three rules cover the rest, all erring towards building:
+
+| At base | At HEAD | Built |
+|---|---|---|
+| same derivation | same derivation | no |
+| different derivation | — | **yes** |
+| absent | present | **yes** — a new package must be built once |
+| — | fails to evaluate | **yes** — so the build reports the real error |
+| present | absent | no — there is nothing left to build |
+
+`changed` may be mixed with explicit installables, which are always built, and
+with `all`, which subsumes it.
+
+:::warning
+`changed` needs enough history to reach the base commit. On GitHub Actions that
+means `fetch-depth: 0` on `actions/checkout`; the default shallow clone has only
+one commit, and the run falls back to building everything.
+:::
+
+### `base`
+
+The ref `changed` diffs against. Unset, it is inferred, first match winning:
+
+1. `pull_request` events: the target branch's tip.
+2. `push` events: the commit the branch pointed at before the push.
+3. Otherwise `HEAD~1`.
+
+Set it explicitly to override — `origin/main` to diff a whole branch rather than
+a single push, for instance. Setting it without a `changed` entry in `builds` is
+an error rather than a silent no-op, since nothing else reads it.
+
+### `on-missing-base`
+
+What happens when no base commit is reachable. That is a first push to a branch
+(whose reported base is the null SHA), a shallow clone that lacks the commit, or
+a force-push that orphaned it.
+
+A base that exists but does not evaluate is not this case. The diff first walks
+back through its first-parent ancestry, up to ten commits, and uses the nearest
+one that does evaluate, reporting the substitution. Only when none of them
+evaluates does `on-missing-base` apply.
+
+| Value | Behaviour |
+|---|---|
+| `all` (default) | Report why, then build every discovered output. |
+| `error` | Fail the run. |
+| `none` | Report why, build nothing, succeed. |
+
+`all` is the default because a cache job that over-builds is merely slow,
+whereas one that silently builds nothing leaves holes in the cache. As with
+`base`, setting this without a `changed` entry is an error.
 
 ### `caches`
 

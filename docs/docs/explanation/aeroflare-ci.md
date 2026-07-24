@@ -22,10 +22,11 @@ A single run performs six stages in order.
 
 1. **Resolve.** Merge the config file with flags and environment, apply
    defaults, and validate. Nothing has happened yet; a bad config fails here.
-2. **Discover.** If — and only if — `builds` contains the entry `all`, evaluate
-   the current flake once and expand that entry into a concrete installable per
-   discovered output. Every later stage sees an ordinary build list and cannot
-   tell the difference.
+2. **Expand.** If — and only if — `builds` contains a sentinel entry, evaluate
+   the current flake and expand that entry into a concrete installable per
+   output: every one of them for `all`, and only those differing from the base
+   commit for `changed`. Every later stage sees an ordinary build list and
+   cannot tell the difference.
 3. **Substituter.** Start a local proxy on `127.0.0.1` that presents the
    *primary* cache and every upstream to Nix as a binary cache.
 4. **Build.** Run `nix build <installable> --print-out-paths` once per entry,
@@ -70,6 +71,83 @@ directly means a broken package is attempted and, per the runner's strict
 failure policy, fails the run. That is deliberate: a package that stopped
 building is something you want to see, not something to silently omit from your
 cache.
+
+## Building only what changed
+
+`all` solves the maintenance problem and creates a cost one: a repository of
+twenty packages rebuilds all twenty when a release bot bumps one version. The
+`changed` sentinel narrows that to the outputs a commit actually affected.
+
+It works by **comparing derivations, not files**. The same enumeration runs
+twice — once against the checkout, once against a throwaway `git worktree` of
+the base commit — and each output's `drvPath` is compared. A `.drv` hash covers
+its inputs transitively, so this catches a version bump, an edit to a shared
+helper function and a `flake.lock` update through one mechanism, with no
+knowledge of the repository's directory layout and no dependence on commit
+message conventions. Path-based and message-based approaches both need such
+assumptions, and both go quietly wrong when a change does not match the pattern
+they expect.
+
+The evaluation differs from discovery's in two ways. Each output is wrapped in
+`builtins.tryEval`, so a single package that fails to evaluate yields `null`
+rather than aborting the enumeration; and `builtins.unsafeDiscardStringContext`
+strips the string context a `drvPath` carries, which `--json` cannot serialise.
+
+Ambiguity is resolved towards building. An output that is new at HEAD is built,
+because a first appearance has nothing to compare against. An output that fails
+to evaluate at HEAD is also built, so `nix build` reports the real error instead
+of the run silently omitting a broken package. An output that disappeared is not
+built, there being nothing left to build.
+
+A worktree is used rather than stashing or `git show`, because evaluating the
+base needs its whole tree — `flake.nix`, `flake.lock` and every package file —
+on disk and undisturbed by whatever the working tree currently holds.
+
+### When the base does not evaluate
+
+A base commit that will not evaluate is a different thing from no base at all.
+It happens routinely: a commit that broke the flake, followed by the commit that
+fixes it. The fixing commit's base is the broken one, and no diff can be taken
+against a tree whose derivations cannot be read.
+
+The commit is not, however, the only tree that can answer the question. Its
+ancestry can, so the diff walks back — the base, then its first parent, and so
+on for up to ten commits — and uses the nearest commit that does evaluate. The
+line naming the base says so when this happens:
+
+```
+base 9af53f6 could not be evaluated, diffing against 495c068 instead
+changed  1 of 2 outputs differ from 495c068  (x86_64-linux)
+  .#packages.x86_64-linux.hello
+```
+
+An older base is a conservative one. Anything that changed in the commits walked
+over is still a difference from the older tree, so the walk can only widen the
+build set, never narrow it. Nor does it leave a hole in the cache: a commit
+skipped over is one whose flake does not evaluate, so its own build cannot have
+succeeded and there is nothing of it to have cached.
+
+This matters because the evaluation cannot be made partial. `tryEval` guards
+each output, but it catches only `throw` and `assert` — an attribute-missing or
+type error, a `callPacakge` typo being the canonical one, propagates and fails
+the evaluation whole. Isolating outputs one per evaluation would not help
+either: the usual NUR shape, `filterAttrs (_: isDerivation)`, forces every
+sibling in order to produce any single attribute, so one broken package there
+means no package evaluates. A tree is evaluatable or it is not.
+
+### When there is no base
+
+Several ordinary situations leave nothing to diff against: the first push to a
+branch, whose webhook reports an all-zero `before`; a shallow clone, which is
+what `actions/checkout` produces by default; a force-push that orphaned the old
+commit; and a base whose whole reachable ancestry fails to evaluate. None of
+these is a fault of the current run, so none is treated as an error by default.
+
+`on-missing-base` decides. The default, `all`, reports the reason and builds
+everything, because the failure modes are asymmetric: a job that over-builds is
+slow, while one that silently builds nothing leaves holes in the cache that
+surface later as cache misses. `error` and `none` are available for workflows
+that prefer a loud failure or a fast exit.
 
 ## The primary cache
 

@@ -148,3 +148,122 @@ jobs:
           TAG: ${{ needs.release.outputs.tag_name }}
           GOPROXY: https://proxy.golang.org
         run: go list -m "github.com/itzemoji/aeroflare@${TAG}"
+
+  publish-nur:
+    needs: release
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    # Every write in this job goes through the App token scoped to
+    # nix-packages, so nothing here needs any permission on this repository.
+    permissions: {}
+    steps:
+      # Scoped to nix-packages: the default GITHUB_TOKEN only ever reaches this
+      # repository, and release-please's token is scoped to this one too.
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ItzEmoji
+          repositories: nix-packages
+
+      - uses: actions/checkout@v6
+        with:
+          repository: ItzEmoji/nix-packages
+          token: ${{ steps.app-token.outputs.token }}
+          path: nix-packages
+
+      # nix-update evaluates the target's default.nix, which opens with
+      # `{ pkgs ? import <nixpkgs> {} }`. The installer runs with
+      # --no-channel-add, so without nix_path there is no <nixpkgs> to resolve
+      # and evaluation fails before the package is ever read.
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # The derivation reconstructs the tag as "v${version}", so version must be
+      # the bare number. Passing the tag verbatim would yield "vv1.12.0".
+      - name: Derive package version from tag
+        id: version
+        env:
+          TAG: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # Rebase-merging re-commits, stamping whoever performs the merge as the
+      # committer while preserving the original author. That is this app's bot,
+      # so the commit has to be authored by it too; any other identity leaves
+      # the merged commit attributed to two different people.
+      - name: Resolve the app's bot identity
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+
+          user_id="$(gh api "/users/${SLUG}[bot]" --jq .id)"
+
+          echo "name=${SLUG}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=${user_id}+${SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
+      # nix-update rewrites version, the fetchFromGitHub hash and vendorHash,
+      # then commits. --version is passed explicitly: left to itself nix-update
+      # picks the newest tag off releases.atom, which is not necessarily the
+      # release this run just produced.
+      - name: Update the package
+        id: update
+        working-directory: nix-packages
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "${{ steps.bot.outputs.name }}"
+          git config user.email "${{ steps.bot.outputs.email }}"
+
+          nix run nixpkgs#nix-update -- \
+            --commit aeroflare \
+            --version "$VERSION"
+
+          # nix-update writes the nixpkgs-conventional "aeroflare: old -> new"
+          # subject; reuse it as the pull request title.
+          echo "subject=$(git log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Open the pull request
+        id: pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          path: nix-packages
+          # Defaults here are github-actions[bot] and github.actor. Neither is
+          # this job's identity, and they would reintroduce the split
+          # attribution should the action ever create a commit of its own.
+          committer: ${{ steps.bot.outputs.name }} <${{ steps.bot.outputs.email }}>
+          author: ${{ steps.bot.outputs.name }} <${{ steps.bot.outputs.email }}>
+          base: main
+          branch: aeroflare/v${{ steps.version.outputs.version }}
+          delete-branch: true
+          title: ${{ steps.update.outputs.subject }}
+          body: |
+            Automated update from [`${{ github.repository }}`][release].
+
+            [release]: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag_name }}
+
+      # nix-packages has auto-merge disabled at the repository level, and main
+      # carries no required checks, so `--auto` would both error out and gate on
+      # nothing. The build above is the gate; merge outright once it passes.
+      # Guarded so that re-running the job on an already-published version, when
+      # nix-update produces no commit and no pull request, exits cleanly.
+      - name: Merge the pull request
+        if: ${{ steps.pr.outputs.pull-request-number != '' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR: ${{ steps.pr.outputs.pull-request-number }}
+        run: |
+          set -euo pipefail
+          gh pr merge --repo ItzEmoji/nix-packages --rebase --delete-branch "$PR"
