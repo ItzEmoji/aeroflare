@@ -10,8 +10,8 @@
     "builds": {
       "type": "array",
       "minItems": 1,
-      "description": "Nix flake installables to build.",
-      "items": { "type": "string", "minLength": 1, "examples": [".#default"] }
+      "description": "Nix flake installables to build. The entry 'all' expands to every packages.<system>.*, devShells.<system>.* and nixosConfigurations.<host> the flake in the working directory exposes for the running system, and may be mixed with explicit installables.",
+      "items": { "type": "string", "minLength": 1, "examples": [".#default", "all"] }
     },
     "caches": {
       "type": "array",
@@ -38,6 +38,24 @@
       "minimum": 1,
       "default": 50,
       "description": "Concurrent upload workers."
+    },
+    "release-repo": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$",
+      "default": "ItzEmoji/aeroflare",
+      "description": "GitHub repository the GitHub Action downloads the aeroflare-ci release asset from, as 'owner/repo'. Read by the Action's install step only; aeroflare-ci itself ignores it.",
+      "examples": ["ItzEmoji/aeroflare"]
+    },
+    "release-version": {
+      "type": "string",
+      "pattern": "^([vV]?[0-9]+\\.[0-9]+\\.[0-9]+.*|[lL][aA][tT][eE][sS][tT])$",
+      "description": "Release the GitHub Action downloads, with or without a leading 'v', or 'latest' for the newest release in release-repo. Defaults to the version the pinned action ref declares. Read by the Action's install step only.",
+      "examples": ["1.11.0", "v1.11.0", "latest"]
+    },
+    "skip-attestation": {
+      "type": "boolean",
+      "default": false,
+      "description": "Skip SLSA provenance verification of the downloaded asset. Only for repositories that publish no attestations — it disables a supply-chain check. Read by the Action's install step only."
     },
     "upstream-cache": {
       "default": "https://cache.nixos.org",

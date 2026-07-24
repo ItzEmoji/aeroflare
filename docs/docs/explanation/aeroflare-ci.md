@@ -18,26 +18,58 @@ runners.
 
 ## The pipeline
 
-A single run performs five stages in order.
+A single run performs six stages in order.
 
 1. **Resolve.** Merge the config file with flags and environment, apply
    defaults, and validate. Nothing has happened yet; a bad config fails here.
-2. **Substituter.** Start a local proxy on `127.0.0.1` that presents the
+2. **Discover.** If — and only if — `builds` contains the entry `all`, evaluate
+   the current flake once and expand that entry into a concrete installable per
+   discovered output. Every later stage sees an ordinary build list and cannot
+   tell the difference.
+3. **Substituter.** Start a local proxy on `127.0.0.1` that presents the
    *primary* cache and every upstream to Nix as a binary cache.
-3. **Build.** Run `nix build <installable> --print-out-paths` once per entry,
+4. **Build.** Run `nix build <installable> --print-out-paths` once per entry,
    with `extra-substituters` pointed at the proxy. Store paths are scraped from
    stdout and deduplicated across installables.
-4. **Filter and prepare.** Tear the proxy down, drop the outputs and references
+5. **Filter and prepare.** Tear the proxy down, drop the outputs and references
    an upstream already serves, and archive what remains into NAR blobs exactly
    once — regardless of how many caches will receive them.
-5. **Push.** Upload the prepared set to every cache in turn.
+6. **Push.** Upload the prepared set to every cache in turn.
 
 Two consequences fall out of this shape. The prepared set is built once and
 reused, so adding a second cache costs upload bandwidth but no extra
 compression. And **every build is pushed to every cache**; there is no way to
 route one installable to one cache and another elsewhere.
 
-For what stages 4 and 5 skip, see [Incremental Caching](./incremental-caching.md).
+For what stages 5 and 6 skip, see [Incremental Caching](./incremental-caching.md).
+
+## Discovering builds
+
+Listing every package by hand is exactly the wrong job for a repository whose
+whole purpose is to publish packages — a NUR repo, most of all. The `all`
+sentinel in `builds` removes the list: it expands to every
+`packages.<system>.*`, `devShells.<system>.*` and `nixosConfigurations.<host>`
+the current flake exposes for the runner's system.
+
+Expansion happens in one `nix eval` of a single expression covering all three
+classes at once, rather than one evaluation per class. The reason is error
+handling: each class is read as `f.packages.${s} or {}`, so a flake that exposes
+no dev shells yields an empty list through the ordinary success path. Querying a
+missing output directly would instead make "this flake has no dev shells"
+indistinguishable from a genuine evaluation failure without pattern-matching
+Nix's stderr.
+
+The evaluation is impure, because `builtins.getFlake` against a local checkout
+is not a locked reference. That is confined to discovery; the builds it produces
+run exactly as a hand-written list would.
+
+Discovery does no filtering beyond the platform check on NixOS configurations.
+This is a real difference from the NUR template's `ci.nix`, which drops
+`meta.broken` and unfree packages before building. Reading flake outputs
+directly means a broken package is attempted and, per the runner's strict
+failure policy, fails the run. That is deliberate: a package that stopped
+building is something you want to see, not something to silently omit from your
+cache.
 
 ## The primary cache
 

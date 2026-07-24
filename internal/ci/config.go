@@ -122,7 +122,8 @@ func LoadFile(path string, required bool) (FileConfig, bool, error) {
 // mistake rather than a flake installable.
 var actionInputNames = []string{
 	"builds", "cache", "cache-token", "compression", "config",
-	"signing-key", "token", "upstream-cache", "workers",
+	"release-repo", "release-version", "signing-key", "skip-attestation",
+	"token", "upstream-cache", "workers",
 }
 
 // validateBuilds rejects build entries that are really a mis-indented action

@@ -89,6 +89,16 @@ jobs:
             .#packages.x86_64-linux.foo
 ```
 
+Or hand it `builds: all` to discover and build every `packages.<system>.*`,
+`devShells.<system>.*` and `nixosConfigurations.<host>` the flake exposes — no
+list to keep up to date as the repository grows:
+
+```yaml
+        with:
+          cache: ghcr.io;${{ github.repository_owner }}/nix-cache
+          builds: all
+```
+
 `ghcr.io` authenticates with the workflow's `github.token` automatically; any
 other registry takes a `cache-token`. By default only store paths missing from
 `https://cache.nixos.org` are uploaded, so your cache holds your artifacts
