@@ -42,8 +42,11 @@ EOF
   # gh stub: `release download` copies the prebuilt archive into the --dir the
   # real install.sh passes. `attestation verify` succeeds. Both honour the
   # FAKE_GH_* flags to simulate failures. $FAKE_ASSETS locates the archive.
+  # Every invocation is appended to $FAKE_GH_LOG, so tests can assert on which
+  # repo and tag install.sh resolved — and on a subcommand never running at all.
   cat > "$WORK/bin/gh" <<'EOF'
 #!/bin/sh
+if [ -n "${FAKE_GH_LOG:-}" ]; then printf '%s\n' "$*" >> "$FAKE_GH_LOG"; fi
 case "$1 $2" in
   "release download")
     [ "${FAKE_GH_DOWNLOAD_FAIL:-0}" = 1 ] && exit 1
@@ -67,6 +70,8 @@ EOF
 
   GITHUB_OUTPUT="$WORK/gh_output"; : > "$GITHUB_OUTPUT"
   export GITHUB_OUTPUT
+  FAKE_GH_LOG="$WORK/gh_log"; : > "$FAKE_GH_LOG"
+  export FAKE_GH_LOG
   export FAKE_ASSETS="$WORK/assets"
   export RUNNER_TEMP="$WORK/temp"
   export GITHUB_ACTION_PATH="$REPO_ROOT"
@@ -74,11 +79,17 @@ EOF
   export RUNNER_OS=Linux RUNNER_ARCH=X64
   # Exported by individual cases; clear them so no case leaks into the next.
   unset FAKE_GH_DOWNLOAD_FAIL FAKE_GH_VERIFY_FAIL
+  unset INPUT_RELEASE_REPO INPUT_RELEASE_VERSION INPUT_SKIP_ATTESTATION INPUT_CONFIG
+  unset AEROFLARE_REPO
   export PATH="$WORK/bin"
 }
 teardown() { PATH=$ORIG_PATH; rm -rf "$WORK"; }
 
 run_install() { bash "$REPO_ROOT/scripts/install.sh" 2>&1; }
+gh_log() { cat "$WORK/gh_log"; }
+
+# The tag install.sh resolves when no version is configured.
+PINNED=$(jq -r '.["."]' "$REPO_ROOT/version.json")
 
 # --- happy path -------------------------------------------------------------
 setup
@@ -120,6 +131,134 @@ setup; export FAKE_GH_VERIFY_FAIL=1
 out=$(run_install); rc=$?
 assert_eq "failed attestation exits 1" "1" "$rc"
 assert_contains "failed attestation annotates" "provenance" "$out"
+teardown
+
+# --- release source: repo ---------------------------------------------------
+setup
+run_install >/dev/null
+assert_contains "defaults to the upstream repo" "--repo ItzEmoji/aeroflare" "$(gh_log)"
+assert_contains "defaults to the pinned tag" "release download v$PINNED " "$(gh_log)"
+teardown
+
+setup; export INPUT_RELEASE_REPO=me/aeroflare-fork
+run_install >/dev/null
+assert_contains "release-repo input is used" "--repo me/aeroflare-fork" "$(gh_log)"
+assert_contains "release-repo input is verified against" \
+  "attestation verify $RUNNER_TEMP/aeroflare/aeroflare-ci-x86_64.tar.zst --repo me/aeroflare-fork" "$(gh_log)"
+teardown
+
+setup; export AEROFLARE_REPO=env/fork
+run_install >/dev/null
+assert_contains "AEROFLARE_REPO still honoured" "--repo env/fork" "$(gh_log)"
+teardown
+
+setup; export AEROFLARE_REPO=env/fork INPUT_RELEASE_REPO=input/fork
+run_install >/dev/null
+assert_contains "input beats AEROFLARE_REPO" "--repo input/fork" "$(gh_log)"
+teardown
+
+setup; export INPUT_RELEASE_REPO=not-a-repo
+out=$(run_install); rc=$?
+assert_eq "malformed release-repo exits 1" "1" "$rc"
+assert_contains "malformed release-repo explains" "must be owner/repo" "$out"
+teardown
+
+# --- release source: version ------------------------------------------------
+setup; export INPUT_RELEASE_VERSION=2.0.0
+run_install >/dev/null
+assert_contains "explicit version becomes a v-tag" "release download v2.0.0 " "$(gh_log)"
+teardown
+
+setup; export INPUT_RELEASE_VERSION=v2.0.0
+run_install >/dev/null
+assert_contains "v-prefixed version is not doubled" "release download v2.0.0 " "$(gh_log)"
+teardown
+
+setup; export INPUT_RELEASE_VERSION=latest
+run_install >/dev/null
+assert_contains "latest passes no tag" "release download --repo" "$(gh_log)"
+teardown
+
+setup; export INPUT_RELEASE_VERSION=LATEST
+run_install >/dev/null
+assert_contains "latest is case-insensitive" "release download --repo" "$(gh_log)"
+teardown
+
+# --- skip-attestation -------------------------------------------------------
+setup; export INPUT_SKIP_ATTESTATION=true
+out=$(run_install); rc=$?
+assert_eq "skip-attestation still succeeds" "0" "$rc"
+assert_contains "skip-attestation warns" "::warning::provenance verification skipped" "$out"
+assert_eq "skip-attestation runs no verify" "" \
+  "$(grep 'attestation verify' "$WORK/gh_log" || true)"
+teardown
+
+setup; export INPUT_SKIP_ATTESTATION=false
+run_install >/dev/null
+assert_contains "skip-attestation false still verifies" "attestation verify" "$(gh_log)"
+teardown
+
+setup; export INPUT_SKIP_ATTESTATION=ture
+out=$(run_install); rc=$?
+assert_eq "malformed skip-attestation exits 1" "1" "$rc"
+assert_contains "malformed skip-attestation explains" "must be true or false" "$out"
+teardown
+
+# --- config file ------------------------------------------------------------
+write_config() {
+  cat > "$WORK/.aeroflare-ci.yaml"
+  export INPUT_CONFIG="$WORK/.aeroflare-ci.yaml"
+}
+
+setup
+write_config <<'EOF'
+builds:
+  - .#default
+caches:
+  - ghcr.io;me/cache
+release-repo: cfg/fork
+release-version: 3.1.0
+EOF
+run_install >/dev/null
+assert_contains "config release-repo is used" "--repo cfg/fork" "$(gh_log)"
+assert_contains "config release-version is used" "release download v3.1.0 " "$(gh_log)"
+teardown
+
+setup; export INPUT_RELEASE_REPO=input/fork
+write_config <<'EOF'
+release-repo: cfg/fork
+EOF
+run_install >/dev/null
+assert_contains "input beats config" "--repo input/fork" "$(gh_log)"
+teardown
+
+setup; export AEROFLARE_REPO=env/fork
+write_config <<'EOF'
+release-repo: cfg/fork
+EOF
+run_install >/dev/null
+assert_contains "config beats AEROFLARE_REPO" "--repo cfg/fork" "$(gh_log)"
+teardown
+
+setup
+write_config <<'EOF'
+release-repo: cfg/fork
+skip-attestation: true   # this fork publishes no attestations
+EOF
+out=$(run_install); rc=$?
+assert_eq "config skip-attestation succeeds" "0" "$rc"
+assert_eq "config skip-attestation runs no verify" "" \
+  "$(grep 'attestation verify' "$WORK/gh_log" || true)"
+teardown
+
+setup
+write_config <<'EOF'
+builds:
+  - .#default
+EOF
+run_install >/dev/null
+assert_contains "config without release keys falls back" "--repo ItzEmoji/aeroflare" "$(gh_log)"
+assert_contains "config without release keys uses pinned tag" "release download v$PINNED " "$(gh_log)"
 teardown
 
 report

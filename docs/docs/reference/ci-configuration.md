@@ -33,9 +33,15 @@ is reported rather than silently ignored.
 | `signing-key` | string | no | unsigned | Path to a signing key, **or** the name of an environment variable holding the key material. |
 | `workers` | integer ≥ 1 | no | `50` | Concurrent upload workers. |
 | `upstream-cache` | string or array of strings | no | `https://cache.nixos.org` | Caches whose paths are skipped. `none` disables filtering. |
+| `release-repo` | string `owner/repo` | no | `ItzEmoji/aeroflare` | Repository the GitHub Action downloads `aeroflare-ci` from. |
+| `release-version` | string | no | the pinned action's version | Release to download, or `latest`. |
+| `skip-attestation` | boolean | no | `false` | Skip provenance verification of the downloaded asset. |
 
 Every entry in `builds` is pushed to every entry in `caches`. There is no way to
 route one installable to one cache and a different installable elsewhere.
+
+The last three keys configure **the GitHub Action's install step**, not a build.
+`aeroflare-ci` itself ignores them — see [Release source keys](#release-source-keys).
 
 ## Complete example
 
@@ -165,6 +171,47 @@ The schema rejects `upstream-cache: []`. The binary alone would read an empty
 list as "unset" and substitute the default — the opposite of what an empty list
 suggests. Write `none` if you mean no filtering.
 :::
+
+### Release source keys
+
+`release-repo`, `release-version` and `skip-attestation` decide **which
+`aeroflare-ci` binary the GitHub Action downloads**. They exist for running a
+fork or a test build instead of the published upstream release.
+
+```yaml title=".aeroflare-ci.yaml"
+release-repo: me/aeroflare-fork
+release-version: latest
+skip-attestation: true   # this fork publishes no attestations
+```
+
+`release-version` accepts `1.11.0`, `v1.11.0`, or `latest`. Omitted, it resolves
+to the version declared by the action ref you pinned. `latest` is what a fork or
+throwaway test repository usually wants, since its release numbering rarely
+tracks upstream's.
+
+:::warning `skip-attestation` disables a supply-chain check
+Every upstream release archive carries SLSA build provenance, and the Action
+verifies it on every run. Setting `skip-attestation: true` means the binary you
+execute in CI is unverified. Set it only for a repository you control that
+publishes no attestations — and prefer publishing them, since the release
+workflow a fork inherits already does.
+:::
+
+Three consequences of these keys being read before the binary exists:
+
+- **`aeroflare-ci` ignores them.** They only take effect through the Action.
+  Running the binary directly, or from [another CI system](../how-to/ci-integration.md),
+  they do nothing.
+- **They are read by a minimal parser.** The Action's install step extracts them
+  from the file with `sed`, because the binary that normally parses the config is
+  the very thing being downloaded, and no YAML tool is guaranteed on a runner. It
+  handles top-level keys with optionally-quoted scalar values and inline
+  comments. Anchors, block scalars and multi-document files are not supported for
+  *these three keys only*; every other key is parsed normally by the binary.
+- **Precedence is input, then file, then default.** The `release-repo`,
+  `release-version` and `skip-attestation` action inputs override the file. The
+  legacy `AEROFLARE_REPO` environment variable still works, but ranks below the
+  file.
 
 ## Precedence
 

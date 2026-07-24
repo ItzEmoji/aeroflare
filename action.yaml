@@ -55,6 +55,25 @@ inputs:
       AEROFLARE_TOKEN_<HOST>. Omit for ghcr.io, which falls back to `token`.
       In config mode, set job-level `env:` vars instead, one per registry.
     required: false
+  release-repo:
+    description: |
+      `owner/repo` to download the aeroflare-ci release asset from, for running
+      a fork or a test build. Defaults to ItzEmoji/aeroflare. Also readable from
+      the config file as `release-repo`.
+    required: false
+  release-version:
+    description: |
+      Release to download: `1.11.0`, `v1.11.0`, or `latest` for the newest
+      release in `release-repo`. Defaults to the version this action's ref pins.
+      Also readable from the config file as `release-version`.
+    required: false
+  skip-attestation:
+    description: |
+      Set to `true` to skip SLSA provenance verification of the downloaded
+      asset. Only for repositories that publish no attestations — it disables a
+      supply-chain check. Also readable from the config file as
+      `skip-attestation`.
+    required: false
 
 runs:
   using: composite
@@ -65,6 +84,13 @@ runs:
       run: "$GITHUB_ACTION_PATH/scripts/install.sh"
       env:
         GH_TOKEN: ${{ inputs.token }}
+        # install.sh reads the release-* keys out of the config itself: they
+        # decide which aeroflare-ci to download, so the binary that normally
+        # parses the config does not exist yet.
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_RELEASE_REPO: ${{ inputs.release-repo }}
+        INPUT_RELEASE_VERSION: ${{ inputs.release-version }}
+        INPUT_SKIP_ATTESTATION: ${{ inputs.skip-attestation }}
 
     - name: Run aeroflare-ci
       shell: bash

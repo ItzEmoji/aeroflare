@@ -186,10 +186,60 @@ read as "unset" and quietly replace with the default. Write
 Every key, its type, and its default is listed in the
 [CI Configuration Schema](../reference/ci-configuration.md).
 
+## Running a fork or a test build
+
+By default the Action downloads the `aeroflare-ci` release asset from
+`ItzEmoji/aeroflare`, at the version the ref you pinned declares. Three inputs
+redirect that — for testing a change before it ships, or for running a fork you
+maintain:
+
+```yaml
+      - uses: ItzEmoji/aeroflare@v1
+        with:
+          cache: ghcr.io;${{ github.repository_owner }}/nix-cache
+          builds: all
+          release-repo: me/aeroflare-fork
+          release-version: latest
+          skip-attestation: true
+```
+
+| Input | Default | Notes |
+|---|---|---|
+| `release-repo` | `ItzEmoji/aeroflare` | `owner/repo`. A bare name, a URL, or an `@ref` suffix is rejected with a pointed message rather than an opaque `gh` failure. |
+| `release-version` | the pinned action's version | `1.11.0`, `v1.11.0`, or `latest`. |
+| `skip-attestation` | `false` | `true` skips provenance verification. |
+
+Reach for `release-version: latest` on a fork or test repository — its release
+numbering rarely matches upstream's, and the default resolves to a tag that
+probably does not exist there.
+
+The same three settings can live in the config file instead, as `release-repo`,
+`release-version` and `skip-attestation`. They are read by the Action's install
+step with a deliberately minimal parser, since the binary that normally reads the
+config is the one being downloaded; see
+[Release source keys](../reference/ci-configuration.md#release-source-keys) for
+the caveats. An input always overrides the file.
+
+:::warning `skip-attestation` disables a supply-chain check
+It exists for repositories that publish no attestations. Set it and the binary
+you execute in CI is unverified. A fork inherits the release workflow that
+publishes provenance, so publishing attestations is usually the better fix.
+:::
+
+:::note Private forks
+Downloads use the `token` input, which defaults to `github.token` and cannot
+read a private repository in another org. Pointing `release-repo` at one means
+passing a PAT as `token` — the same token the Action uses for `ghcr.io` pushes.
+:::
+
+The undocumented `AEROFLARE_REPO` environment variable still works and still
+means the same thing, but it ranks below both the input and the config file.
+
 ## Verifying the binaries yourself
 
 Every release archive carries SLSA build provenance, which the Action checks
-on every run. To check by hand:
+on every run — against `release-repo`, so a fork is verified against itself.
+To check by hand:
 
 ```bash
 gh attestation verify aeroflare-ci-x86_64.tar.zst --repo ItzEmoji/aeroflare
@@ -204,7 +254,19 @@ warning above.
 **`release <tag> of <repo> ships no aeroflare-ci-<arch>.tar.zst`**
 The Action resolves the release tag from the `version.json` at the ref you
 pinned, then downloads that release's archive. Tags before `v1.8.0` publish
-no archives. Pin the Action to a release that does.
+no archives. Pin the Action to a release that does — or, if you set
+`release-repo`, point `release-version` at a tag that exists there.
+`release-version: latest` sidesteps the mismatch.
+
+**`'release-repo' must be owner/repo, got '…'`**
+The input takes a repository, not a URL and not a ref: `me/aeroflare-fork`,
+never `https://github.com/me/aeroflare-fork` or `me/aeroflare-fork@v1`. Use
+`release-version` for the ref.
+
+**`provenance verification failed for … ; if this repo publishes no attestations…`**
+A `release-repo` whose releases carry no SLSA provenance. Publishing
+attestations from the fork is the better fix; `skip-attestation: true` is the
+escape hatch, at the cost of the check.
 
 For errors that aren't specific to the Action — token resolution, partial
 push failures, list-replace semantics — see
