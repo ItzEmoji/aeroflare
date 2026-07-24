@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,10 +34,10 @@ type flakeOutputs struct {
 	NixosConfigurations []string `json:"nixosConfigurations"`
 }
 
-// hasDiscoverSentinel reports whether any build entry asks for discovery.
-func hasDiscoverSentinel(builds []string) bool {
+// hasSentinel reports whether any build entry is the given sentinel.
+func hasSentinel(builds []string, sentinel string) bool {
 	for _, b := range builds {
-		if strings.TrimSpace(b) == discoverSentinel {
+		if strings.TrimSpace(b) == sentinel {
 			return true
 		}
 	}
@@ -120,15 +119,18 @@ func discoverLine(o flakeOutputs) string {
 		len(o.Packages), len(o.DevShells), len(o.NixosConfigurations), o.System)
 }
 
-// expandBuilds replaces every sentinel entry with found, leaving explicit
-// entries in place. Duplicates are dropped, so listing a package explicitly
-// alongside `all` builds it once.
-func expandBuilds(builds, found []string) []string {
-	seen := make(map[string]bool, len(builds)+len(found))
+// expandBuilds replaces each sentinel entry with the installables expansions
+// holds for it, leaving explicit entries in place. Both sentinels are expanded
+// in one pass over a single seen set, so listing a package explicitly alongside
+// `all`, or naming both sentinels, still builds it once. A sentinel with no
+// expansion — `changed` when nothing changed — drops out instead of reaching
+// nix as a literal installable.
+func expandBuilds(builds []string, expansions map[string][]string) []string {
+	seen := make(map[string]bool, len(builds))
 	var out []string
 	for _, b := range builds {
 		entries := []string{b}
-		if strings.TrimSpace(b) == discoverSentinel {
+		if found, ok := expansions[strings.TrimSpace(b)]; ok {
 			entries = found
 		}
 		for _, e := range entries {
@@ -164,49 +166,44 @@ func trimEvalNoise(stderr string) string {
 // surfaces only on failure, since a successful discovery has nothing to say
 // beyond its roll-up line.
 func discoverFlake(dir string) (flakeOutputs, error) {
+	var out flakeOutputs
+	err := evalFlake(dir, discoverSentinel, discoverExpr, &out)
+	return out, err
+}
+
+// evalFlake evaluates expr(dir) against dir's flake and decodes the JSON into
+// into. sentinel names the `builds` entry that asked for the evaluation, so the
+// "no flake here" message says which one to look at.
+//
+// Shared by both sentinels because the only differences between their
+// evaluations are the expression and the result type; everything else — the
+// impurity, the up-front flake.nix check, the captured output, the error
+// trimming — is identical, and having drifted apart would show up as two
+// different failure messages for the same broken checkout.
+func evalFlake(dir, sentinel string, expr func(string) string, into any) error {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return flakeOutputs{}, fmt.Errorf("resolving %s: %w", dir, err)
+		return fmt.Errorf("resolving %s: %w", dir, err)
 	}
 	// Checked up front because the alternative is a twenty-line Nix stack trace
 	// ending in "flake.nix does not exist" for what is almost always a job
 	// running from the wrong directory.
 	if _, err := os.Stat(filepath.Join(abs, "flake.nix")); err != nil {
-		return flakeOutputs{}, fmt.Errorf("'all' needs a flake: no flake.nix in %s", abs)
+		return fmt.Errorf("'%s' needs a flake: no flake.nix in %s", sentinel, abs)
 	}
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("nix", "eval", "--impure", "--json", "--expr", discoverExpr(abs))
+	cmd := exec.Command("nix", "eval", "--impure", "--json", "--expr", expr(abs))
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		msg := trimEvalNoise(stderr.String())
 		if msg == "" {
-			return flakeOutputs{}, fmt.Errorf("nix eval: %w", err)
+			return fmt.Errorf("nix eval: %w", err)
 		}
-		return flakeOutputs{}, fmt.Errorf("nix eval: %w\n%s", err, msg)
+		return fmt.Errorf("nix eval: %w\n%s", err, msg)
 	}
-	var out flakeOutputs
-	if err := json.Unmarshal(stdout.Bytes(), &out); err != nil {
-		return flakeOutputs{}, fmt.Errorf("parsing discovery output: %w", err)
+	if err := json.Unmarshal(stdout.Bytes(), into); err != nil {
+		return fmt.Errorf("parsing %s evaluation output: %w", sentinel, err)
 	}
-	return out, nil
-}
-
-// resolveDiscovery expands the `all` sentinel in spec.Builds in place. It never
-// shells out when no entry asks for discovery.
-func resolveDiscovery(spec *RunSpec, w io.Writer) error {
-	if !hasDiscoverSentinel(spec.Builds) {
-		return nil
-	}
-	out, err := discoverFlake(discoverRef)
-	if err != nil {
-		return err
-	}
-	if out.Total() == 0 {
-		return fmt.Errorf("'all' found nothing to build: the flake exposes no packages, "+
-			"devShells or nixosConfigurations for %s", out.System)
-	}
-	_, _ = fmt.Fprintf(w, "%s\n", discoverLine(out))
-	spec.Builds = expandBuilds(spec.Builds, out.Installables(discoverRef))
 	return nil
 }

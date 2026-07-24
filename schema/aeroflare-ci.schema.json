@@ -10,8 +10,20 @@
     "builds": {
       "type": "array",
       "minItems": 1,
-      "description": "Nix flake installables to build. The entry 'all' expands to every packages.<system>.*, devShells.<system>.* and nixosConfigurations.<host> the flake in the working directory exposes for the running system, and may be mixed with explicit installables.",
-      "items": { "type": "string", "minLength": 1, "examples": [".#default", "all"] }
+      "description": "Nix flake installables to build. The entry 'all' expands to every packages.<system>.*, devShells.<system>.* and nixosConfigurations.<host> the flake in the working directory exposes for the running system. The entry 'changed' expands to only those whose derivation differs from the base commit's. Either may be mixed with explicit installables.",
+      "items": { "type": "string", "minLength": 1, "examples": [".#default", "all", "changed"] }
+    },
+    "base": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ref that the 'changed' sentinel diffs against. Defaults to the base the CI event names — 'before' for a push, the target branch's tip for a pull request — and falls back to HEAD~1. Rejected unless a build entry is 'changed', since nothing else reads it.",
+      "examples": ["origin/main", "HEAD~1"]
+    },
+    "on-missing-base": {
+      "type": "string",
+      "enum": ["all", "error", "none"],
+      "default": "all",
+      "description": "What 'changed' does when no base commit is reachable, such as in a shallow clone, on the first push to a branch, or after a force-push. 'all' builds every discovered output, 'error' fails the run, 'none' builds nothing and succeeds. Rejected unless a build entry is 'changed', since nothing else reads it."
     },
     "caches": {
       "type": "array",

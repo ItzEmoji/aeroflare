@@ -58,6 +58,8 @@ fi
 # Full `if` blocks, not `[ -n "$x" ] && args+=(...)`: the latter is safe under
 # `set -e` (a failing test is exempt as a non-final member of an && list) but it
 # trips shellcheck SC2015 and misleads readers.
+if [ -n "${INPUT_BASE:-}" ];           then args+=(--base           "$INPUT_BASE");           fi
+if [ -n "${INPUT_ON_MISSING_BASE:-}" ]; then args+=(--on-missing-base "$INPUT_ON_MISSING_BASE"); fi
 if [ -n "${INPUT_COMPRESSION:-}" ];    then args+=(--compression    "$INPUT_COMPRESSION");    fi
 if [ -n "${INPUT_WORKERS:-}" ];        then args+=(--workers        "$INPUT_WORKERS");        fi
 if [ -n "${INPUT_SIGNING_KEY:-}" ];    then args+=(--signing-key    "$INPUT_SIGNING_KEY");    fi

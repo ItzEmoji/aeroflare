@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestHasDiscoverSentinel(t *testing.T) {
+func TestHasSentinel_Discover(t *testing.T) {
 	cases := []struct {
 		name   string
 		builds []string
@@ -22,8 +22,8 @@ func TestHasDiscoverSentinel(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := hasDiscoverSentinel(tc.builds); got != tc.want {
-				t.Errorf("hasDiscoverSentinel(%v) = %v, want %v", tc.builds, got, tc.want)
+			if got := hasSentinel(tc.builds, discoverSentinel); got != tc.want {
+				t.Errorf("hasSentinel(%v, all) = %v, want %v", tc.builds, got, tc.want)
 			}
 		})
 	}
@@ -132,7 +132,9 @@ func TestTotal(t *testing.T) {
 }
 
 func TestExpandBuilds_SentinelOnly(t *testing.T) {
-	got := expandBuilds([]string{"all"}, []string{".#packages.x.a", ".#packages.x.b"})
+	got := expandBuilds([]string{"all"}, map[string][]string{
+		discoverSentinel: {".#packages.x.a", ".#packages.x.b"},
+	})
 	want := []string{".#packages.x.a", ".#packages.x.b"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
@@ -143,7 +145,7 @@ func TestExpandBuilds_SentinelOnly(t *testing.T) {
 func TestExpandBuilds_MixedKeepsOrder(t *testing.T) {
 	got := expandBuilds(
 		[]string{"github:other/flake#tool", "all", ".#extra"},
-		[]string{".#packages.x.a"},
+		map[string][]string{discoverSentinel: {".#packages.x.a"}},
 	)
 	want := []string{"github:other/flake#tool", ".#packages.x.a", ".#extra"}
 	if !reflect.DeepEqual(got, want) {
@@ -155,7 +157,7 @@ func TestExpandBuilds_MixedKeepsOrder(t *testing.T) {
 func TestExpandBuilds_Deduplicates(t *testing.T) {
 	got := expandBuilds(
 		[]string{".#packages.x.a", "all"},
-		[]string{".#packages.x.a", ".#packages.x.b"},
+		map[string][]string{discoverSentinel: {".#packages.x.a", ".#packages.x.b"}},
 	)
 	want := []string{".#packages.x.a", ".#packages.x.b"}
 	if !reflect.DeepEqual(got, want) {
@@ -165,7 +167,7 @@ func TestExpandBuilds_Deduplicates(t *testing.T) {
 
 func TestExpandBuilds_NoSentinelIsUnchanged(t *testing.T) {
 	in := []string{".#default", ".#other"}
-	got := expandBuilds(in, []string{".#packages.x.a"})
+	got := expandBuilds(in, map[string][]string{discoverSentinel: {".#packages.x.a"}})
 	if !reflect.DeepEqual(got, in) {
 		t.Errorf("got %v, want %v", got, in)
 	}
@@ -244,20 +246,5 @@ func TestDiscoverFlake_NoFlake(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no flake.nix in") {
 		t.Errorf("got %v", err)
-	}
-}
-
-// Discovery must not shell out at all when no build entry asks for it.
-func TestResolveDiscovery_NoSentinelIsNoOp(t *testing.T) {
-	spec := RunSpec{Builds: []string{".#default"}}
-	var sb strings.Builder
-	if err := resolveDiscovery(&spec, &sb); err != nil {
-		t.Fatalf("resolveDiscovery: %v", err)
-	}
-	if !reflect.DeepEqual(spec.Builds, []string{".#default"}) {
-		t.Errorf("builds changed: %v", spec.Builds)
-	}
-	if sb.String() != "" {
-		t.Errorf("expected no output, got %q", sb.String())
 	}
 }

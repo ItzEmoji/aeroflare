@@ -104,4 +104,19 @@ assert_fails "two caches is an error" \
 out=$(run_sh INPUT_CONFIG=c.yaml INPUT_BUILDS='.#default' 2>&1 || true)
 assert_contains "mutual-exclusion message is actionable" "mutually exclusive" "$out"
 
+
+# --- base / on-missing-base -------------------------------------------------
+out=$(run_sh INPUT_CACHE='ghcr.io;me/cache' INPUT_BUILDS='changed' INPUT_BASE='origin/main')
+assert_contains "base passes --base"      "ARG:--base"     "$out"
+assert_contains "base value"              "ARG:origin/main" "$out"
+
+out=$(run_sh INPUT_CACHE='ghcr.io;me/cache' INPUT_BUILDS='changed' INPUT_ON_MISSING_BASE='error')
+assert_contains "on-missing-base flag"  "ARG:--on-missing-base" "$out"
+assert_contains "on-missing-base value" "ARG:error"             "$out"
+
+out=$(run_sh INPUT_CACHE='ghcr.io;me/cache' INPUT_BUILDS='changed')
+assert_eq "no --base when unset" \
+  "0" "$(grep -c '^ARG:--base$' <<<"$out")"
+assert_eq "no --on-missing-base when unset" \
+  "0" "$(grep -c '^ARG:--on-missing-base$' <<<"$out")"
 report

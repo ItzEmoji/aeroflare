@@ -11,8 +11,24 @@ inputs:
       Newline- or comma-separated Nix flake installables to build, e.g. `.#default`.
       The entry `all` expands to every `packages.<system>.*`, `devShells.<system>.*`
       and `nixosConfigurations.<host>` the checked-out flake exposes for the runner's
-      system, and can be mixed with explicit installables.
+      system. The entry `changed` expands to only those whose derivation differs
+      from the base commit's. Either can be mixed with explicit installables.
       Configless mode. Mutually exclusive with `config`.
+    required: false
+  base:
+    description: |
+      Ref that `changed` diffs against. Defaults to the base the CI event names
+      — `before` for a push, the target branch's tip for a pull request — and
+      falls back to `HEAD~1`. Needs enough history to reach it: set
+      `fetch-depth: 0` on actions/checkout. Also readable from the config file
+      as `base`.
+    required: false
+  on-missing-base:
+    description: |
+      What `changed` does when no base commit is reachable — a shallow clone, a
+      first push to a branch, a force-push. `all` (default) builds everything,
+      `error` fails the run, `none` builds nothing and succeeds. Also readable
+      from the config file as `on-missing-base`.
     required: false
   cache:
     description: |
@@ -99,6 +115,8 @@ runs:
         AEROFLARE_CI_BIN: ${{ steps.install.outputs.bin }}
         GITHUB_TOKEN: ${{ inputs.token }}
         INPUT_BUILDS: ${{ inputs.builds }}
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_ON_MISSING_BASE: ${{ inputs.on-missing-base }}
         INPUT_CACHE: ${{ inputs.cache }}
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_COMPRESSION: ${{ inputs.compression }}

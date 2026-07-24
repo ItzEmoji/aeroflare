@@ -46,12 +46,14 @@ func envOr(key, def string) string {
 func main() {
 	var builds, caches, upstreams stringList
 	fs := flag.NewFlagSet("aeroflare-ci", flag.ContinueOnError)
-	fs.Var(&builds, "build", "flake installable to build, or 'all' to discover them (repeatable)")
+	fs.Var(&builds, "build", "flake installable to build, 'all' to discover them, or 'changed' for those differing from the base (repeatable)")
 	fs.Var(&caches, "cache", "<registry>;<repository> push target (repeatable)")
 	configPath := fs.String("config", envOr("AEROFLARE_CI_CONFIG", ".aeroflare-ci.yaml"), "config file path")
 	compression := fs.String("compression", os.Getenv("AEROFLARE_CI_COMPRESSION"), "compression: zstd, xz, gzip, none")
 	signingKey := fs.String("signing-key", os.Getenv("AEROFLARE_CI_SIGNING_KEY"), "signing key path or env var name")
 	fs.Var(&upstreams, "upstream-cache", "upstream cache URL (repeatable), or 'none' to disable filtering")
+	base := fs.String("base", os.Getenv("AEROFLARE_CI_BASE"), "ref 'changed' diffs against (default: the CI event's base, else HEAD~1)")
+	onMissingBase := fs.String("on-missing-base", os.Getenv("AEROFLARE_CI_ON_MISSING_BASE"), "when no base is reachable: all, error, none")
 	workers := fs.Int("workers", 0, "concurrent workers (0 = default 50)")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		os.Exit(2)
@@ -82,6 +84,8 @@ func main() {
 		SigningKey:     *signingKey,
 		Workers:        *workers,
 		UpstreamCaches: upstreams,
+		Base:           *base,
+		OnMissingBase:  *onMissingBase,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "aeroflare-ci: %v\n", err)
