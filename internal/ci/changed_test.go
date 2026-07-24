@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -164,8 +165,9 @@ func TestChangedExpr_EscapesPath(t *testing.T) {
 	}
 }
 
-// Every output must go through tryEval, or one broken package aborts the whole
-// enumeration; and drvPath carries string context that --json cannot serialise.
+// Every output must go through tryEval, which keeps a package that *throws*
+// from aborting the enumeration; and drvPath carries string context that --json
+// cannot serialise.
 func TestChangedExpr_TolerantAndSerialisable(t *testing.T) {
 	expr := changedExpr("/repo")
 	for _, want := range []string{
@@ -397,12 +399,20 @@ func writeEvent(t *testing.T, body string) string {
 // initRepo builds a two-commit repository, so HEAD~1 exists and differs.
 func initRepo(t *testing.T) string {
 	t.Helper()
+	return initRepoN(t, 2)
+}
+
+// initRepoN builds a repository of n commits, each writing its own number to
+// version.txt, so both the content and the ancestry are predictable.
+func initRepoN(t *testing.T, n int) string {
+	t.Helper()
 	dir := t.TempDir()
 	git(t, dir, "init", "--quiet", "-b", "main")
 	git(t, dir, "config", "user.email", "test@example.com")
 	git(t, dir, "config", "user.name", "test")
 	git(t, dir, "config", "commit.gpgsign", "false")
-	for _, v := range []string{"1", "2"} {
+	for i := 1; i <= n; i++ {
+		v := strconv.Itoa(i)
 		if err := os.WriteFile(filepath.Join(dir, "version.txt"), []byte(v+"\n"), 0o644); err != nil {
 			t.Fatalf("writing version.txt: %v", err)
 		}
@@ -539,6 +549,163 @@ func TestResolveBuilds_MissingBase(t *testing.T) {
 				t.Errorf("the reason was not reported: %q", sb.String())
 			}
 		})
+	}
+}
+
+// The ancestry is the base itself first, then its parents, so the diff prefers
+// the commit it was actually asked for.
+func TestBaseAncestry(t *testing.T) {
+	repo := initRepoN(t, 4)
+	head := gitOut(t, repo, "rev-parse", "HEAD")
+
+	got, err := baseAncestry(repo, head)
+	if err != nil {
+		t.Fatalf("baseAncestry: %v", err)
+	}
+	if len(got) != 4 {
+		t.Fatalf("got %d commits, want the whole 4-commit history: %v", len(got), got)
+	}
+	if got[0] != head {
+		t.Errorf("ancestry[0] = %q, want the base itself %q", got[0], head)
+	}
+	if want := gitOut(t, repo, "rev-parse", "HEAD~1"); got[1] != want {
+		t.Errorf("ancestry[1] = %q, want %q", got[1], want)
+	}
+}
+
+// A history longer than the limit is truncated, so a repository whose flake has
+// been broken for months does not spawn an unbounded number of worktrees.
+func TestBaseAncestry_Bounded(t *testing.T) {
+	repo := initRepoN(t, baseAncestryLimit+5)
+	head := gitOut(t, repo, "rev-parse", "HEAD")
+
+	got, err := baseAncestry(repo, head)
+	if err != nil {
+		t.Fatalf("baseAncestry: %v", err)
+	}
+	if len(got) != baseAncestryLimit {
+		t.Errorf("got %d commits, want at most %d", len(got), baseAncestryLimit)
+	}
+}
+
+// The ordinary path: the requested base evaluates, so nothing else is even
+// looked at.
+func TestFirstEvaluatable_PrefersRequestedBase(t *testing.T) {
+	want := flakeDrvs{System: "x86_64-linux", Packages: map[string]string{"a": "/nix/store/a.drv"}}
+	var seen []string
+	got, sha, err := firstEvaluatable([]string{"aaa", "bbb"}, func(s string) (flakeDrvs, error) {
+		seen = append(seen, s)
+		return want, nil
+	})
+	if err != nil {
+		t.Fatalf("firstEvaluatable: %v", err)
+	}
+	if sha != "aaa" {
+		t.Errorf("used %q, want the requested base", sha)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+	if !reflect.DeepEqual(seen, []string{"aaa"}) {
+		t.Errorf("evaluated %v, want only the requested base", seen)
+	}
+}
+
+// The bug this exists for: a base commit that does not evaluate must not turn
+// into a full rebuild. Its nearest evaluatable ancestor is a real base, and
+// diffing against it builds only what actually changed.
+func TestFirstEvaluatable_SkipsBrokenBase(t *testing.T) {
+	want := flakeDrvs{System: "x86_64-linux", Packages: map[string]string{"a": "/nix/store/a.drv"}}
+	var seen []string
+	got, sha, err := firstEvaluatable([]string{"broken", "alsobroken", "good"}, func(s string) (flakeDrvs, error) {
+		seen = append(seen, s)
+		if s == "good" {
+			return want, nil
+		}
+		return flakeDrvs{}, errors.New("attribute 'callPacakge' missing")
+	})
+	if err != nil {
+		t.Fatalf("firstEvaluatable: %v", err)
+	}
+	if sha != "good" {
+		t.Errorf("used %q, want the nearest evaluatable ancestor", sha)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+	if !reflect.DeepEqual(seen, []string{"broken", "alsobroken", "good"}) {
+		t.Errorf("walked %v, want the ancestry in order", seen)
+	}
+}
+
+// When nothing in reach evaluates there is genuinely no base, and the last
+// failure is what says why.
+func TestFirstEvaluatable_NoneEvaluate(t *testing.T) {
+	_, _, err := firstEvaluatable([]string{"a", "b"}, func(s string) (flakeDrvs, error) {
+		return flakeDrvs{}, errors.New("broken at " + s)
+	})
+	if err == nil {
+		t.Fatal("expected an error when no ancestor evaluates")
+	}
+	if !strings.Contains(err.Error(), "broken at b") {
+		t.Errorf("error should carry the last failure, got: %v", err)
+	}
+}
+
+// An empty ancestry cannot happen from git, but must not panic or silently
+// report success either.
+func TestFirstEvaluatable_EmptyAncestry(t *testing.T) {
+	if _, _, err := firstEvaluatable(nil, func(string) (flakeDrvs, error) {
+		t.Fatal("evaluated something with no ancestry")
+		return flakeDrvs{}, nil
+	}); err == nil {
+		t.Error("expected an error for an empty ancestry")
+	}
+}
+
+// Walking back changes what the diff means, so it cannot be silent: the log has
+// to name both the base that was asked for and the one actually used.
+func TestResolveBuilds_ReportsWalkBack(t *testing.T) {
+	spec := RunSpec{Builds: []string{changedSentinel}}
+	var sb strings.Builder
+	differ := func(string) (changedResult, error) {
+		return changedResult{
+			Changed:   flakeOutputs{System: "x86_64-linux", Packages: []string{"hello"}},
+			Total:     2,
+			Base:      "495c068",
+			Requested: "9af53f6",
+		}, nil
+	}
+	if err := resolveBuilds(&spec, &sb, differ); err != nil {
+		t.Fatalf("resolveBuilds: %v", err)
+	}
+	if !reflect.DeepEqual(spec.Builds, []string{".#packages.x86_64-linux.hello"}) {
+		t.Errorf("got %v, want only the changed package", spec.Builds)
+	}
+	for _, want := range []string{"9af53f6", "495c068"} {
+		if !strings.Contains(sb.String(), want) {
+			t.Errorf("the walk-back was not reported, missing %q: %q", want, sb.String())
+		}
+	}
+}
+
+// A diff against the base it was asked for says nothing extra.
+func TestResolveBuilds_NoWalkBackIsQuiet(t *testing.T) {
+	spec := RunSpec{Builds: []string{changedSentinel}}
+	var sb strings.Builder
+	differ := func(string) (changedResult, error) {
+		return changedResult{
+			Changed:   flakeOutputs{System: "x86_64-linux"},
+			Total:     2,
+			Base:      "495c068",
+			Requested: "495c068",
+		}, nil
+	}
+	if err := resolveBuilds(&spec, &sb, differ); err != nil {
+		t.Fatalf("resolveBuilds: %v", err)
+	}
+	if strings.Contains(sb.String(), "instead") {
+		t.Errorf("reported a walk-back that did not happen: %q", sb.String())
 	}
 }
 

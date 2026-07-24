@@ -103,13 +103,45 @@ A worktree is used rather than stashing or `git show`, because evaluating the
 base needs its whole tree — `flake.nix`, `flake.lock` and every package file —
 on disk and undisturbed by whatever the working tree currently holds.
 
+### When the base does not evaluate
+
+A base commit that will not evaluate is a different thing from no base at all.
+It happens routinely: a commit that broke the flake, followed by the commit that
+fixes it. The fixing commit's base is the broken one, and no diff can be taken
+against a tree whose derivations cannot be read.
+
+The commit is not, however, the only tree that can answer the question. Its
+ancestry can, so the diff walks back — the base, then its first parent, and so
+on for up to ten commits — and uses the nearest commit that does evaluate. The
+line naming the base says so when this happens:
+
+```
+base 9af53f6 could not be evaluated, diffing against 495c068 instead
+changed  1 of 2 outputs differ from 495c068  (x86_64-linux)
+  .#packages.x86_64-linux.hello
+```
+
+An older base is a conservative one. Anything that changed in the commits walked
+over is still a difference from the older tree, so the walk can only widen the
+build set, never narrow it. Nor does it leave a hole in the cache: a commit
+skipped over is one whose flake does not evaluate, so its own build cannot have
+succeeded and there is nothing of it to have cached.
+
+This matters because the evaluation cannot be made partial. `tryEval` guards
+each output, but it catches only `throw` and `assert` — an attribute-missing or
+type error, a `callPacakge` typo being the canonical one, propagates and fails
+the evaluation whole. Isolating outputs one per evaluation would not help
+either: the usual NUR shape, `filterAttrs (_: isDerivation)`, forces every
+sibling in order to produce any single attribute, so one broken package there
+means no package evaluates. A tree is evaluatable or it is not.
+
 ### When there is no base
 
 Several ordinary situations leave nothing to diff against: the first push to a
 branch, whose webhook reports an all-zero `before`; a shallow clone, which is
 what `actions/checkout` produces by default; a force-push that orphaned the old
-commit; and a base commit whose flake no longer evaluates. None of these is a
-fault of the current run, so none is treated as an error by default.
+commit; and a base whose whole reachable ancestry fails to evaluate. None of
+these is a fault of the current run, so none is treated as an error by default.
 
 `on-missing-base` decides. The default, `all`, reports the reason and builds
 everything, because the failure modes are asymmetric: a job that over-builds is

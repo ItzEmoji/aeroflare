@@ -98,10 +98,19 @@ func changedOutputs(base, head flakeDrvs) flakeOutputs {
 //
 // It mirrors discoverExpr's structure — one expression, `or {}` for absent
 // classes, NixOS configurations filtered to the running system — and adds two
-// things discovery does not need. tryEval keeps a single broken package from
-// aborting the whole enumeration, yielding null for that attribute instead; and
+// things discovery does not need. tryEval yields null for a package that
+// *throws*, rather than letting it abort the whole enumeration; and
 // unsafeDiscardStringContext strips the string context a drvPath carries, which
 // --json cannot serialise.
+//
+// tryEval is a narrow net, not a general one: it catches `throw` and `assert`
+// and nothing else, so an attribute-missing or type error — a `callPacakge`
+// typo, say — propagates and fails the evaluation outright. Nor is per-output
+// isolation available to rescue it, because the common NUR shape
+// `filterAttrs (_: isDerivation) …` forces every sibling to produce any one
+// attribute: when one package there is broken, no package evaluates. A tree
+// that will not evaluate is therefore treated as exactly that, and the caller
+// looks to its ancestry rather than pretending the enumeration succeeded.
 func changedExpr(flakePath string) string {
 	return `let
   f = builtins.getFlake "` + escapeNixString(flakePath) + `";
@@ -207,6 +216,68 @@ func verifyCommit(dir, ref string) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
+// baseAncestryLimit bounds how far back the diff will look for a base that
+// evaluates. Each step costs a worktree and an evaluation, and a repository
+// whose flake has been broken for more commits than this has a problem a
+// smarter base will not fix — at which point on-missing-base decides.
+const baseAncestryLimit = 10
+
+// baseAncestry returns sha and its nearest ancestors, nearest first.
+//
+// First-parent, so a merge commit's base is the branch's own history rather
+// than everything the merge dragged in; and bounded, so the walk is a bounded
+// cost rather than a history-length one. A shallow clone simply stops early at
+// its boundary, which needs no special case: a short ancestry is one the walk
+// can exhaust, and exhausting it is already a defined outcome.
+func baseAncestry(dir, sha string) ([]string, error) {
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("git", "rev-list", "--first-parent",
+		fmt.Sprintf("--max-count=%d", baseAncestryLimit), sha)
+	cmd.Dir = dir
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return nil, fmt.Errorf("listing the ancestry of %s: %s", shortSHA(sha), msg)
+		}
+		return nil, fmt.Errorf("listing the ancestry of %s: %w", shortSHA(sha), err)
+	}
+	return strings.Fields(stdout.String()), nil
+}
+
+// baseEval evaluates the flake at one commit and returns its derivations.
+type baseEval func(sha string) (flakeDrvs, error)
+
+// firstEvaluatable walks ancestry in order and returns the derivations of the
+// first commit whose flake evaluates, along with that commit.
+//
+// Walking back is what keeps one broken commit from costing a full rebuild:
+// the requested base failing to evaluate says nothing about whether the current
+// outputs changed, only that this particular commit cannot answer the question.
+// An older ancestor can, and answers it conservatively — it can only make more
+// outputs look changed, never fewer, since anything that changed in between is
+// still a difference from the older tree. Nothing is lost from the cache
+// either: a commit skipped over is one whose own build cannot have succeeded.
+func firstEvaluatable(ancestry []string, eval baseEval) (flakeDrvs, string, error) {
+	if len(ancestry) == 0 {
+		return flakeDrvs{}, "", fmt.Errorf("no base commit to diff against")
+	}
+	var err error
+	for _, sha := range ancestry {
+		var drvs flakeDrvs
+		if drvs, err = eval(sha); err == nil {
+			return drvs, sha, nil
+		}
+	}
+	if len(ancestry) == 1 {
+		return flakeDrvs{}, "", fmt.Errorf("base %s could not be evaluated: %w",
+			shortSHA(ancestry[0]), err)
+	}
+	return flakeDrvs{}, "", fmt.Errorf(
+		"base %s could not be evaluated, nor could any of its %d nearest ancestors: %w",
+		shortSHA(ancestry[0]), len(ancestry)-1, err)
+}
+
 // withBaseWorktree checks sha out into a throwaway worktree of dir and calls fn
 // with its path.
 //
@@ -256,7 +327,8 @@ func withBaseWorktree(dir, sha string, fn func(path string) error) error {
 type changedResult struct {
 	Changed     flakeOutputs // the outputs to build
 	Total       int          // how many outputs were compared
-	Base        string       // the base commit, abbreviated, for reporting
+	Base        string       // the base commit actually diffed against, abbreviated
+	Requested   string       // the base asked for; differs from Base after a walk-back
 	MissingBase string       // why no base was usable, if none was
 	All         flakeOutputs // every discovered output, for the `all` fallback
 }
@@ -303,12 +375,13 @@ func evalDrvs(dir string) (flakeDrvs, error) {
 }
 
 // newDiffer returns the differ that compares a checkout's derivations against
-// baseRef's.
+// baseRef's, or against baseRef's nearest evaluatable ancestor.
 //
-// A missing or unevaluatable base is reported through changedResult rather than
-// as an error: neither is this run's fault, and the policy decides what happens
-// next. A HEAD evaluation failure is an error, because there is then nothing
-// meaningful to build — the same stance `all` takes today.
+// A base that is missing outright, or whose whole reachable ancestry refuses to
+// evaluate, is reported through changedResult rather than as an error: neither
+// is this run's fault, and the policy decides what happens next. A HEAD
+// evaluation failure is an error, because there is then nothing meaningful to
+// build — the same stance `all` takes today.
 func newDiffer(baseRef string) differ {
 	return func(dir string) (changedResult, error) {
 		head, err := evalDrvs(dir)
@@ -322,22 +395,29 @@ func newDiffer(baseRef string) differ {
 			return changedResult{MissingBase: err.Error(), All: all}, nil
 		}
 
-		var base flakeDrvs
-		if err := withBaseWorktree(dir, sha, func(path string) error {
-			var evalErr error
-			base, evalErr = evalDrvs(path)
-			return evalErr
-		}); err != nil {
-			return changedResult{
-				MissingBase: fmt.Sprintf("base %s could not be evaluated: %v", shortSHA(sha), err),
-				All:         all,
-			}, nil
+		ancestry, err := baseAncestry(dir, sha)
+		if err != nil {
+			return changedResult{MissingBase: err.Error(), All: all}, nil
+		}
+
+		base, used, err := firstEvaluatable(ancestry, func(candidate string) (flakeDrvs, error) {
+			var drvs flakeDrvs
+			err := withBaseWorktree(dir, candidate, func(path string) error {
+				var evalErr error
+				drvs, evalErr = evalDrvs(path)
+				return evalErr
+			})
+			return drvs, err
+		})
+		if err != nil {
+			return changedResult{MissingBase: err.Error(), All: all}, nil
 		}
 
 		return changedResult{
-			Changed: changedOutputs(base, head),
-			Total:   head.Total(),
-			Base:    shortSHA(sha),
+			Changed:   changedOutputs(base, head),
+			Total:     head.Total(),
+			Base:      shortSHA(used),
+			Requested: shortSHA(sha),
 		}, nil
 	}
 }
@@ -352,6 +432,12 @@ func resolveChanged(spec *RunSpec, w io.Writer, d differ) ([]string, error) {
 
 	if res.MissingBase == "" {
 		installables := res.Changed.Installables(discoverRef)
+		// Which commit the diff is against changes what its result means, so a
+		// base that is not the one asked for has to be said out loud.
+		if res.Requested != "" && res.Requested != res.Base {
+			_, _ = fmt.Fprintf(w, "base %s could not be evaluated, diffing against %s instead\n",
+				res.Requested, res.Base)
+		}
 		_, _ = fmt.Fprintf(w, "%s\n", changedLine(res.Changed, res.Total, res.Base))
 		for _, i := range installables {
 			_, _ = fmt.Fprintf(w, "  %s\n", i)

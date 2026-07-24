@@ -164,8 +164,13 @@ an error rather than a silent no-op, since nothing else reads it.
 ### `on-missing-base`
 
 What happens when no base commit is reachable. That is a first push to a branch
-(whose reported base is the null SHA), a shallow clone that lacks the commit, a
-force-push that orphaned it, or a base commit whose flake no longer evaluates.
+(whose reported base is the null SHA), a shallow clone that lacks the commit, or
+a force-push that orphaned it.
+
+A base that exists but does not evaluate is not this case. The diff first walks
+back through its first-parent ancestry, up to ten commits, and uses the nearest
+one that does evaluate, reporting the substitution. Only when none of them
+evaluates does `on-missing-base` apply.
 
 | Value | Behaviour |
 |---|---|
