@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aeroflare",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  "keep_vars": true,
+  "previews": {},
+  // Static-only Worker: no script, just serve the built files in dist/
+  "build": { "command": "bun install && bun run build --out-dir dist/aeroflare" },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}

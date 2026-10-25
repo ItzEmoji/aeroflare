@@ -60,7 +60,7 @@ docker run -e AEROFLARE_CACHE=<org>/<cache> -p 8080:8080 ghcr.io/itzemoji/aerofl
 
 Full guide, including private-cache credentials and a persistent
 `docker-compose.yml` setup:
-[Docker](https://aeroflare.pages.dev/docs/how-to/docker).
+[Docker](https://docs.itzemoji.com/aeroflare/docs/how-to/docker).
 
 ---
 
@@ -121,7 +121,7 @@ rather than a copy of nixpkgs.
 
 Full guide, including advanced `config:` mode, multiple caches, GitLab CI,
 generic runners, and binary verification:
-[GitHub Action](https://aeroflare.pages.dev/docs/how-to/github-action).
+[GitHub Action](https://docs.itzemoji.com/aeroflare/docs/how-to/github-action).
 
 ---
 
@@ -181,5 +181,5 @@ Aeroflare is versioned as a command-line tool. A release may change, rename, or 
 
 ## Documentation
 
-For full guides, reference manuals, and architecture explanations, check out the [documentation site](https://aeroflare.pages.dev) or browse [docs/docs/](docs/docs/).
+For full guides, reference manuals, and architecture explanations, check out the [documentation site](https://docs.itzemoji.com/aeroflare) or browse [docs/docs/](docs/docs/).
 
