@@ -41,7 +41,7 @@ jobs:
           ref: ${{ needs.release.outputs.tag_name }}
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version-file: go.mod
       - name: Build release binaries
         env:
           AEROFLARE_VERSION: ${{ needs.release.outputs.tag_name }}
@@ -139,7 +139,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version-file: go.mod
 
       # proxy.golang.org never polls GitHub; it only fetches a version when a
       # client asks for it. This request is what gets the tag onto pkg.go.dev.
