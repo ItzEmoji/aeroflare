@@ -6,7 +6,7 @@ const config: Config = {
   title: 'Aeroflare',
   tagline: 'High-performance OCI-backed Nix binary cache proxy',
   favicon: 'img/favicon.svg',
-  url: 'https://docs.itzemoji.com/aeroflare',
+  url: 'https://docs.itzemoji.com',
   baseUrl: '/aeroflare',
   organizationName: 'aeroflare',
   projectName: 'aeroflare',
