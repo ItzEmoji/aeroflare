@@ -11,8 +11,6 @@ jobs:
           go-version-file: go.mod
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.12
       - name: check public API boundaries
         run: make check-api
   nix-build:
