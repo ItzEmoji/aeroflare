@@ -2,9 +2,11 @@ import React from 'react';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import { motion } from 'framer-motion';
 
 function HomepageHeader() {
+  const logoUrl = useBaseUrl('/img/logo.svg');
   return (
     <header className="hero-centered">
       <div className="container">
@@ -13,7 +15,7 @@ function HomepageHeader() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          <img src="/img/logo.svg" alt="Aeroflare Logo" style={{ width: '80px', marginBottom: '1.5rem' }} />
+          <img src={logoUrl} alt="Aeroflare Logo" style={{ width: '80px', marginBottom: '1.5rem' }} />
           <h1 style={{ fontSize: 'clamp(2.2rem, 4.5vw, 3.8rem)', fontWeight: 700, marginBottom: '1rem', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
             High-Performance OCI-Backed <br />
             <span className="gradient-text">Nix Binary Cache</span>
