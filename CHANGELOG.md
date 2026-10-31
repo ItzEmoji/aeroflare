@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.14.0](https://github.com/ItzEmoji/aeroflare/compare/v1.13.0...v1.14.0) (2026-10-25)
+
+
+### Features
+
+* migrate from pages to workers ([#46](https://github.com/ItzEmoji/aeroflare/issues/46)) ([670893b](https://github.com/ItzEmoji/aeroflare/commit/670893b9cc2f057c0f24ae61ea19a4432e36f98a))
+
+
+### Bug Fixes
+
+* **docs:** resolve homepage logo path with baseUrl ([1e3491d](https://github.com/ItzEmoji/aeroflare/commit/1e3491d31507f466d436aabf003cecf47e77e5ca))
+
 ## [1.13.0](https://github.com/ItzEmoji/aeroflare/compare/v1.12.0...v1.13.0) (2026-07-24)
 
 
