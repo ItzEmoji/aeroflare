@@ -75,8 +75,8 @@ func TestCollectAssets_MissingDir(t *testing.T) {
 func fakeAssetsAPI(t *testing.T, buckets [][]string, uploaded map[string]string) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/accounts/acc/workers/scripts/w/assets-upload-session":
+		switch r.URL.Path {
+		case "/accounts/acc/workers/scripts/w/assets-upload-session":
 			if r.Header.Get("Authorization") != "Bearer cf-token" {
 				t.Errorf("session auth = %q", r.Header.Get("Authorization"))
 			}
@@ -96,7 +96,7 @@ func fakeAssetsAPI(t *testing.T, buckets [][]string, uploaded map[string]string)
 				"success": true,
 				"result":  map[string]any{"jwt": "upload-jwt", "buckets": buckets},
 			})
-		case r.URL.Path == "/accounts/acc/workers/assets/upload":
+		case "/accounts/acc/workers/assets/upload":
 			if r.Header.Get("Authorization") != "Bearer upload-jwt" {
 				t.Errorf("upload auth = %q", r.Header.Get("Authorization"))
 			}
