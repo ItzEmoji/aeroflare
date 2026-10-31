@@ -1,132 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nix binary cache</title>
-<link rel="icon" href="/logo.svg" type="image/svg+xml">
-<script>
-  // Apply a saved Light/Dark choice before first paint; none means System.
-  try {
-    var t = localStorage.getItem("theme");
-    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
-  } catch (e) {}
-</script>
-<style>
-  :root {
-    --bg: #ffffff;
-    --fg: #1d2327;
-    --muted: #5f6b73;
-    --line: #e3e8eb;
-    --panel: #f6f8f9;
-    --accent: #0f7b8a;
-    color-scheme: light;
-  }
-  :root[data-theme="dark"] {
-    --bg: #111618;
-    --fg: #e4e9ec;
-    --muted: #96a3ab;
-    --line: #263035;
-    --panel: #182024;
-    --accent: #6ad7e5;
-    color-scheme: dark;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #111618;
-      --fg: #e4e9ec;
-      --muted: #96a3ab;
-      --line: #263035;
-      --panel: #182024;
-      --accent: #6ad7e5;
-      color-scheme: dark;
-    }
-  }
-  .theme {
-    position: absolute; top: 1rem; right: 1rem;
-    font: inherit; font-size: 0.85rem; color: var(--muted);
-    background: transparent; border: 1px solid var(--line); border-radius: 6px;
-    padding: 0.25rem 0.6rem; cursor: pointer;
-  }
-  .theme:hover { color: var(--fg); }
-  .theme:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--fg);
-    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  }
-  main { max-width: 40rem; margin: 0 auto; padding: 4rem 1.25rem 2rem; }
-  header { text-align: center; margin-bottom: 2.5rem; }
-  header img { width: 140px; height: 140px; }
-  h1 { font-size: 1.75rem; margin: 0.5rem 0 0.75rem; letter-spacing: -0.01em; }
-  h2 { font-size: 1.05rem; margin: 2.5rem 0 0.75rem; }
-  p { margin: 0 0 1rem; }
-  .lead { color: var(--muted); font-size: 1.05rem; }
-  a { color: var(--accent); text-underline-offset: 2px; }
-  code { font: 0.9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .lead code { color: var(--fg); }
-  ul.api { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  ul.api li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 1rem; justify-content: space-between; padding: 0.7rem 1rem; }
-  ul.api li + li { border-top: 1px solid var(--line); }
-  ul.api li:nth-child(odd) { background: var(--panel); }
-  ul.api span { color: var(--muted); font-size: 0.95rem; }
-  footer { max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; text-align: center; }
-  footer a { color: inherit; }
-</style>
-</head>
-<body>
-<button class="theme" type="button" title="Switch between system, light and dark theme">Theme: System</button>
-<main>
-  <header>
-    <a href="https://github.com/ItzEmoji/aeroflare"><img src="/logo.svg" alt="aeroflare logo"></a>
-    <h1>Nix binary cache</h1>
-    <p class="lead"><code>https://<span class="host">this-host</span>/</code> provides prebuilt
-    binaries for Nix. Once it is added as a substituter, Nix downloads from it
-    automatically instead of building locally.</p>
-  </header>
+  <head>
+    <title>Nix binary cache</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+    <style>
+      body {
+        max-width: 800px;
+        margin: 4em auto;
+        padding: 0 1em;
+        font: 18px/1.6 system-ui, sans-serif;
+        color: #222;
+        background: #fff;
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { color: #ddd; background: #111; }
+        a { color: #6ad7e5; }
+      }
+      p { text-align: center; }
+      hr { border: 0; border-top: 1px solid #8884; margin: 2em 0; }
+    </style>
+  </head>
+  <body>
+    <p>
+      <a href="https://github.com/ItzEmoji/aeroflare">
+        <img src="/logo.svg" width="200" alt="aeroflare logo" />
+      </a>
+    </p>
 
-  <h2>API</h2>
-  <ul class="api">
-    <li><a href="/nix-cache-info"><code>/nix-cache-info</code></a><span>Cache metadata</span></li>
-    <li><a href="/api/public-key"><code>/api/public-key</code></a><span>Public key the store paths are signed with</span></li>
-    <li><code>/&lt;hash&gt;.narinfo</code><span>Information about one store path</span></li>
-    <li><code>/nar/&lt;file&gt;</code><span>The compressed store path</span></li>
-  </ul>
+    <p>
+      <code>https://<span class="host">this-host</span>/</code> provides prebuilt
+      binaries for Nix. Once added as a substituter, Nix uses it automatically to
+      speed up builds.
+    </p>
 
-  <h2>Using this cache</h2>
-  <p>Add this URL as a substituter and trust the key from
-  <a href="/api/public-key"><code>/api/public-key</code></a>. The NixOS Wiki shows how
-  to do that on NixOS and other systems:
-  <a href="https://wiki.nixos.org/wiki/Binary_Cache#Using_a_binary_cache">Binary Cache &rarr; Using a binary cache</a>.</p>
-  <p>To run a cache like this one yourself, see the
-  <a href="https://docs.itzemoji.com/aeroflare/">aeroflare documentation</a>.</p>
-</main>
-<footer>
-  Served by <a href="https://github.com/ItzEmoji/aeroflare">aeroflare</a>
-</footer>
-<script>
-  for (const el of document.querySelectorAll(".host")) el.textContent = location.host;
+    <hr />
 
-  // Theme button: cycles System -> Light -> Dark and remembers the choice.
-  (function () {
-    var root = document.documentElement;
-    var button = document.querySelector(".theme");
-    var order = ["system", "light", "dark"];
-    var names = { system: "System", light: "Light", dark: "Dark" };
-    function current() { return root.dataset.theme || "system"; }
-    function show() { button.textContent = "Theme: " + names[current()]; }
-    button.addEventListener("click", function () {
-      var next = order[(order.indexOf(current()) + 1) % order.length];
-      if (next === "system") delete root.dataset.theme; else root.dataset.theme = next;
-      try {
-        if (next === "system") localStorage.removeItem("theme"); else localStorage.setItem("theme", next);
-      } catch (e) {}
-      show();
-    });
-    show();
-  })();
-</script>
-</body>
+    <p>
+      To use it, add this URL as a substituter and trust the key from
+      <a href="/api/public-key">/api/public-key</a>. The
+      <a href="https://wiki.nixos.org/wiki/Binary_Cache#Using_a_binary_cache">NixOS Wiki</a>
+      explains how.
+    </p>
+    <p>
+      Cache metadata is at <a href="/nix-cache-info">/nix-cache-info</a>. To run a
+      cache like this yourself, see the
+      <a href="https://docs.itzemoji.com/aeroflare/">aeroflare documentation</a>.
+    </p>
+
+    <script>
+      for (const el of document.querySelectorAll(".host")) el.textContent = location.host;
+    </script>
+  </body>
 </html>
