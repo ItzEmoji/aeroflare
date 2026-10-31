@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nix binary cache</title>
+<style>
+  body { font-family: sans-serif; max-width: 42em; margin: 2em auto; padding: 0 1em; line-height: 1.5; }
+  pre { background: #f4f4f4; padding: 0.6em 0.8em; overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>Nix binary cache</h1>
+
+<p>This is a binary cache for <a href="https://nixos.org/">Nix</a>. It serves
+pre-built store paths to Nix clients and is not meant to be browsed.</p>
+
+<p>To use it, add it to your <code>nix.conf</code> together with its signing key
+from <a href="/api/public-key">/api/public-key</a>:</p>
+
+<pre>extra-substituters = https://<span class="host">this-host</span>
+extra-trusted-public-keys = &lt;key from /api/public-key&gt;</pre>
+
+<p>Cache metadata: <a href="/nix-cache-info">/nix-cache-info</a></p>
+
+<p>Served by <a href="https://github.com/ItzEmoji/aeroflare">aeroflare</a>.</p>
+
+<script>
+  for (const el of document.querySelectorAll(".host")) el.textContent = location.host;
+</script>
+</body>
+</html>

@@ -4,6 +4,13 @@
   "main": "worker.js",
   "compatibility_date": "2026-06-20",
 
+  // Static files served before the Worker runs. public/index.html is the
+  // landing page at "/"; edit or replace it to customize the page. Paths with
+  // no matching file (narinfo, NAR, ...) fall through to the Worker.
+  "assets": {
+    "directory": "./public",
+  },
+
   // Workers Logs and traces. Declared here because `wrangler deploy` overwrites
   // dashboard settings with this file, which would otherwise switch them off.
   "observability": {

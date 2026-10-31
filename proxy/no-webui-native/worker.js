@@ -35,6 +35,7 @@ const NARINFO_FIELDS = [
 const CACHE_IMMUTABLE = "public, max-age=31536000, immutable"; // 1 year
 const CACHE_CACHE_INFO = "public, max-age=86400"; // 1 day
 const CACHE_PUBLIC_KEY = "public, max-age=300"; // 5 minutes
+const CACHE_INDEX = "public, max-age=3600"; // 1 hour (fallback landing page)
 const CACHE_NOT_FOUND = "public, max-age=60"; // 1 minute
 const CACHE_ERROR = "no-store";
 
@@ -271,11 +272,55 @@ async function handleNar(env, path) {
   return notFound();
 }
 
+// handleIndex serves the built-in landing page. Normally "/" is answered by the
+// static asset public/index.html before the Worker runs (that is the copy users
+// edit); this fallback covers deployments without assets, e.g. older CLIs that
+// upload worker.js alone. Keep the wording in sync with public/index.html.
+function handleIndex(url) {
+  const host = url.host.replace(/[<>&"]/g, "");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nix binary cache</title>
+<style>
+  body { font-family: sans-serif; max-width: 42em; margin: 2em auto; padding: 0 1em; line-height: 1.5; }
+  pre { background: #f4f4f4; padding: 0.6em 0.8em; overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>Nix binary cache</h1>
+
+<p>This is a binary cache for <a href="https://nixos.org/">Nix</a>. It serves
+pre-built store paths to Nix clients and is not meant to be browsed.</p>
+
+<p>To use it, add it to your <code>nix.conf</code> together with its signing key
+from <a href="/api/public-key">/api/public-key</a>:</p>
+
+<pre>extra-substituters = https://${host}
+extra-trusted-public-keys = &lt;key from /api/public-key&gt;</pre>
+
+<p>Cache metadata: <a href="/nix-cache-info">/nix-cache-info</a></p>
+
+<p>Served by <a href="https://github.com/ItzEmoji/aeroflare">aeroflare</a>.</p>
+</body>
+</html>
+`;
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": CACHE_INDEX },
+  });
+}
+
 export default {
   async fetch(request, env, ctx) {
     try {
       const url = new URL(request.url);
       const path = url.pathname.replace(/\/$/, "");
+
+      if (path === "" || path === "/index.html") {
+        return handleIndex(url);
+      }
 
       if (path === "/nix-cache-info") {
         return new Response("StoreDir: /nix/store\nWantMassQuery: 1\nPriority: 40\n", {
