@@ -286,24 +286,45 @@ function handleIndex(url) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nix binary cache</title>
 <link rel="icon" href="https://docs.itzemoji.com/aeroflare/img/logo.svg" type="image/svg+xml">
+<script>
+  // Apply the saved theme before first paint so the page never flashes.
+  try {
+    var t = localStorage.getItem("theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
 <style>
   :root {
-    --bg: #ffffff;
-    --fg: #1d2327;
-    --muted: #5f6b73;
-    --line: #e3e8eb;
-    --panel: #f6f8f9;
+    --bg: #fafbfc;
+    --surface: #ffffff;
+    --fg: #182024;
+    --muted: #5d6970;
+    --line: #e2e7ea;
     --accent: #0f7b8a;
-    color-scheme: light dark;
+    --accent-soft: #e3f6f8;
+    --radius: 12px;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1214;
+    --surface: #151b1e;
+    --fg: #e6ebee;
+    --muted: #93a0a7;
+    --line: #242d31;
+    --accent: #6ad7e5;
+    --accent-soft: #15292d;
+    color-scheme: dark;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #111618;
-      --fg: #e4e9ec;
-      --muted: #96a3ab;
-      --line: #263035;
-      --panel: #182024;
+    :root:not([data-theme="light"]) {
+      --bg: #0e1214;
+      --surface: #151b1e;
+      --fg: #e6ebee;
+      --muted: #93a0a7;
+      --line: #242d31;
       --accent: #6ad7e5;
+      --accent-soft: #15292d;
+      color-scheme: dark;
     }
   }
   * { box-sizing: border-box; }
@@ -313,54 +334,147 @@ function handleIndex(url) {
     color: var(--fg);
     font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  main { max-width: 40rem; margin: 0 auto; padding: 4rem 1.25rem 2rem; }
-  header { text-align: center; margin-bottom: 2.5rem; }
-  header img { width: 140px; height: 140px; }
-  h1 { font-size: 1.75rem; margin: 0.5rem 0 0.75rem; letter-spacing: -0.01em; }
-  h2 { font-size: 1.05rem; margin: 2.5rem 0 0.75rem; }
-  p { margin: 0 0 1rem; }
-  .lead { color: var(--muted); font-size: 1.05rem; }
-  a { color: var(--accent); text-underline-offset: 2px; }
-  code { font: 0.9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .lead code { color: var(--fg); }
-  ul.api { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  ul.api li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 1rem; justify-content: space-between; padding: 0.7rem 1rem; }
-  ul.api li + li { border-top: 1px solid var(--line); }
-  ul.api li:nth-child(odd) { background: var(--panel); }
-  ul.api span { color: var(--muted); font-size: 0.95rem; }
-  footer { max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; text-align: center; }
-  footer a { color: inherit; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+
+  .bar {
+    max-width: 46rem; margin: 0 auto; padding: 1rem 1.25rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 0.5rem; color: var(--fg); font-weight: 600; }
+  .brand img { width: 28px; height: 28px; }
+  .brand:hover { text-decoration: none; }
+
+  button {
+    font: inherit; color: var(--fg); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .theme { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.7rem; font-size: 0.875rem; }
+  .theme svg { width: 16px; height: 16px; }
+
+  main { max-width: 46rem; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+  .hero { text-align: center; padding-bottom: 1rem; }
+  .hero img { width: 120px; height: 120px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 1rem 0 0.5rem; letter-spacing: -0.02em; }
+  .lead { color: var(--muted); font-size: 1.05rem; max-width: 34rem; margin: 0 auto 1.5rem; }
+
+  .url {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+    padding: 0.3rem 0.3rem 0.3rem 1rem; max-width: 100%;
+  }
+  .url code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .url button { border-radius: 999px; padding: 0.3rem 0.85rem; font-size: 0.85rem; }
+
+  h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 3rem 0 0.75rem; }
+
+  .api { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+  .api li { display: flex; align-items: center; gap: 0.75rem; padding: 0.8rem 1rem; flex-wrap: wrap; }
+  .api li + li { border-top: 1px solid var(--line); }
+  .api .get {
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em;
+    color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 0.1rem 0.45rem;
+  }
+  .api .desc { color: var(--muted); font-size: 0.925rem; margin-left: auto; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.75rem; }
+  .card {
+    display: block; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 1rem 1.1rem; color: var(--fg); transition: border-color 0.15s;
+  }
+  .card:hover { border-color: var(--accent); text-decoration: none; }
+  .card strong { display: block; margin-bottom: 0.2rem; }
+  .card span { color: var(--muted); font-size: 0.925rem; }
+  .note { color: var(--muted); font-size: 0.925rem; margin-top: 0.9rem; }
+
+  footer { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; color: var(--muted); font-size: 0.875rem; text-align: center; }
+  footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 </style>
 </head>
 <body>
+<div class="bar">
+  <a class="brand" href="https://github.com/ItzEmoji/aeroflare"><img src="https://docs.itzemoji.com/aeroflare/img/logo.svg" alt="">aeroflare</a>
+  <button class="theme" type="button" aria-label="Switch color theme">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/>
+    </svg>
+    <span>System</span>
+  </button>
+</div>
+
 <main>
-  <header>
-    <a href="https://github.com/ItzEmoji/aeroflare"><img src="https://docs.itzemoji.com/aeroflare/img/logo.svg" alt="aeroflare logo"></a>
+  <section class="hero">
+    <img src="https://docs.itzemoji.com/aeroflare/img/logo.svg" alt="aeroflare logo">
     <h1>Nix binary cache</h1>
-    <p class="lead"><code>https://${host}/</code> provides prebuilt
-    binaries for Nix. Once it is added as a substituter, Nix downloads from it
-    automatically instead of building locally.</p>
-  </header>
+    <p class="lead">Prebuilt binaries for Nix. Once this cache is added as a
+    substituter, Nix downloads from it automatically instead of building locally.</p>
+    <div class="url">
+      <code>https://${host}/</code>
+      <button class="copy" type="button">Copy</button>
+    </div>
+  </section>
 
   <h2>API</h2>
   <ul class="api">
-    <li><a href="/nix-cache-info"><code>/nix-cache-info</code></a><span>Cache metadata</span></li>
-    <li><a href="/api/public-key"><code>/api/public-key</code></a><span>Public key the store paths are signed with</span></li>
-    <li><code>/&lt;hash&gt;.narinfo</code><span>Information about one store path</span></li>
-    <li><code>/nar/&lt;file&gt;</code><span>The compressed store path</span></li>
+    <li><span class="get">GET</span><a href="/nix-cache-info"><code>/nix-cache-info</code></a><span class="desc">Cache metadata</span></li>
+    <li><span class="get">GET</span><a href="/api/public-key"><code>/api/public-key</code></a><span class="desc">Public signing key</span></li>
+    <li><span class="get">GET</span><code>/&lt;hash&gt;.narinfo</code><span class="desc">Information about one store path</span></li>
+    <li><span class="get">GET</span><code>/nar/&lt;file&gt;</code><span class="desc">The compressed store path</span></li>
   </ul>
 
   <h2>Using this cache</h2>
-  <p>Add this URL as a substituter and trust the key from
-  <a href="/api/public-key"><code>/api/public-key</code></a>. The NixOS Wiki shows how
-  to do that on NixOS and other systems:
-  <a href="https://wiki.nixos.org/wiki/Binary_Cache#Using_a_binary_cache">Binary Cache &rarr; Using a binary cache</a>.</p>
-  <p>To run a cache like this one yourself, see the
-  <a href="https://docs.itzemoji.com/aeroflare/">aeroflare documentation</a>.</p>
+  <div class="cards">
+    <a class="card" href="https://wiki.nixos.org/wiki/Binary_Cache#Using_a_binary_cache">
+      <strong>NixOS Wiki &rarr;</strong>
+      <span>How to add a binary cache on NixOS and other systems.</span>
+    </a>
+    <a class="card" href="https://docs.itzemoji.com/aeroflare/">
+      <strong>aeroflare docs &rarr;</strong>
+      <span>Run a cache like this one on your own registry.</span>
+    </a>
+  </div>
+  <p class="note">Trust the key from <a href="/api/public-key"><code>/api/public-key</code></a>
+  together with the URL above, or Nix will reject the downloads.</p>
 </main>
-<footer>
-  Served by <a href="https://github.com/ItzEmoji/aeroflare">aeroflare</a>
-</footer>
+
+<footer>Served by <a href="https://github.com/ItzEmoji/aeroflare">aeroflare</a></footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+
+    var url = "https://" + location.host + "/";
+    var hosts = document.querySelectorAll(".host");
+    for (var i = 0; i < hosts.length; i++) hosts[i].textContent = location.host;
+
+    var copy = document.querySelector(".copy");
+    copy.addEventListener("click", function () {
+      navigator.clipboard.writeText(url).then(function () {
+        copy.textContent = "Copied";
+        setTimeout(function () { copy.textContent = "Copy"; }, 1500);
+      });
+    });
+
+    // Theme button cycles System -> Light -> Dark and remembers the choice.
+    var order = ["system", "light", "dark"];
+    var labels = { system: "System", light: "Light", dark: "Dark" };
+    var button = document.querySelector(".theme");
+    var label = button.querySelector("span");
+    function current() { return root.dataset.theme || "system"; }
+    function apply(t) {
+      if (t === "system") delete root.dataset.theme; else root.dataset.theme = t;
+      try { if (t === "system") localStorage.removeItem("theme"); else localStorage.setItem("theme", t); } catch (e) {}
+      label.textContent = labels[t];
+    }
+    label.textContent = labels[current()];
+    button.addEventListener("click", function () {
+      apply(order[(order.indexOf(current()) + 1) % order.length]);
+    });
+  })();
+</script>
 </body>
 </html>
 `;
