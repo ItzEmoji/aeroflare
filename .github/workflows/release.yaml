@@ -35,7 +35,6 @@ jobs:
       id-token: write
       attestations: write
     steps:
-
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.release.outputs.tag_name }}
