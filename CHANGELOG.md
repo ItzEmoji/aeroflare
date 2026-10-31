@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.15.0](https://github.com/ItzEmoji/aeroflare/compare/v1.14.0...v1.15.0) (2026-10-31)
+
+
+### Features
+
+* **init:** upload the proxy's static assets when deploying ([024763c](https://github.com/ItzEmoji/aeroflare/commit/024763cfcb138dcf9efd570fa6d62528be265c00))
+* **proxy:** add theme switcher and modernize landing page ([e656233](https://github.com/ItzEmoji/aeroflare/commit/e6562335170fc041479e476e2278da6a72982b8c))
+* **proxy:** cache narinfo and NAR responses at the edge for 1 year ([3b51904](https://github.com/ItzEmoji/aeroflare/commit/3b519040dd1b3a6dd50f24b7ac2902b5c42190e8))
+* **proxy:** redesign landing page with logo and API overview ([a258031](https://github.com/ItzEmoji/aeroflare/commit/a258031190c4b4d0577608aab958c49acaafa817))
+* **proxy:** restore simple landing page and add theme switch ([d7e99b9](https://github.com/ItzEmoji/aeroflare/commit/d7e99b93a1814c0455582bad028468fbadbcd69a))
+* **proxy:** serve a landing page at the cache root ([0f6a985](https://github.com/ItzEmoji/aeroflare/commit/0f6a98539d074c8c599fb05b90386e6fab8e76c9))
+* **proxy:** simplify landing page to a cache.nixos.org-style page ([f9d9c78](https://github.com/ItzEmoji/aeroflare/commit/f9d9c7883d79b8f9380ecea47bd4cd9aeba56f21))
+
+
+### Bug Fixes
+
+* **init:** enable Workers Cache when deploying the proxy via the API ([0bc54d7](https://github.com/ItzEmoji/aeroflare/commit/0bc54d75d08d8f675fde069e780c114869d35040))
+* worker cache ([032fd95](https://github.com/ItzEmoji/aeroflare/commit/032fd95d788baabe47042727ed60c1e3a5dd2bb1))
+
 ## [1.14.0](https://github.com/ItzEmoji/aeroflare/compare/v1.13.0...v1.14.0) (2026-10-25)
 
 
