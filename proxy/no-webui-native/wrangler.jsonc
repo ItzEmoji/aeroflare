@@ -4,6 +4,13 @@
   "main": "worker.js",
   "compatibility_date": "2026-06-20",
 
+  // Workers Logs and traces. Declared here because `wrangler deploy` overwrites
+  // dashboard settings with this file, which would otherwise switch them off.
+  "observability": {
+    "logs": { "enabled": true },
+    "traces": { "enabled": true },
+  },
+
   // Workers Cache: serve cached responses in front of the Worker, honoring the
   // Cache-Control it returns (narinfo/NAR: 1 year). cross_version_cache keeps
   // those entries across redeploys instead of keying them to the Worker version.
