@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -126,9 +127,23 @@ func deployWorker(cfg *InitConfig) error {
 		secrets["NIXCACHE_TOKEN"] = base64.StdEncoding.EncodeToString([]byte(cfg.WorkerToken))
 	}
 
+	// Static assets (the landing page) live in public/ next to worker.js, both
+	// in a checkout and in the layout fetchLatestWorkerScript extracts.
+	assets, err := collectAssets(filepath.Join(filepath.Dir(scriptPath), workerAssetsDirName))
+	if err != nil {
+		return err
+	}
+	assetsJWT, err := uploadWorkerAssets(cfg.CloudflareAccountID, cfg.CloudflareToken, cfg.WorkerName, assets)
+	if err != nil {
+		return err
+	}
+	if len(assets) > 0 {
+		printInfo(fmt.Sprintf("Uploaded %d static asset(s)", len(assets)))
+	}
+
 	scriptTag, err := deployWorkerViaAPI(
 		cfg.CloudflareAccountID, cfg.CloudflareToken,
-		cfg.WorkerName, scriptPath, "2024-12-01", vars, secrets,
+		cfg.WorkerName, scriptPath, "2024-12-01", assetsJWT, vars, secrets,
 	)
 	if err != nil {
 		return err
@@ -219,7 +234,7 @@ func fetchLatestWorkerScript() (string, error) {
 		return "", fmt.Errorf("download release %s: HTTP %d", tag, resp.StatusCode)
 	}
 
-	script, err := workerScriptFromTarball(resp.Body)
+	bundle, err := workerBundleFromTarball(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -229,27 +244,54 @@ func fetchLatestWorkerScript() (string, error) {
 		return "", err
 	}
 
+	// Lay the files out like the repo (worker.js with public/ beside it), so
+	// deployWorker finds the assets the same way as for a local checkout.
+	write := func(p string, data []byte) error {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(p, data, 0o644)
+	}
 	scriptPath := filepath.Join(tmpDir, "worker.js")
-	if err := os.WriteFile(scriptPath, script, 0644); err != nil {
+	if err := write(scriptPath, bundle.Script); err != nil {
 		_ = os.RemoveAll(tmpDir)
 		return "", err
+	}
+	for rel, data := range bundle.Assets {
+		if err := write(filepath.Join(tmpDir, workerAssetsDirName, filepath.FromSlash(rel)), data); err != nil {
+			_ = os.RemoveAll(tmpDir)
+			return "", err
+		}
 	}
 
 	return scriptPath, nil
 }
 
-// workerScriptFromTarball reads a gzipped release tarball and returns the
-// contents of the worker script. Entries are matched on their path below the
-// archive's top-level directory (named "<repo>-<tag>"), which is the component
-// `tar --strip-components=1` used to discard. Nothing is written using a path
-// taken from the archive, so a hostile entry name cannot escape anywhere.
-func workerScriptFromTarball(r io.Reader) ([]byte, error) {
+// workerBundle is what init deploys from a release: the worker script and its
+// static assets, keyed by slash-separated path below public/.
+type workerBundle struct {
+	Script []byte
+	Assets map[string][]byte
+}
+
+// workerAssetsRelPrefix is the static-assets folder inside the release tarball.
+const workerAssetsRelPrefix = "proxy/no-webui-native/" + workerAssetsDirName + "/"
+
+// workerBundleFromTarball reads a gzipped release tarball and returns the
+// worker script plus the files under its public/ folder (absent in releases
+// before the landing page; then Assets is empty). Entries are matched on their
+// path below the archive's top-level directory (named "<repo>-<tag>"), which is
+// the component `tar --strip-components=1` used to discard. Asset paths that
+// are not local (e.g. "public/../x") are skipped, so a hostile entry name
+// cannot escape the directory the caller writes them to.
+func workerBundleFromTarball(r io.Reader) (*workerBundle, error) {
 	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("read release tarball: %w", err)
 	}
 	defer func() { _ = gz.Close() }()
 
+	b := &workerBundle{Assets: map[string][]byte{}}
 	tr := tar.NewReader(gz)
 	for {
 		hdr, err := tr.Next()
@@ -262,12 +304,32 @@ func workerScriptFromTarball(r io.Reader) ([]byte, error) {
 		if hdr.Typeflag != tar.TypeReg {
 			continue
 		}
-		if _, rest, ok := strings.Cut(hdr.Name, "/"); ok && rest == workerScriptRelPath {
-			return io.ReadAll(io.LimitReader(tr, maxWorkerScriptBytes))
+		_, rest, ok := strings.Cut(hdr.Name, "/")
+		if !ok {
+			continue
+		}
+		switch {
+		case rest == workerScriptRelPath:
+			if b.Script, err = io.ReadAll(io.LimitReader(tr, maxWorkerScriptBytes)); err != nil {
+				return nil, fmt.Errorf("read release tarball: %w", err)
+			}
+		case strings.HasPrefix(rest, workerAssetsRelPrefix):
+			rel := strings.TrimPrefix(rest, workerAssetsRelPrefix)
+			if !filepath.IsLocal(filepath.FromSlash(rel)) {
+				continue
+			}
+			data, err := io.ReadAll(io.LimitReader(tr, maxWorkerScriptBytes))
+			if err != nil {
+				return nil, fmt.Errorf("read release tarball: %w", err)
+			}
+			b.Assets[path.Clean(rel)] = data
 		}
 	}
 
-	return nil, fmt.Errorf("%s not found in release tarball", workerScriptRelPath)
+	if b.Script == nil {
+		return nil, fmt.Errorf("%s not found in release tarball", workerScriptRelPath)
+	}
+	return b, nil
 }
 
 // workerEnvVars builds the environment variable map for the worker deployment.

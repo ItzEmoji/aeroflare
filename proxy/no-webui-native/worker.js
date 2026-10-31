@@ -25,6 +25,25 @@ const NARINFO_FIELDS = [
   ["sig", "Sig"],
 ];
 
+// --- Edge cache policy (Workers Cache: enabled by `init` and wrangler config) ---
+// Workers Cache sits in front of this Worker and honors the Cache-Control we
+// return (RFC 9111); without one it falls back to a short heuristic TTL.
+// narinfo and NAR responses are keyed by the store hash, so their content never
+// changes: cache them for a year. Misses must stay short, or a path pushed after
+// the first lookup would be reported missing for a year. The public key can be
+// rotated by `configure`, so it gets a short TTL too.
+const CACHE_IMMUTABLE = "public, max-age=31536000, immutable"; // 1 year
+const CACHE_CACHE_INFO = "public, max-age=86400"; // 1 day
+const CACHE_PUBLIC_KEY = "public, max-age=300"; // 5 minutes
+const CACHE_INDEX = "public, max-age=3600"; // 1 hour (fallback landing page)
+const CACHE_NOT_FOUND = "public, max-age=60"; // 1 minute
+const CACHE_ERROR = "no-store";
+
+// notFound returns a 404 that is only briefly cacheable.
+function notFound(body = "Not found") {
+  return new Response(body, { status: 404, headers: { "Cache-Control": CACHE_NOT_FOUND } });
+}
+
 // --- Module-global caches (persist across requests within a Worker isolate) ---
 
 // Bearer token cache. Registry tokens live a few minutes and are identical for
@@ -203,9 +222,11 @@ async function handlePublicKey(env) {
   const ann = (manifest && manifest.annotations) || {};
   const key = ann["aeroflare.public-key"] || ann["public-key"];
   if (key) {
-    return new Response(key + "\n", { headers: { "Content-Type": "text/plain" } });
+    return new Response(key + "\n", {
+      headers: { "Content-Type": "text/plain", "Cache-Control": CACHE_PUBLIC_KEY },
+    });
   }
-  return new Response("No public key configured", { status: 404 });
+  return notFound("No public key configured");
 }
 
 async function handleNarinfo(env, path) {
@@ -214,10 +235,10 @@ async function handleNarinfo(env, path) {
   const ann = narAnnotations(manifest);
   if (ann) {
     return new Response(generateNarinfo(ann), {
-      headers: { "Content-Type": "text/x-nix-narinfo" },
+      headers: { "Content-Type": "text/x-nix-narinfo", "Cache-Control": CACHE_IMMUTABLE },
     });
   }
-  return new Response("Not found", { status: 404 });
+  return notFound();
 }
 
 async function handleNar(env, path) {
@@ -228,7 +249,7 @@ async function handleNar(env, path) {
   // NAR basename (e.g. <hash>.nar.zst -> <hash>).
   const narIdx = basename.indexOf(".nar");
   const tag = narIdx !== -1 ? basename.slice(0, narIdx) : basename;
-  if (!tag) return new Response("Not found", { status: 404 });
+  if (!tag) return notFound();
 
   const manifest = await resolveManifest(env, tag);
   const layer = selectNarLayer(manifest);
@@ -237,7 +258,7 @@ async function handleNar(env, path) {
     try {
       const res = await registryFetch(env, url, null);
       if (res.ok) {
-        const headers = { "Content-Type": ct };
+        const headers = { "Content-Type": ct, "Cache-Control": CACHE_IMMUTABLE };
         const len = res.headers.get("Content-Length");
         if (len) headers["Content-Length"] = len;
         return new Response(res.body, { headers });
@@ -248,7 +269,77 @@ async function handleNar(env, path) {
     }
   }
 
-  return new Response("Not found", { status: 404 });
+  return notFound();
+}
+
+// handleIndex serves the built-in landing page. Normally "/" is answered by the
+// static asset public/index.html before the Worker runs (that is the copy users
+// edit); this fallback covers deployments without assets, e.g. older CLIs that
+// upload worker.js alone. It is public/index.html with the host filled in
+// server-side and the logo loaded from the docs site; keep the two in sync.
+function handleIndex(url) {
+  const host = url.host.replace(/[<>&"]/g, "");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Nix binary cache</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="https://docs.itzemoji.com/aeroflare/img/logo.svg" type="image/svg+xml" />
+    <style>
+      body {
+        max-width: 800px;
+        margin: 4em auto;
+        padding: 0 1em;
+        font: 18px/1.6 system-ui, sans-serif;
+        color: #222;
+        background: #fff;
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { color: #ddd; background: #111; }
+        a { color: #6ad7e5; }
+      }
+      p { text-align: center; }
+      hr { border: 0; border-top: 1px solid #8884; margin: 2em 0; }
+    </style>
+  </head>
+  <body>
+    <p>
+      <a href="https://github.com/ItzEmoji/aeroflare">
+        <img src="https://docs.itzemoji.com/aeroflare/img/logo.svg" width="200" alt="aeroflare logo" />
+      </a>
+    </p>
+
+    <p>
+      <code>https://${host}/</code> provides prebuilt
+      binaries for Nix. Once added as a substituter, Nix uses it automatically to
+      speed up builds.
+    </p>
+
+    <hr />
+
+    <p>
+      To use it, add this URL as a substituter and trust the key from
+      <a href="/api/public-key">/api/public-key</a>. The
+      <a href="https://wiki.nixos.org/wiki/Binary_Cache#Using_a_binary_cache">NixOS Wiki</a>
+      explains how.
+    </p>
+    <p>
+      Cache metadata is at <a href="/nix-cache-info">/nix-cache-info</a>. To run a
+      cache like this yourself, see the
+      <a href="https://docs.itzemoji.com/aeroflare/">aeroflare documentation</a>.
+    </p>
+
+    <script>
+      for (const el of document.querySelectorAll(".host")) el.textContent = location.host;
+    </script>
+  </body>
+</html>
+`;
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": CACHE_INDEX },
+  });
 }
 
 export default {
@@ -257,9 +348,13 @@ export default {
       const url = new URL(request.url);
       const path = url.pathname.replace(/\/$/, "");
 
+      if (path === "" || path === "/index.html") {
+        return handleIndex(url);
+      }
+
       if (path === "/nix-cache-info") {
         return new Response("StoreDir: /nix/store\nWantMassQuery: 1\nPriority: 40\n", {
-          headers: { "Content-Type": "text/x-nix-cache-info" },
+          headers: { "Content-Type": "text/x-nix-cache-info", "Cache-Control": CACHE_CACHE_INFO },
         });
       }
 
@@ -275,10 +370,13 @@ export default {
         return handleNar(env, path);
       }
 
-      return new Response("Not found", { status: 404 });
+      return notFound();
     } catch (err) {
       console.error("Top level fetch error:", err);
-      return new Response("Internal Server Error", { status: 500 });
+      return new Response("Internal Server Error", {
+        status: 500,
+        headers: { "Cache-Control": CACHE_ERROR },
+      });
     }
   },
 };

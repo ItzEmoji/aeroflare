@@ -57,12 +57,12 @@ func TestWorkerScriptFromTarball(t *testing.T) {
 		"aeroflare-1.9.0/proxy/no-webui-native/worker.js.map": "should not match",
 	})
 
-	got, err := workerScriptFromTarball(bytes.NewReader(tarball))
+	b, err := workerBundleFromTarball(bytes.NewReader(tarball))
 	if err != nil {
-		t.Fatalf("workerScriptFromTarball() error = %v", err)
+		t.Fatalf("workerBundleFromTarball() error = %v", err)
 	}
-	if want := "export default { fetch() {} }"; string(got) != want {
-		t.Errorf("workerScriptFromTarball() = %q, want %q", got, want)
+	if want := "export default { fetch() {} }"; string(b.Script) != want {
+		t.Errorf("workerBundleFromTarball() = %q, want %q", b.Script, want)
 	}
 }
 
@@ -71,8 +71,8 @@ func TestWorkerScriptFromTarballMissingScript(t *testing.T) {
 		"aeroflare-1.9.0/README.md": "# readme",
 	})
 
-	if _, err := workerScriptFromTarball(bytes.NewReader(tarball)); err == nil {
-		t.Fatal("workerScriptFromTarball() on an archive without the script: want error, got nil")
+	if _, err := workerBundleFromTarball(bytes.NewReader(tarball)); err == nil {
+		t.Fatal("workerBundleFromTarball() on an archive without the script: want error, got nil")
 	}
 }
 
@@ -83,13 +83,13 @@ func TestWorkerScriptFromTarballIgnoresUnwrappedPath(t *testing.T) {
 		workerScriptRelPath: "unwrapped",
 	})
 
-	if _, err := workerScriptFromTarball(bytes.NewReader(tarball)); err == nil {
-		t.Fatal("workerScriptFromTarball() on an unwrapped path: want error, got nil")
+	if _, err := workerBundleFromTarball(bytes.NewReader(tarball)); err == nil {
+		t.Fatal("workerBundleFromTarball() on an unwrapped path: want error, got nil")
 	}
 }
 
 func TestWorkerScriptFromTarballNotGzip(t *testing.T) {
-	if _, err := workerScriptFromTarball(strings.NewReader("not a tarball")); err == nil {
-		t.Fatal("workerScriptFromTarball() on non-gzip input: want error, got nil")
+	if _, err := workerBundleFromTarball(strings.NewReader("not a tarball")); err == nil {
+		t.Fatal("workerBundleFromTarball() on non-gzip input: want error, got nil")
 	}
 }

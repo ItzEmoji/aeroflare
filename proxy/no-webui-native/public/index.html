@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Nix binary cache</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+    <style>
+      body {
+        max-width: 800px;
+        margin: 4em auto;
+        padding: 0 1em;
+        font: 18px/1.6 system-ui, sans-serif;
+        color: #222;
+        background: #fff;
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { color: #ddd; background: #111; }
+        a { color: #6ad7e5; }
+      }
+      p { text-align: center; }
+      hr { border: 0; border-top: 1px solid #8884; margin: 2em 0; }
+    </style>
+  </head>
+  <body>
+    <p>
+      <a href="https://github.com/ItzEmoji/aeroflare">
+        <img src="/logo.svg" width="200" alt="aeroflare logo" />
+      </a>
+    </p>
+
+    <p>
+      <code>https://<span class="host">this-host</span>/</code> provides prebuilt
+      binaries for Nix. Once added as a substituter, Nix uses it automatically to
+      speed up builds.
+    </p>
+
+    <hr />
+
+    <p>
+      To use it, add this URL as a substituter and trust the key from
+      <a href="/api/public-key">/api/public-key</a>. The
+      <a href="https://wiki.nixos.org/wiki/Binary_Cache#Using_a_binary_cache">NixOS Wiki</a>
+      explains how.
+    </p>
+    <p>
+      Cache metadata is at <a href="/nix-cache-info">/nix-cache-info</a>. To run a
+      cache like this yourself, see the
+      <a href="https://docs.itzemoji.com/aeroflare/">aeroflare documentation</a>.
+    </p>
+
+    <script>
+      for (const el of document.querySelectorAll(".host")) el.textContent = location.host;
+    </script>
+  </body>
+</html>
