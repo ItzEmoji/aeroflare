@@ -40,12 +40,7 @@ func deployWorkerViaAPI(cfAccountID, cfApiToken, workerName, scriptPath, compatD
 		})
 	}
 
-	metadata := map[string]interface{}{
-		"main_module":        "worker.js",
-		"compatibility_date": compatDate,
-		"bindings":           bindings,
-	}
-	metadataJSON, _ := json.Marshal(metadata)
+	metadataJSON, _ := json.Marshal(workerUploadMetadata(compatDate, bindings))
 
 	// Metadata part.
 	metaHeader := make(textproto.MIMEHeader)
@@ -90,6 +85,23 @@ func deployWorkerViaAPI(cfAccountID, cfApiToken, workerName, scriptPath, compatD
 	}
 
 	return parseWorkerDeployTag(respBody)
+}
+
+// workerUploadMetadata builds the "metadata" part of a module upload. It
+// enables Workers Cache (the API counterpart of wrangler's `cache` block), so
+// Cloudflare serves the proxy's responses from cache in front of the Worker
+// for as long as their Cache-Control allows (narinfo/NAR: 1 year), and keeps
+// those entries across redeploys via cross_version_cache.
+func workerUploadMetadata(compatDate string, bindings []map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"main_module":        "worker.js",
+		"compatibility_date": compatDate,
+		"bindings":           bindings,
+		"cache_options": map[string]interface{}{
+			"enabled":             true,
+			"cross_version_cache": true,
+		},
+	}
 }
 
 // parseWorkerDeployTag extracts the deployed script's tag from a successful

@@ -25,7 +25,7 @@ const NARINFO_FIELDS = [
   ["sig", "Sig"],
 ];
 
-// --- Edge cache policy (Workers Cache, enabled in wrangler.toml) ---
+// --- Edge cache policy (Workers Cache: enabled by `init` and wrangler config) ---
 // Workers Cache sits in front of this Worker and honors the Cache-Control we
 // return (RFC 9111); without one it falls back to a short heuristic TTL.
 // narinfo and NAR responses are keyed by the store hash, so their content never

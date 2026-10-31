@@ -20,3 +20,24 @@ func TestParseWorkerDeployTag_InvalidJSON(t *testing.T) {
 		t.Fatal("expected an error for an unparseable body, got nil")
 	}
 }
+
+// The proxy relies on Workers Cache (cached in front of the Worker, kept across
+// redeploys) to honor its long Cache-Control TTLs. `init` deploys through the
+// API rather than wrangler, so the upload metadata must enable it itself.
+func TestWorkerUploadMetadata_EnablesWorkersCache(t *testing.T) {
+	meta := workerUploadMetadata("2026-06-20", nil)
+
+	cache, ok := meta["cache_options"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("cache_options missing or wrong type: %#v", meta["cache_options"])
+	}
+	if cache["enabled"] != true {
+		t.Errorf("cache_options.enabled = %v, want true", cache["enabled"])
+	}
+	if cache["cross_version_cache"] != true {
+		t.Errorf("cache_options.cross_version_cache = %v, want true", cache["cross_version_cache"])
+	}
+	if meta["main_module"] != "worker.js" || meta["compatibility_date"] != "2026-06-20" {
+		t.Errorf("unexpected base metadata: %#v", meta)
+	}
+}
