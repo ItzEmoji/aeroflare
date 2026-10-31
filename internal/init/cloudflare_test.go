@@ -25,7 +25,7 @@ func TestParseWorkerDeployTag_InvalidJSON(t *testing.T) {
 // redeploys) to honor its long Cache-Control TTLs. `init` deploys through the
 // API rather than wrangler, so the upload metadata must enable it itself.
 func TestWorkerUploadMetadata_EnablesWorkersCache(t *testing.T) {
-	meta := workerUploadMetadata("2026-06-20", nil)
+	meta := workerUploadMetadata("2026-06-20", nil, "")
 
 	cache, ok := meta["cache_options"].(map[string]interface{})
 	if !ok {

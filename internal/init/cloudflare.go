@@ -13,7 +13,7 @@ import (
 
 // deployWorkerViaAPI uploads a worker script to Cloudflare Workers using the
 // multipart "module upload" format, and returns the deployed script's tag.
-func deployWorkerViaAPI(cfAccountID, cfApiToken, workerName, scriptPath, compatDate string, vars, secrets map[string]string) (string, error) {
+func deployWorkerViaAPI(cfAccountID, cfApiToken, workerName, scriptPath, compatDate, assetsJWT string, vars, secrets map[string]string) (string, error) {
 	scriptContent, err := os.ReadFile(scriptPath)
 	if err != nil {
 		return "", fmt.Errorf("read worker script: %w", err)
@@ -40,7 +40,7 @@ func deployWorkerViaAPI(cfAccountID, cfApiToken, workerName, scriptPath, compatD
 		})
 	}
 
-	metadataJSON, _ := json.Marshal(workerUploadMetadata(compatDate, bindings))
+	metadataJSON, _ := json.Marshal(workerUploadMetadata(compatDate, bindings, assetsJWT))
 
 	// Metadata part.
 	metaHeader := make(textproto.MIMEHeader)
@@ -64,7 +64,7 @@ func deployWorkerViaAPI(cfAccountID, cfApiToken, workerName, scriptPath, compatD
 	_ = writer.Close()
 
 	req, err := http.NewRequest("PUT",
-		fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/workers/scripts/%s", cfAccountID, workerName),
+		fmt.Sprintf(cfAPIBase+"/accounts/%s/workers/scripts/%s", cfAccountID, workerName),
 		&body,
 	)
 	if err != nil {
@@ -92,8 +92,12 @@ func deployWorkerViaAPI(cfAccountID, cfApiToken, workerName, scriptPath, compatD
 // Cloudflare serves the proxy's responses from cache in front of the Worker
 // for as long as their Cache-Control allows (narinfo/NAR: 1 year), and keeps
 // those entries across redeploys via cross_version_cache.
-func workerUploadMetadata(compatDate string, bindings []map[string]interface{}) map[string]interface{} {
-	return map[string]interface{}{
+//
+// assetsJWT is the completion token from uploadWorkerAssets; when set, the
+// static assets (public/index.html, ...) are attached and served before the
+// Worker runs. Empty means no assets.
+func workerUploadMetadata(compatDate string, bindings []map[string]interface{}, assetsJWT string) map[string]interface{} {
+	meta := map[string]interface{}{
 		"main_module":        "worker.js",
 		"compatibility_date": compatDate,
 		"bindings":           bindings,
@@ -102,6 +106,10 @@ func workerUploadMetadata(compatDate string, bindings []map[string]interface{}) 
 			"cross_version_cache": true,
 		},
 	}
+	if assetsJWT != "" {
+		meta["assets"] = map[string]interface{}{"jwt": assetsJWT}
+	}
+	return meta
 }
 
 // parseWorkerDeployTag extracts the deployed script's tag from a successful
@@ -129,7 +137,7 @@ func enableWorkerRoute(cfAccountID, cfApiToken, workerName string) error {
 	payload, _ := json.Marshal(map[string]interface{}{"enabled": true})
 
 	req, err := http.NewRequest("POST",
-		fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/workers/scripts/%s/subdomain", cfAccountID, workerName),
+		fmt.Sprintf(cfAPIBase+"/accounts/%s/workers/scripts/%s/subdomain", cfAccountID, workerName),
 		bytes.NewReader(payload),
 	)
 	if err != nil {
@@ -150,7 +158,7 @@ func enableWorkerRoute(cfAccountID, cfApiToken, workerName string) error {
 // getWorkersSubdomain fetches the workers.dev subdomain for the account.
 func getWorkersSubdomain(cfAccountID, cfApiToken string) string {
 	req, err := http.NewRequest("GET",
-		fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/workers/subdomain", cfAccountID),
+		fmt.Sprintf(cfAPIBase+"/accounts/%s/workers/subdomain", cfAccountID),
 		nil,
 	)
 	if err != nil {
