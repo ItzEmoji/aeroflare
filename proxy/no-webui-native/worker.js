@@ -25,6 +25,24 @@ const NARINFO_FIELDS = [
   ["sig", "Sig"],
 ];
 
+// --- Edge cache policy (Workers Cache, enabled in wrangler.toml) ---
+// Workers Cache sits in front of this Worker and honors the Cache-Control we
+// return (RFC 9111); without one it falls back to a short heuristic TTL.
+// narinfo and NAR responses are keyed by the store hash, so their content never
+// changes: cache them for a year. Misses must stay short, or a path pushed after
+// the first lookup would be reported missing for a year. The public key can be
+// rotated by `configure`, so it gets a short TTL too.
+const CACHE_IMMUTABLE = "public, max-age=31536000, immutable"; // 1 year
+const CACHE_CACHE_INFO = "public, max-age=86400"; // 1 day
+const CACHE_PUBLIC_KEY = "public, max-age=300"; // 5 minutes
+const CACHE_NOT_FOUND = "public, max-age=60"; // 1 minute
+const CACHE_ERROR = "no-store";
+
+// notFound returns a 404 that is only briefly cacheable.
+function notFound(body = "Not found") {
+  return new Response(body, { status: 404, headers: { "Cache-Control": CACHE_NOT_FOUND } });
+}
+
 // --- Module-global caches (persist across requests within a Worker isolate) ---
 
 // Bearer token cache. Registry tokens live a few minutes and are identical for
@@ -203,9 +221,11 @@ async function handlePublicKey(env) {
   const ann = (manifest && manifest.annotations) || {};
   const key = ann["aeroflare.public-key"] || ann["public-key"];
   if (key) {
-    return new Response(key + "\n", { headers: { "Content-Type": "text/plain" } });
+    return new Response(key + "\n", {
+      headers: { "Content-Type": "text/plain", "Cache-Control": CACHE_PUBLIC_KEY },
+    });
   }
-  return new Response("No public key configured", { status: 404 });
+  return notFound("No public key configured");
 }
 
 async function handleNarinfo(env, path) {
@@ -214,10 +234,10 @@ async function handleNarinfo(env, path) {
   const ann = narAnnotations(manifest);
   if (ann) {
     return new Response(generateNarinfo(ann), {
-      headers: { "Content-Type": "text/x-nix-narinfo" },
+      headers: { "Content-Type": "text/x-nix-narinfo", "Cache-Control": CACHE_IMMUTABLE },
     });
   }
-  return new Response("Not found", { status: 404 });
+  return notFound();
 }
 
 async function handleNar(env, path) {
@@ -228,7 +248,7 @@ async function handleNar(env, path) {
   // NAR basename (e.g. <hash>.nar.zst -> <hash>).
   const narIdx = basename.indexOf(".nar");
   const tag = narIdx !== -1 ? basename.slice(0, narIdx) : basename;
-  if (!tag) return new Response("Not found", { status: 404 });
+  if (!tag) return notFound();
 
   const manifest = await resolveManifest(env, tag);
   const layer = selectNarLayer(manifest);
@@ -237,7 +257,7 @@ async function handleNar(env, path) {
     try {
       const res = await registryFetch(env, url, null);
       if (res.ok) {
-        const headers = { "Content-Type": ct };
+        const headers = { "Content-Type": ct, "Cache-Control": CACHE_IMMUTABLE };
         const len = res.headers.get("Content-Length");
         if (len) headers["Content-Length"] = len;
         return new Response(res.body, { headers });
@@ -248,7 +268,7 @@ async function handleNar(env, path) {
     }
   }
 
-  return new Response("Not found", { status: 404 });
+  return notFound();
 }
 
 export default {
@@ -259,7 +279,7 @@ export default {
 
       if (path === "/nix-cache-info") {
         return new Response("StoreDir: /nix/store\nWantMassQuery: 1\nPriority: 40\n", {
-          headers: { "Content-Type": "text/x-nix-cache-info" },
+          headers: { "Content-Type": "text/x-nix-cache-info", "Cache-Control": CACHE_CACHE_INFO },
         });
       }
 
@@ -275,10 +295,13 @@ export default {
         return handleNar(env, path);
       }
 
-      return new Response("Not found", { status: 404 });
+      return notFound();
     } catch (err) {
       console.error("Top level fetch error:", err);
-      return new Response("Internal Server Error", { status: 500 });
+      return new Response("Internal Server Error", {
+        status: 500,
+        headers: { "Cache-Control": CACHE_ERROR },
+      });
     }
   },
 };

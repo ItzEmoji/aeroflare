@@ -2,6 +2,13 @@ name = "aeroflare-proxy"
 main = "worker.js"
 compatibility_date = "2026-06-20"
 
+# Workers Cache: serve cached responses in front of the Worker, honoring the
+# Cache-Control it returns (narinfo/NAR: 1 year). cross_version_cache keeps those
+# entries across redeploys instead of keying them to the Worker version.
+[cache]
+enabled = true
+cross_version_cache = true
+
 # Configurable environment variables. No registry is hardcoded — point these at
 # any OCI registry (GHCR, Docker Hub, GitLab, Gitea/Forgejo, ACR, GCR, ...).
 [vars]
