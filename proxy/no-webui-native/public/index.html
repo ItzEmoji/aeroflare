@@ -4,27 +4,82 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nix binary cache</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
 <style>
-  body { font-family: sans-serif; max-width: 42em; margin: 2em auto; padding: 0 1em; line-height: 1.5; }
-  pre { background: #f4f4f4; padding: 0.6em 0.8em; overflow-x: auto; }
+  :root {
+    --bg: #ffffff;
+    --fg: #1d2327;
+    --muted: #5f6b73;
+    --line: #e3e8eb;
+    --panel: #f6f8f9;
+    --accent: #0f7b8a;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111618;
+      --fg: #e4e9ec;
+      --muted: #96a3ab;
+      --line: #263035;
+      --panel: #182024;
+      --accent: #6ad7e5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 40rem; margin: 0 auto; padding: 4rem 1.25rem 2rem; }
+  header { text-align: center; margin-bottom: 2.5rem; }
+  header img { width: 140px; height: 140px; }
+  h1 { font-size: 1.75rem; margin: 0.5rem 0 0.75rem; letter-spacing: -0.01em; }
+  h2 { font-size: 1.05rem; margin: 2.5rem 0 0.75rem; }
+  p { margin: 0 0 1rem; }
+  .lead { color: var(--muted); font-size: 1.05rem; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  code { font: 0.9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .lead code { color: var(--fg); }
+  ul.api { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  ul.api li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 1rem; justify-content: space-between; padding: 0.7rem 1rem; }
+  ul.api li + li { border-top: 1px solid var(--line); }
+  ul.api li:nth-child(odd) { background: var(--panel); }
+  ul.api span { color: var(--muted); font-size: 0.95rem; }
+  footer { max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; text-align: center; }
+  footer a { color: inherit; }
 </style>
 </head>
 <body>
-<h1>Nix binary cache</h1>
+<main>
+  <header>
+    <a href="https://github.com/ItzEmoji/aeroflare"><img src="/logo.svg" alt="aeroflare logo"></a>
+    <h1>Nix binary cache</h1>
+    <p class="lead"><code>https://<span class="host">this-host</span>/</code> provides prebuilt
+    binaries for Nix. Once it is added as a substituter, Nix downloads from it
+    automatically instead of building locally.</p>
+  </header>
 
-<p>This is a binary cache for <a href="https://nixos.org/">Nix</a>. It serves
-pre-built store paths to Nix clients and is not meant to be browsed.</p>
+  <h2>API</h2>
+  <ul class="api">
+    <li><a href="/nix-cache-info"><code>/nix-cache-info</code></a><span>Cache metadata</span></li>
+    <li><a href="/api/public-key"><code>/api/public-key</code></a><span>Public key the store paths are signed with</span></li>
+    <li><code>/&lt;hash&gt;.narinfo</code><span>Information about one store path</span></li>
+    <li><code>/nar/&lt;file&gt;</code><span>The compressed store path</span></li>
+  </ul>
 
-<p>To use it, add it to your <code>nix.conf</code> together with its signing key
-from <a href="/api/public-key">/api/public-key</a>:</p>
-
-<pre>extra-substituters = https://<span class="host">this-host</span>
-extra-trusted-public-keys = &lt;key from /api/public-key&gt;</pre>
-
-<p>Cache metadata: <a href="/nix-cache-info">/nix-cache-info</a></p>
-
-<p>Served by <a href="https://github.com/ItzEmoji/aeroflare">aeroflare</a>.</p>
-
+  <h2>Using this cache</h2>
+  <p>Add this URL as a substituter and trust the key from
+  <a href="/api/public-key"><code>/api/public-key</code></a>. The NixOS Wiki shows how
+  to do that on NixOS and other systems:
+  <a href="https://wiki.nixos.org/wiki/Binary_Cache#Using_a_binary_cache">Binary Cache &rarr; Using a binary cache</a>.</p>
+  <p>To run a cache like this one yourself, see the
+  <a href="https://docs.itzemoji.com/aeroflare/">aeroflare documentation</a>.</p>
+</main>
+<footer>
+  Served by <a href="https://github.com/ItzEmoji/aeroflare">aeroflare</a>
+</footer>
 <script>
   for (const el of document.querySelectorAll(".host")) el.textContent = location.host;
 </script>
